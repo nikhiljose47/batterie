@@ -1,0 +1,4051 @@
+{
+  "metadata": {
+    "datasetName": "Sensor-free Physical and Brain Readiness Activity Map",
+    "version": "1.0.0",
+    "generatedDate": "2026-07-06",
+    "scoreRange": {
+      "min": 0,
+      "max": 100,
+      "recommendedStart": 70
+    },
+    "importantLabel": "Estimated readiness, not measured body or brain energy",
+    "medicalDisclaimer": "This heuristic is not a diagnostic, medical, occupational-safety, or fitness-clearance tool. It cannot detect illness, sleep disorders, dehydration, hypoglycemia, injury, heat illness, or dangerous fatigue.",
+    "method": "Activity MET/intensity estimates inform physical drain. Duration, cognitive load, stress, recovery and mood inform brain-readiness change. Age multipliers are deliberately small because fitness, health, sleep quality and individual response usually matter more than age alone.",
+    "sourceBasis": [
+      "2024 Adult Compendium of Physical Activities (standardized MET values; adults 19–59)",
+      "2024 Older Adult Compendium of Physical Activities (older-adult activity costs)",
+      "WHO Guidelines on Physical Activity and Sedentary Behaviour (2020)",
+      "CDC About Sleep: recommended sleep duration changes by age (2024)",
+      "CDC/NIOSH Fatigue and Work: fatigue relates to sleep disruption, long/irregular hours, stress, mental/physical demand and heat (2026)"
+    ],
+    "accuracyNotes": [
+      "No universal world-average brain-energy score exists.",
+      "The same activity can energize one person and fatigue another.",
+      "Use confidence bands and personalize with optional one-tap self-ratings after activities.",
+      "Do not compare scores between users as if they were laboratory measurements."
+    ]
+  },
+  "ageBands": [
+    {
+      "id": "child_6_12",
+      "minAge": 6,
+      "maxAge": 12,
+      "sleepTargetHours": {
+        "min": 9,
+        "max": 12
+      },
+      "physicalDrainMultiplier": 0.9,
+      "mentalDrainMultiplier": 0.9,
+      "recoveryMultiplier": 1.08,
+      "note": "Use parent/guardian input; activity estimates are especially uncertain for children."
+    },
+    {
+      "id": "teen_13_17",
+      "minAge": 13,
+      "maxAge": 17,
+      "sleepTargetHours": {
+        "min": 8,
+        "max": 10
+      },
+      "physicalDrainMultiplier": 0.95,
+      "mentalDrainMultiplier": 0.95,
+      "recoveryMultiplier": 1.05,
+      "note": "School load and growth make sleep particularly important."
+    },
+    {
+      "id": "young_adult_18_29",
+      "minAge": 18,
+      "maxAge": 29,
+      "sleepTargetHours": {
+        "min": 7,
+        "max": 9
+      },
+      "physicalDrainMultiplier": 1.0,
+      "mentalDrainMultiplier": 1.0,
+      "recoveryMultiplier": 1.0,
+      "note": "Reference band for the model."
+    },
+    {
+      "id": "adult_30_44",
+      "minAge": 30,
+      "maxAge": 44,
+      "sleepTargetHours": {
+        "min": 7,
+        "max": 9
+      },
+      "physicalDrainMultiplier": 1.03,
+      "mentalDrainMultiplier": 1.02,
+      "recoveryMultiplier": 0.99,
+      "note": "Small conservative adjustment only; fitness matters more than age alone."
+    },
+    {
+      "id": "adult_45_59",
+      "minAge": 45,
+      "maxAge": 59,
+      "sleepTargetHours": {
+        "min": 7,
+        "max": 9
+      },
+      "physicalDrainMultiplier": 1.08,
+      "mentalDrainMultiplier": 1.04,
+      "recoveryMultiplier": 0.96,
+      "note": "Increase physical drain slightly for vigorous/manual activities."
+    },
+    {
+      "id": "older_60_74",
+      "minAge": 60,
+      "maxAge": 74,
+      "sleepTargetHours": {
+        "min": 7,
+        "max": 9
+      },
+      "physicalDrainMultiplier": 1.15,
+      "mentalDrainMultiplier": 1.05,
+      "recoveryMultiplier": 0.93,
+      "note": "Use lower confidence unless mobility and fitness are known."
+    },
+    {
+      "id": "older_75_plus",
+      "minAge": 75,
+      "maxAge": 120,
+      "sleepTargetHours": {
+        "min": 7,
+        "max": 8
+      },
+      "physicalDrainMultiplier": 1.25,
+      "mentalDrainMultiplier": 1.08,
+      "recoveryMultiplier": 0.9,
+      "note": "Large individual variation; do not use for safety-critical decisions."
+    }
+  ],
+  "activities": [
+    {
+      "id": "night_sleep_good_quality",
+      "name": "Night sleep, good quality",
+      "category": "sleep_recovery",
+      "referenceMinutes": 480,
+      "met": 0.95,
+      "intensity": "sedentary",
+      "physicalDelta": 28,
+      "brainDelta": 34,
+      "delayedPhysicalDelta": 4,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "sleep",
+        "gain"
+      ]
+    },
+    {
+      "id": "night_sleep_interrupted",
+      "name": "Night sleep, interrupted",
+      "category": "sleep_recovery",
+      "referenceMinutes": 480,
+      "met": 0.95,
+      "intensity": "sedentary",
+      "physicalDelta": 15,
+      "brainDelta": 16,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "sleep",
+        "gain",
+        "low_quality"
+      ]
+    },
+    {
+      "id": "night_sleep_very_short",
+      "name": "Night sleep, very short",
+      "category": "sleep_recovery",
+      "referenceMinutes": 240,
+      "met": 0.95,
+      "intensity": "sedentary",
+      "physicalDelta": 4,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": -4,
+      "delayedAfterMinutes": 60,
+      "confidence": "high",
+      "tags": [
+        "sleep",
+        "sleep_debt"
+      ]
+    },
+    {
+      "id": "power_nap_10_20_min",
+      "name": "Power nap 10–20 min",
+      "category": "sleep_recovery",
+      "referenceMinutes": 20,
+      "met": 0.95,
+      "intensity": "sedentary",
+      "physicalDelta": 5,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 10,
+      "confidence": "high",
+      "tags": [
+        "nap",
+        "gain"
+      ]
+    },
+    {
+      "id": "nap_30_45_min",
+      "name": "Nap 30–45 min",
+      "category": "sleep_recovery",
+      "referenceMinutes": 40,
+      "met": 0.95,
+      "intensity": "sedentary",
+      "physicalDelta": 7,
+      "brainDelta": 10,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 20,
+      "confidence": "high",
+      "tags": [
+        "nap",
+        "gain"
+      ]
+    },
+    {
+      "id": "long_nap_60_120_min",
+      "name": "Long nap 60–120 min",
+      "category": "sleep_recovery",
+      "referenceMinutes": 90,
+      "met": 0.95,
+      "intensity": "sedentary",
+      "physicalDelta": 8,
+      "brainDelta": 5,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": -2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "nap",
+        "sleep_inertia"
+      ]
+    },
+    {
+      "id": "lying_in_bed_awake",
+      "name": "Lying in bed awake",
+      "category": "sleep_recovery",
+      "referenceMinutes": 30,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 1,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "rest",
+        "sedentary"
+      ]
+    },
+    {
+      "id": "eyes_closed_quiet_rest",
+      "name": "Eyes-closed quiet rest",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 7,
+      "brainDelta": 7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "rest",
+        "gain"
+      ]
+    },
+    {
+      "id": "progressive_muscle_relaxation",
+      "name": "Progressive muscle relaxation",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 10,
+      "brainDelta": 13,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "relaxation",
+        "gain"
+      ]
+    },
+    {
+      "id": "slow_breathing_exercise",
+      "name": "Slow breathing exercise",
+      "category": "sleep_recovery",
+      "referenceMinutes": 10,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 10,
+      "brainDelta": 13,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "breathing",
+        "gain"
+      ]
+    },
+    {
+      "id": "mindfulness_meditation",
+      "name": "Mindfulness meditation",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 10,
+      "brainDelta": 11,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "meditation",
+        "gain"
+      ]
+    },
+    {
+      "id": "body_scan_meditation",
+      "name": "Body-scan meditation",
+      "category": "sleep_recovery",
+      "referenceMinutes": 20,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 10,
+      "brainDelta": 11,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "meditation",
+        "gain"
+      ]
+    },
+    {
+      "id": "restorative_yoga",
+      "name": "Restorative yoga",
+      "category": "sleep_recovery",
+      "referenceMinutes": 30,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": 8,
+      "brainDelta": 12,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "yoga",
+        "gain"
+      ]
+    },
+    {
+      "id": "gentle_stretching",
+      "name": "Gentle stretching",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 2.3,
+      "intensity": "light",
+      "physicalDelta": 5,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "stretching",
+        "gain"
+      ]
+    },
+    {
+      "id": "warm_shower_or_bath",
+      "name": "Warm shower or bath",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "self_care",
+        "gain"
+      ]
+    },
+    {
+      "id": "quiet_time_outdoors",
+      "name": "Quiet time outdoors",
+      "category": "sleep_recovery",
+      "referenceMinutes": 20,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 11,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "nature",
+        "gain"
+      ]
+    },
+    {
+      "id": "morning_daylight_exposure",
+      "name": "Morning daylight exposure",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "circadian",
+        "gain"
+      ]
+    },
+    {
+      "id": "listening_to_calm_music",
+      "name": "Listening to calm music",
+      "category": "sleep_recovery",
+      "referenceMinutes": 20,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "music",
+        "gain"
+      ]
+    },
+    {
+      "id": "massage_or_self_massage",
+      "name": "Massage or self-massage",
+      "category": "sleep_recovery",
+      "referenceMinutes": 20,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 9,
+      "brainDelta": 15,
+      "delayedPhysicalDelta": 2,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "recovery",
+        "gain"
+      ]
+    },
+    {
+      "id": "foam_rolling",
+      "name": "Foam rolling",
+      "category": "sleep_recovery",
+      "referenceMinutes": 15,
+      "met": 2.3,
+      "intensity": "light",
+      "physicalDelta": 5,
+      "brainDelta": 7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 15,
+      "confidence": "high",
+      "tags": [
+        "recovery"
+      ]
+    },
+    {
+      "id": "sitting_quietly",
+      "name": "Sitting quietly",
+      "category": "sedentary",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": 0,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "sitting"
+      ]
+    },
+    {
+      "id": "standing_quietly",
+      "name": "Standing quietly",
+      "category": "sedentary",
+      "referenceMinutes": 30,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": 0,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "standing"
+      ]
+    },
+    {
+      "id": "reclining_and_watching_tv",
+      "name": "Reclining and watching TV",
+      "category": "sedentary",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "screen",
+        "sitting"
+      ]
+    },
+    {
+      "id": "watching_an_educational_video",
+      "name": "Watching an educational video",
+      "category": "sedentary",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "screen",
+        "learning"
+      ]
+    },
+    {
+      "id": "watching_entertainment_video",
+      "name": "Watching entertainment video",
+      "category": "sedentary",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "screen"
+      ]
+    },
+    {
+      "id": "binge_watching_shows",
+      "name": "Binge-watching shows",
+      "category": "sedentary",
+      "referenceMinutes": 180,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -14,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "screen",
+        "long_session"
+      ]
+    },
+    {
+      "id": "reading_for_pleasure",
+      "name": "Reading for pleasure",
+      "category": "sedentary",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "reading"
+      ]
+    },
+    {
+      "id": "reading_difficult_material",
+      "name": "Reading difficult material",
+      "category": "sedentary",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -14,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "reading",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "listening_to_podcast_casually",
+      "name": "Listening to podcast casually",
+      "category": "sedentary",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": 3,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "audio"
+      ]
+    },
+    {
+      "id": "waiting_in_a_queue",
+      "name": "Waiting in a queue",
+      "category": "sedentary",
+      "referenceMinutes": 20,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "waiting"
+      ]
+    },
+    {
+      "id": "sitting_in_a_lecture",
+      "name": "Sitting in a lecture",
+      "category": "sedentary",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "learning",
+        "sitting"
+      ]
+    },
+    {
+      "id": "sitting_meeting_passive",
+      "name": "Sitting meeting, passive",
+      "category": "sedentary",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -8,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "meeting",
+        "sitting"
+      ]
+    },
+    {
+      "id": "sitting_meeting_active_participation",
+      "name": "Sitting meeting, active participation",
+      "category": "sedentary",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -19,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "meeting",
+        "cognitive"
+      ]
+    },
+    {
+      "id": "standing_desk_work",
+      "name": "Standing desk work",
+      "category": "sedentary",
+      "referenceMinutes": 60,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -3,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "work",
+        "standing"
+      ]
+    },
+    {
+      "id": "phone_browsing_while_lying_down",
+      "name": "Phone browsing while lying down",
+      "category": "sedentary",
+      "referenceMinutes": 45,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "screen",
+        "reclining"
+      ]
+    },
+    {
+      "id": "light_email_checking",
+      "name": "Light email checking",
+      "category": "cognitive_work",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "work",
+        "screen"
+      ]
+    },
+    {
+      "id": "email_and_message_backlog",
+      "name": "Email and message backlog",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -19,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "work",
+        "screen"
+      ]
+    },
+    {
+      "id": "routine_data_entry",
+      "name": "Routine data entry",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "work",
+        "repetitive"
+      ]
+    },
+    {
+      "id": "focused_coding",
+      "name": "Focused coding",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -18,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "coding",
+        "deep_work",
+        "screen"
+      ]
+    },
+    {
+      "id": "debugging_difficult_problem",
+      "name": "Debugging difficult problem",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -24,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "coding",
+        "deep_work",
+        "stress"
+      ]
+    },
+    {
+      "id": "software_design_or_architecture",
+      "name": "Software design or architecture",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -20,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "planning",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "writing_or_editing_document",
+      "name": "Writing or editing document",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "writing",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "creative_brainstorming",
+      "name": "Creative brainstorming",
+      "category": "cognitive_work",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "creative"
+      ]
+    },
+    {
+      "id": "complex_mathematics",
+      "name": "Complex mathematics",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -20,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "math",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "studying_familiar_topic",
+      "name": "Studying familiar topic",
+      "category": "cognitive_work",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "study"
+      ]
+    },
+    {
+      "id": "studying_new_difficult_topic",
+      "name": "Studying new difficult topic",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -20,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "study",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "memorization_practice",
+      "name": "Memorization practice",
+      "category": "cognitive_work",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -14,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "study",
+        "memory"
+      ]
+    },
+    {
+      "id": "practice_exam",
+      "name": "Practice exam",
+      "category": "cognitive_work",
+      "referenceMinutes": 120,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -33,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "exam",
+        "stress"
+      ]
+    },
+    {
+      "id": "real_exam_or_high_stakes_test",
+      "name": "Real exam or high-stakes test",
+      "category": "cognitive_work",
+      "referenceMinutes": 180,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -40,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "exam",
+        "high_stress"
+      ]
+    },
+    {
+      "id": "research_literature_search",
+      "name": "Research literature search",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "research",
+        "screen"
+      ]
+    },
+    {
+      "id": "reading_scientific_paper",
+      "name": "Reading scientific paper",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -18,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "research",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "analyzing_spreadsheet_or_data",
+      "name": "Analyzing spreadsheet or data",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -22,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "analysis",
+        "screen"
+      ]
+    },
+    {
+      "id": "preparing_presentation",
+      "name": "Preparing presentation",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -17,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "presentation",
+        "work"
+      ]
+    },
+    {
+      "id": "giving_a_presentation",
+      "name": "Giving a presentation",
+      "category": "cognitive_work",
+      "referenceMinutes": 45,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -22,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "public_speaking",
+        "stress"
+      ]
+    },
+    {
+      "id": "teaching_or_tutoring",
+      "name": "Teaching or tutoring",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -3,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "teaching",
+        "social"
+      ]
+    },
+    {
+      "id": "learning_a_language",
+      "name": "Learning a language",
+      "category": "cognitive_work",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "learning"
+      ]
+    },
+    {
+      "id": "playing_a_musical_instrument_practice",
+      "name": "Playing a musical instrument, practice",
+      "category": "cognitive_work",
+      "referenceMinutes": 45,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -3,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "music",
+        "skill"
+      ]
+    },
+    {
+      "id": "strategic_board_game",
+      "name": "Strategic board game",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "game",
+        "cognitive"
+      ]
+    },
+    {
+      "id": "fast_paced_competitive_video_game",
+      "name": "Fast-paced competitive video game",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -17,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "gaming",
+        "screen",
+        "stress"
+      ]
+    },
+    {
+      "id": "casual_video_game",
+      "name": "Casual video game",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "gaming",
+        "screen"
+      ]
+    },
+    {
+      "id": "multiple_tasks_and_interruptions",
+      "name": "Multiple tasks and interruptions",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -24,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "multitasking",
+        "stress"
+      ]
+    },
+    {
+      "id": "decision_heavy_planning",
+      "name": "Decision-heavy planning",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -24,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "planning",
+        "decision_fatigue"
+      ]
+    },
+    {
+      "id": "financial_budgeting_or_tax_work",
+      "name": "Financial budgeting or tax work",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -24,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "finance",
+        "stress"
+      ]
+    },
+    {
+      "id": "job_interview",
+      "name": "Job interview",
+      "category": "cognitive_work",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -4,
+      "brainDelta": -24,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "interview",
+        "stress"
+      ]
+    },
+    {
+      "id": "technical_interview_or_coding_test",
+      "name": "Technical interview or coding test",
+      "category": "cognitive_work",
+      "referenceMinutes": 90,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -31,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "interview",
+        "deep_work",
+        "stress"
+      ]
+    },
+    {
+      "id": "social_media_scrolling",
+      "name": "Social media scrolling",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "social_media"
+      ]
+    },
+    {
+      "id": "rapid_short_video_scrolling",
+      "name": "Rapid short-video scrolling",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "social_media",
+        "high_stimulation"
+      ]
+    },
+    {
+      "id": "online_news_browsing",
+      "name": "Online news browsing",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "news"
+      ]
+    },
+    {
+      "id": "text_messaging_friends",
+      "name": "Text messaging friends",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "social"
+      ]
+    },
+    {
+      "id": "work_chat_and_notifications",
+      "name": "Work chat and notifications",
+      "category": "screen_social",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -16,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "work",
+        "interruptions"
+      ]
+    },
+    {
+      "id": "video_call_with_friends_or_family",
+      "name": "Video call with friends or family",
+      "category": "screen_social",
+      "referenceMinutes": 45,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": 0,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "social"
+      ]
+    },
+    {
+      "id": "video_meeting_for_work",
+      "name": "Video meeting for work",
+      "category": "screen_social",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -19,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "meeting"
+      ]
+    },
+    {
+      "id": "customer_support_calls",
+      "name": "Customer support calls",
+      "category": "screen_social",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -21,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "work",
+        "social",
+        "stress"
+      ]
+    },
+    {
+      "id": "casual_phone_call",
+      "name": "Casual phone call",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "social"
+      ]
+    },
+    {
+      "id": "difficult_phone_call",
+      "name": "Difficult phone call",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -18,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "social",
+        "stress"
+      ]
+    },
+    {
+      "id": "content_creation_or_video_editing",
+      "name": "Content creation or video editing",
+      "category": "screen_social",
+      "referenceMinutes": 90,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -23,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "creative",
+        "screen",
+        "deep_work"
+      ]
+    },
+    {
+      "id": "online_shopping_browsing",
+      "name": "Online shopping browsing",
+      "category": "screen_social",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -5,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "shopping"
+      ]
+    },
+    {
+      "id": "late_night_screen_use",
+      "name": "Late-night screen use",
+      "category": "screen_social",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": -3,
+      "delayedBrainDelta": -6,
+      "delayedAfterMinutes": 180,
+      "confidence": "medium",
+      "tags": [
+        "screen",
+        "late_night",
+        "sleep_disrupting"
+      ]
+    },
+    {
+      "id": "very_slow_walking",
+      "name": "Very slow walking",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -2,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "walking",
+        "light"
+      ]
+    },
+    {
+      "id": "easy_walking",
+      "name": "Easy walking",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 2.8,
+      "intensity": "light",
+      "physicalDelta": -3,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "walking",
+        "light"
+      ]
+    },
+    {
+      "id": "brisk_walking",
+      "name": "Brisk walking",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 4.3,
+      "intensity": "moderate",
+      "physicalDelta": -7,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "walking",
+        "moderate"
+      ]
+    },
+    {
+      "id": "fast_walking",
+      "name": "Fast walking",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -8,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "walking",
+        "moderate"
+      ]
+    },
+    {
+      "id": "walking_uphill",
+      "name": "Walking uphill",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -11,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "walking",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "hiking_easy_trail",
+      "name": "Hiking easy trail",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 5.3,
+      "intensity": "moderate",
+      "physicalDelta": -13,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "hiking",
+        "nature"
+      ]
+    },
+    {
+      "id": "hiking_difficult_trail",
+      "name": "Hiking difficult trail",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -19,
+      "brainDelta": 0,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "hiking",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "climbing_stairs_slowly",
+      "name": "Climbing stairs slowly",
+      "category": "walking_transport",
+      "referenceMinutes": 10,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -3,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "stairs",
+        "moderate"
+      ]
+    },
+    {
+      "id": "climbing_stairs_quickly",
+      "name": "Climbing stairs quickly",
+      "category": "walking_transport",
+      "referenceMinutes": 10,
+      "met": 8.8,
+      "intensity": "vigorous",
+      "physicalDelta": -10,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "stairs",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "walking_while_carrying_groceries",
+      "name": "Walking while carrying groceries",
+      "category": "walking_transport",
+      "referenceMinutes": 20,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -5,
+      "brainDelta": 0,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "walking",
+        "carrying"
+      ]
+    },
+    {
+      "id": "driving_in_light_traffic",
+      "name": "Driving in light traffic",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "driving",
+        "attention"
+      ]
+    },
+    {
+      "id": "driving_in_heavy_traffic",
+      "name": "Driving in heavy traffic",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -4,
+      "brainDelta": -26,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "driving",
+        "stress"
+      ]
+    },
+    {
+      "id": "motorcycle_or_scooter_riding",
+      "name": "Motorcycle or scooter riding",
+      "category": "walking_transport",
+      "referenceMinutes": 45,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -3,
+      "brainDelta": -14,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "transport",
+        "attention"
+      ]
+    },
+    {
+      "id": "bus_passenger_seated",
+      "name": "Bus passenger, seated",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "transport",
+        "sitting"
+      ]
+    },
+    {
+      "id": "train_passenger_seated",
+      "name": "Train passenger, seated",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "transport",
+        "sitting"
+      ]
+    },
+    {
+      "id": "air_travel_seated",
+      "name": "Air travel, seated",
+      "category": "walking_transport",
+      "referenceMinutes": 180,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -4,
+      "brainDelta": -18,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "travel",
+        "sitting",
+        "long_session"
+      ]
+    },
+    {
+      "id": "commuting_with_transfers",
+      "name": "Commuting with transfers",
+      "category": "walking_transport",
+      "referenceMinutes": 60,
+      "met": 2.3,
+      "intensity": "light",
+      "physicalDelta": -5,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "commute",
+        "walking"
+      ]
+    },
+    {
+      "id": "cycling_for_transport_easy",
+      "name": "Cycling for transport, easy",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cycling",
+        "moderate"
+      ]
+    },
+    {
+      "id": "cycling_for_transport_fast",
+      "name": "Cycling for transport, fast",
+      "category": "walking_transport",
+      "referenceMinutes": 30,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -15,
+      "brainDelta": -3,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "cycling",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "mobility_routine",
+      "name": "Mobility routine",
+      "category": "exercise",
+      "referenceMinutes": 15,
+      "met": 2.5,
+      "intensity": "light",
+      "physicalDelta": 1,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "mobility",
+        "recovery"
+      ]
+    },
+    {
+      "id": "light_yoga",
+      "name": "Light yoga",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 2.5,
+      "intensity": "light",
+      "physicalDelta": 1,
+      "brainDelta": 5,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "yoga",
+        "light"
+      ]
+    },
+    {
+      "id": "power_yoga",
+      "name": "Power yoga",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -8,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "yoga",
+        "moderate"
+      ]
+    },
+    {
+      "id": "tai_chi",
+      "name": "Tai chi",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -1,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "balance",
+        "moderate"
+      ]
+    },
+    {
+      "id": "light_calisthenics",
+      "name": "Light calisthenics",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -5,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "strength",
+        "light"
+      ]
+    },
+    {
+      "id": "moderate_calisthenics",
+      "name": "Moderate calisthenics",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "strength",
+        "moderate"
+      ]
+    },
+    {
+      "id": "vigorous_calisthenics",
+      "name": "Vigorous calisthenics",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -5,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "strength",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "weight_training_light",
+      "name": "Weight training, light",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "strength",
+        "light"
+      ]
+    },
+    {
+      "id": "weight_training_moderate",
+      "name": "Weight training, moderate",
+      "category": "exercise",
+      "referenceMinutes": 60,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -13,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "strength",
+        "moderate"
+      ]
+    },
+    {
+      "id": "weight_training_heavy",
+      "name": "Weight training, heavy",
+      "category": "exercise",
+      "referenceMinutes": 60,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "strength",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "circuit_training",
+      "name": "Circuit training",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "cardio",
+        "strength",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "hiit_workout",
+      "name": "HIIT workout",
+      "category": "exercise",
+      "referenceMinutes": 20,
+      "met": 10.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -17,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "cardio",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "jogging",
+      "name": "Jogging",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -13,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "running",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "running_easy_pace",
+      "name": "Running, easy pace",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 8.3,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "running",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "running_moderate_pace",
+      "name": "Running, moderate pace",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 9.8,
+      "intensity": "very_vigorous",
+      "physicalDelta": -20,
+      "brainDelta": -3,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "running",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "running_fast_pace",
+      "name": "Running, fast pace",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 11.8,
+      "intensity": "very_vigorous",
+      "physicalDelta": -25,
+      "brainDelta": -8,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "running",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "sprint_intervals",
+      "name": "Sprint intervals",
+      "category": "exercise",
+      "referenceMinutes": 15,
+      "met": 14.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -21,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "running",
+        "very_vigorous"
+      ]
+    },
+    {
+      "id": "stationary_cycling_easy",
+      "name": "Stationary cycling, easy",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -5,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cycling",
+        "light"
+      ]
+    },
+    {
+      "id": "stationary_cycling_moderate",
+      "name": "Stationary cycling, moderate",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 5.5,
+      "intensity": "moderate",
+      "physicalDelta": -12,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cycling",
+        "moderate"
+      ]
+    },
+    {
+      "id": "stationary_cycling_vigorous",
+      "name": "Stationary cycling, vigorous",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 9.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -22,
+      "brainDelta": -8,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "cycling",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "swimming_easy",
+      "name": "Swimming, easy",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -8,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "swimming",
+        "moderate"
+      ]
+    },
+    {
+      "id": "swimming_laps_moderate",
+      "name": "Swimming laps, moderate",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "swimming",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "swimming_laps_vigorous",
+      "name": "Swimming laps, vigorous",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 10.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -25,
+      "brainDelta": -8,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "swimming",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "rowing_machine_moderate",
+      "name": "Rowing machine, moderate",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -13,
+      "brainDelta": -3,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "rowing",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "rowing_machine_vigorous",
+      "name": "Rowing machine, vigorous",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 12.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -25,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "rowing",
+        "very_vigorous"
+      ]
+    },
+    {
+      "id": "jump_rope_moderate",
+      "name": "Jump rope, moderate",
+      "category": "exercise",
+      "referenceMinutes": 15,
+      "met": 9.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -13,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "cardio",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "jump_rope_fast",
+      "name": "Jump rope, fast",
+      "category": "exercise",
+      "referenceMinutes": 15,
+      "met": 12.3,
+      "intensity": "very_vigorous",
+      "physicalDelta": -18,
+      "brainDelta": -5,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "cardio",
+        "very_vigorous"
+      ]
+    },
+    {
+      "id": "elliptical_trainer",
+      "name": "Elliptical trainer",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -3,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cardio",
+        "moderate"
+      ]
+    },
+    {
+      "id": "dance_fitness",
+      "name": "Dance fitness",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 6.5,
+      "intensity": "vigorous",
+      "physicalDelta": -15,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "dance",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "slow_dancing",
+      "name": "Slow dancing",
+      "category": "exercise",
+      "referenceMinutes": 30,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -4,
+      "brainDelta": 3,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "dance",
+        "light"
+      ]
+    },
+    {
+      "id": "aerobics_class",
+      "name": "Aerobics class",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 7.3,
+      "intensity": "vigorous",
+      "physicalDelta": -18,
+      "brainDelta": -8,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cardio",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "pilates",
+      "name": "Pilates",
+      "category": "exercise",
+      "referenceMinutes": 45,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -5,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "core",
+        "moderate"
+      ]
+    },
+    {
+      "id": "cool_down_after_exercise",
+      "name": "Cool-down after exercise",
+      "category": "exercise",
+      "referenceMinutes": 10,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "recovery",
+        "cooldown"
+      ]
+    },
+    {
+      "id": "badminton_recreational",
+      "name": "Badminton, recreational",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 5.5,
+      "intensity": "moderate",
+      "physicalDelta": -14,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "badminton_competitive",
+      "name": "Badminton, competitive",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -20,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "tennis_singles",
+      "name": "Tennis, singles",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -23,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "tennis_doubles",
+      "name": "Tennis, doubles",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "table_tennis",
+      "name": "Table tennis",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "football_or_soccer_casual",
+      "name": "Football or soccer, casual",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -20,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "football_or_soccer_competitive",
+      "name": "Football or soccer, competitive",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 10.0,
+      "intensity": "very_vigorous",
+      "physicalDelta": -30,
+      "brainDelta": -21,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "very_vigorous"
+      ]
+    },
+    {
+      "id": "basketball_casual_shooting",
+      "name": "Basketball, casual shooting",
+      "category": "sports",
+      "referenceMinutes": 45,
+      "met": 4.5,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": 0,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "basketball_game",
+      "name": "Basketball game",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -23,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "cricket_batting_or_bowling",
+      "name": "Cricket batting or bowling",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -13,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "cricket_fielding_or_casual_play",
+      "name": "Cricket fielding or casual play",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "volleyball_recreational",
+      "name": "Volleyball, recreational",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "moderate"
+      ]
+    },
+    {
+      "id": "volleyball_competitive",
+      "name": "Volleyball, competitive",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "martial_arts_training",
+      "name": "Martial arts training",
+      "category": "sports",
+      "referenceMinutes": 60,
+      "met": 10.3,
+      "intensity": "very_vigorous",
+      "physicalDelta": -31,
+      "brainDelta": -19,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 7,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "very_vigorous"
+      ]
+    },
+    {
+      "id": "boxing_bag_workout",
+      "name": "Boxing bag workout",
+      "category": "sports",
+      "referenceMinutes": 30,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -12,
+      "brainDelta": -6,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "wrestling_or_grappling",
+      "name": "Wrestling or grappling",
+      "category": "sports",
+      "referenceMinutes": 30,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -17,
+      "brainDelta": -16,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "sport",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "cooking_light_meal",
+      "name": "Cooking, light meal",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -2,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "cooking",
+        "standing"
+      ]
+    },
+    {
+      "id": "cooking_complex_meal",
+      "name": "Cooking, complex meal",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 2.5,
+      "intensity": "light",
+      "physicalDelta": -5,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 4,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cooking",
+        "multitasking"
+      ]
+    },
+    {
+      "id": "washing_dishes",
+      "name": "Washing dishes",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -2,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "chores"
+      ]
+    },
+    {
+      "id": "laundry_folding_clothes",
+      "name": "Laundry, folding clothes",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -2,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "chores"
+      ]
+    },
+    {
+      "id": "laundry_carrying_and_hanging",
+      "name": "Laundry, carrying and hanging",
+      "category": "home_work",
+      "referenceMinutes": 45,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -5,
+      "brainDelta": -3,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "chores",
+        "carrying"
+      ]
+    },
+    {
+      "id": "sweeping_floors",
+      "name": "Sweeping floors",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 3.3,
+      "intensity": "moderate",
+      "physicalDelta": -5,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cleaning",
+        "moderate"
+      ]
+    },
+    {
+      "id": "mopping_floors",
+      "name": "Mopping floors",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cleaning",
+        "moderate"
+      ]
+    },
+    {
+      "id": "vacuuming",
+      "name": "Vacuuming",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -4,
+      "brainDelta": -2,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cleaning"
+      ]
+    },
+    {
+      "id": "bathroom_cleaning",
+      "name": "Bathroom cleaning",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cleaning",
+        "moderate"
+      ]
+    },
+    {
+      "id": "deep_house_cleaning",
+      "name": "Deep house cleaning",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -9,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cleaning",
+        "moderate"
+      ]
+    },
+    {
+      "id": "making_the_bed",
+      "name": "Making the bed",
+      "category": "home_work",
+      "referenceMinutes": 10,
+      "met": 3.3,
+      "intensity": "moderate",
+      "physicalDelta": -2,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "chores"
+      ]
+    },
+    {
+      "id": "grocery_shopping",
+      "name": "Grocery shopping",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 2.3,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "shopping",
+        "walking"
+      ]
+    },
+    {
+      "id": "carrying_heavy_groceries",
+      "name": "Carrying heavy groceries",
+      "category": "home_work",
+      "referenceMinutes": 15,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": -4,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "carrying",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "gardening_light",
+      "name": "Gardening, light",
+      "category": "home_work",
+      "referenceMinutes": 45,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": 3,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "garden",
+        "moderate"
+      ]
+    },
+    {
+      "id": "gardening_digging",
+      "name": "Gardening, digging",
+      "category": "home_work",
+      "referenceMinutes": 45,
+      "met": 5.5,
+      "intensity": "moderate",
+      "physicalDelta": -12,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "garden",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "lawn_mowing_push_mower",
+      "name": "Lawn mowing, push mower",
+      "category": "home_work",
+      "referenceMinutes": 45,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -11,
+      "brainDelta": -3,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "garden",
+        "moderate"
+      ]
+    },
+    {
+      "id": "home_repair_light",
+      "name": "Home repair, light",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "repair"
+      ]
+    },
+    {
+      "id": "home_repair_heavy",
+      "name": "Home repair, heavy",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -16,
+      "brainDelta": -19,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "repair",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "washing_a_car",
+      "name": "Washing a car",
+      "category": "home_work",
+      "referenceMinutes": 45,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -6,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "cleaning",
+        "moderate"
+      ]
+    },
+    {
+      "id": "childcare_calm_play",
+      "name": "Childcare, calm play",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 2.5,
+      "intensity": "light",
+      "physicalDelta": -5,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 5,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "caregiving",
+        "social"
+      ]
+    },
+    {
+      "id": "childcare_active_play",
+      "name": "Childcare, active play",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -10,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 6,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "caregiving",
+        "active"
+      ]
+    },
+    {
+      "id": "caring_for_a_crying_child",
+      "name": "Caring for a crying child",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 2.3,
+      "intensity": "light",
+      "physicalDelta": -6,
+      "brainDelta": -26,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "caregiving",
+        "stress"
+      ]
+    },
+    {
+      "id": "elder_care_light_assistance",
+      "name": "Elder care, light assistance",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -17,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "caregiving"
+      ]
+    },
+    {
+      "id": "elder_care_lifting_assistance",
+      "name": "Elder care, lifting assistance",
+      "category": "home_work",
+      "referenceMinutes": 30,
+      "met": 4.0,
+      "intensity": "moderate",
+      "physicalDelta": -8,
+      "brainDelta": -16,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "caregiving",
+        "lifting"
+      ]
+    },
+    {
+      "id": "office_work_routine",
+      "name": "Office work, routine",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "sitting"
+      ]
+    },
+    {
+      "id": "retail_work_standing",
+      "name": "Retail work, standing",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "standing"
+      ]
+    },
+    {
+      "id": "warehouse_work_light",
+      "name": "Warehouse work, light",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 3.5,
+      "intensity": "moderate",
+      "physicalDelta": -9,
+      "brainDelta": -15,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "manual"
+      ]
+    },
+    {
+      "id": "warehouse_work_heavy",
+      "name": "Warehouse work, heavy",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 6.5,
+      "intensity": "vigorous",
+      "physicalDelta": -19,
+      "brainDelta": -17,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "manual",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "construction_work_moderate",
+      "name": "Construction work, moderate",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 5.5,
+      "intensity": "moderate",
+      "physicalDelta": -15,
+      "brainDelta": -21,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "manual",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "construction_work_heavy",
+      "name": "Construction work, heavy",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 8.0,
+      "intensity": "vigorous",
+      "physicalDelta": -24,
+      "brainDelta": -23,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 75,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "manual",
+        "very_vigorous"
+      ]
+    },
+    {
+      "id": "farm_work_moderate",
+      "name": "Farm work, moderate",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 5.0,
+      "intensity": "moderate",
+      "physicalDelta": -13,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "manual"
+      ]
+    },
+    {
+      "id": "farm_work_heavy",
+      "name": "Farm work, heavy",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 7.0,
+      "intensity": "vigorous",
+      "physicalDelta": -20,
+      "brainDelta": -17,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 3,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "manual",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "hot_environment_physical_work",
+      "name": "Hot-environment physical work",
+      "category": "home_work",
+      "referenceMinutes": 60,
+      "met": 6.0,
+      "intensity": "vigorous",
+      "physicalDelta": -18,
+      "brainDelta": -23,
+      "delayedPhysicalDelta": -1,
+      "delayedBrainDelta": 2,
+      "delayedAfterMinutes": 45,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "heat",
+        "vigorous"
+      ]
+    },
+    {
+      "id": "night_shift_work",
+      "name": "Night-shift work",
+      "category": "home_work",
+      "referenceMinutes": 480,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -19,
+      "brainDelta": -40,
+      "delayedPhysicalDelta": -3,
+      "delayedBrainDelta": -6,
+      "delayedAfterMinutes": 180,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "night_shift",
+        "sleep_disrupting"
+      ]
+    },
+    {
+      "id": "long_workday_over_10_hours",
+      "name": "Long workday over 10 hours",
+      "category": "home_work",
+      "referenceMinutes": 600,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -15,
+      "brainDelta": -40,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "high",
+      "tags": [
+        "occupation",
+        "long_hours",
+        "fatigue"
+      ]
+    },
+    {
+      "id": "relaxed_conversation",
+      "name": "Relaxed conversation",
+      "category": "social_emotional",
+      "referenceMinutes": 30,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": 1,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "social",
+        "gain"
+      ]
+    },
+    {
+      "id": "laughing_with_friends",
+      "name": "Laughing with friends",
+      "category": "social_emotional",
+      "referenceMinutes": 30,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": 7,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "social",
+        "gain"
+      ]
+    },
+    {
+      "id": "supportive_family_time",
+      "name": "Supportive family time",
+      "category": "social_emotional",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 2,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "social",
+        "gain"
+      ]
+    },
+    {
+      "id": "busy_social_gathering",
+      "name": "Busy social gathering",
+      "category": "social_emotional",
+      "referenceMinutes": 120,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -5,
+      "brainDelta": -22,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "social",
+        "stimulation"
+      ]
+    },
+    {
+      "id": "networking_event",
+      "name": "Networking event",
+      "category": "social_emotional",
+      "referenceMinutes": 90,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -5,
+      "brainDelta": -27,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "social",
+        "work",
+        "stress"
+      ]
+    },
+    {
+      "id": "conflict_or_argument",
+      "name": "Conflict or argument",
+      "category": "social_emotional",
+      "referenceMinutes": 30,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -20,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "conflict",
+        "stress"
+      ]
+    },
+    {
+      "id": "providing_emotional_support",
+      "name": "Providing emotional support",
+      "category": "social_emotional",
+      "referenceMinutes": 60,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -22,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "caregiving",
+        "emotional_labor"
+      ]
+    },
+    {
+      "id": "receiving_emotional_support",
+      "name": "Receiving emotional support",
+      "category": "social_emotional",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 8,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "social",
+        "gain"
+      ]
+    },
+    {
+      "id": "religious_or_spiritual_gathering",
+      "name": "Religious or spiritual gathering",
+      "category": "social_emotional",
+      "referenceMinutes": 60,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": 1,
+      "brainDelta": 2,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "community",
+        "gain"
+      ]
+    },
+    {
+      "id": "volunteering_light_activity",
+      "name": "Volunteering, light activity",
+      "category": "social_emotional",
+      "referenceMinutes": 120,
+      "met": 2.5,
+      "intensity": "light",
+      "physicalDelta": -7,
+      "brainDelta": -13,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "community",
+        "moderate"
+      ]
+    },
+    {
+      "id": "crowded_noisy_environment",
+      "name": "Crowded noisy environment",
+      "category": "social_emotional",
+      "referenceMinutes": 60,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": -4,
+      "brainDelta": -21,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "sensory_load",
+        "stress"
+      ]
+    },
+    {
+      "id": "quiet_solitary_hobby",
+      "name": "Quiet solitary hobby",
+      "category": "social_emotional",
+      "referenceMinutes": 45,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 7,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "hobby",
+        "gain"
+      ]
+    },
+    {
+      "id": "competitive_event_as_participant",
+      "name": "Competitive event as participant",
+      "category": "social_emotional",
+      "referenceMinutes": 60,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": -8,
+      "brainDelta": -23,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "competition",
+        "stress"
+      ]
+    },
+    {
+      "id": "attending_a_concert",
+      "name": "Attending a concert",
+      "category": "social_emotional",
+      "referenceMinutes": 120,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": -5,
+      "brainDelta": -20,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "music",
+        "sensory_load"
+      ]
+    },
+    {
+      "id": "drink_water_after_mild_thirst",
+      "name": "Drink water after mild thirst",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 5,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 4,
+      "brainDelta": 3,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "hydration",
+        "gain"
+      ]
+    },
+    {
+      "id": "oral_rehydration_after_heavy_sweating",
+      "name": "Oral rehydration after heavy sweating",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 10,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 7,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "hydration",
+        "recovery"
+      ]
+    },
+    {
+      "id": "balanced_breakfast",
+      "name": "Balanced breakfast",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 20,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "meal",
+        "gain"
+      ]
+    },
+    {
+      "id": "balanced_lunch",
+      "name": "Balanced lunch",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 30,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "meal",
+        "gain"
+      ]
+    },
+    {
+      "id": "balanced_dinner",
+      "name": "Balanced dinner",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 30,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "meal"
+      ]
+    },
+    {
+      "id": "light_healthy_snack",
+      "name": "Light healthy snack",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 10,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "snack"
+      ]
+    },
+    {
+      "id": "large_heavy_meal",
+      "name": "Large heavy meal",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 45,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -7,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 1,
+      "delayedAfterMinutes": 120,
+      "confidence": "low_to_medium",
+      "tags": [
+        "meal",
+        "post_meal_dip"
+      ]
+    },
+    {
+      "id": "very_sugary_snack_or_drink",
+      "name": "Very sugary snack or drink",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 10,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": 3,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": -3,
+      "delayedAfterMinutes": 90,
+      "confidence": "low_to_medium",
+      "tags": [
+        "sugar",
+        "short_boost"
+      ]
+    },
+    {
+      "id": "skipped_regular_meal",
+      "name": "Skipped regular meal",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 240,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -7,
+      "brainDelta": -25,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "meal_skipped",
+        "drain"
+      ]
+    },
+    {
+      "id": "caffeine_morning_or_early_afternoon",
+      "name": "Caffeine, morning or early afternoon",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 5,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": -4,
+      "delayedAfterMinutes": 240,
+      "confidence": "low_to_medium",
+      "tags": [
+        "caffeine",
+        "temporary_boost"
+      ]
+    },
+    {
+      "id": "caffeine_late_afternoon_or_evening",
+      "name": "Caffeine, late afternoon or evening",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 5,
+      "met": 1.0,
+      "intensity": "sedentary",
+      "physicalDelta": 0,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": -2,
+      "delayedBrainDelta": -7,
+      "delayedAfterMinutes": 240,
+      "confidence": "low_to_medium",
+      "tags": [
+        "caffeine",
+        "late",
+        "sleep_disrupting"
+      ]
+    },
+    {
+      "id": "alcohol_use",
+      "name": "Alcohol use",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 60,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -3,
+      "brainDelta": -5,
+      "delayedPhysicalDelta": -6,
+      "delayedBrainDelta": -8,
+      "delayedAfterMinutes": 180,
+      "confidence": "low_to_medium",
+      "tags": [
+        "alcohol",
+        "sleep_disrupting"
+      ]
+    },
+    {
+      "id": "prolonged_time_without_fluids",
+      "name": "Prolonged time without fluids",
+      "category": "nutrition_hydration",
+      "referenceMinutes": 180,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -7,
+      "brainDelta": -23,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "dehydration",
+        "drain"
+      ]
+    },
+    {
+      "id": "microbreak_from_screen",
+      "name": "Microbreak from screen",
+      "category": "breaks",
+      "referenceMinutes": 3,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 1,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "break",
+        "gain"
+      ]
+    },
+    {
+      "id": "stand_and_move_break",
+      "name": "Stand and move break",
+      "category": "breaks",
+      "referenceMinutes": 5,
+      "met": 2.0,
+      "intensity": "light",
+      "physicalDelta": 2,
+      "brainDelta": 4,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "break",
+        "movement",
+        "gain"
+      ]
+    },
+    {
+      "id": "short_outdoor_walk_break",
+      "name": "Short outdoor walk break",
+      "category": "breaks",
+      "referenceMinutes": 10,
+      "met": 3.0,
+      "intensity": "moderate",
+      "physicalDelta": 1,
+      "brainDelta": 6,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "break",
+        "walking",
+        "gain"
+      ]
+    },
+    {
+      "id": "meal_break_away_from_desk",
+      "name": "Meal break away from desk",
+      "category": "breaks",
+      "referenceMinutes": 30,
+      "met": 1.8,
+      "intensity": "light",
+      "physicalDelta": 5,
+      "brainDelta": 11,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "break",
+        "meal",
+        "gain"
+      ]
+    },
+    {
+      "id": "switching_between_unrelated_tasks",
+      "name": "Switching between unrelated tasks",
+      "category": "breaks",
+      "referenceMinutes": 10,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -1,
+      "brainDelta": -9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "context_switch",
+        "drain"
+      ]
+    },
+    {
+      "id": "unexpected_interruption",
+      "name": "Unexpected interruption",
+      "category": "breaks",
+      "referenceMinutes": 10,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": -2,
+      "brainDelta": -11,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "interruption",
+        "drain"
+      ]
+    },
+    {
+      "id": "commute_to_home_decompression",
+      "name": "Commute-to-home decompression",
+      "category": "breaks",
+      "referenceMinutes": 20,
+      "met": 1.5,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "transition",
+        "gain"
+      ]
+    },
+    {
+      "id": "journaling_or_reflection",
+      "name": "Journaling or reflection",
+      "category": "breaks",
+      "referenceMinutes": 15,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 8,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "reflection",
+        "gain"
+      ]
+    },
+    {
+      "id": "planning_tomorrow",
+      "name": "Planning tomorrow",
+      "category": "breaks",
+      "referenceMinutes": 15,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 3,
+      "brainDelta": -1,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "id": "preparing_for_sleep_without_screens",
+      "name": "Preparing for sleep without screens",
+      "category": "breaks",
+      "referenceMinutes": 30,
+      "met": 1.3,
+      "intensity": "sedentary",
+      "physicalDelta": 6,
+      "brainDelta": 9,
+      "delayedPhysicalDelta": 0,
+      "delayedBrainDelta": 0,
+      "delayedAfterMinutes": 0,
+      "confidence": "low_to_medium",
+      "tags": [
+        "sleep_hygiene",
+        "gain"
+      ]
+    }
+  ]
+}

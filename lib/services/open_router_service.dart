@@ -6,7 +6,7 @@ import '../models/chat_message.dart';
 
 class OpenRouterService {
   static const String _baseUrl = 'https://openrouter.ai/api/v1';
-  static const String _defaultModel = 'openai/gpt-4o-mini';
+  static const String _defaultModel = 'openrouter/free';
 
   const OpenRouterService();
 
@@ -30,11 +30,7 @@ class OpenRouterService {
     );
 
     if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final errorMsg = (body['error'] as Map<String, dynamic>?)?['message']
-          as String? ??
-          'HTTP ${response.statusCode}';
-      throw Exception(errorMsg);
+      throw OpenRouterException.fromResponse(response);
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -45,7 +41,8 @@ class OpenRouterService {
     required String apiKey,
     required String userInput,
   }) async {
-    const systemPrompt = '''You are an energy health analyzer. Based on how the user describes their physical and mental state, assess their energy levels.
+    const systemPrompt =
+        '''You are an energy health analyzer. Based on how the user describes their physical and mental state, assess their energy levels.
 
 Respond with ONLY a valid JSON object — no markdown, no code fences, no extra text:
 {
@@ -84,6 +81,51 @@ Rules:
   }
 }
 
+class OpenRouterException implements Exception {
+  const OpenRouterException(this.message);
+
+  final String message;
+
+  factory OpenRouterException.fromResponse(http.Response response) {
+    final errorMessage = _extractErrorMessage(response.body);
+
+    if (response.statusCode == 402) {
+      return const OpenRouterException(
+        'OpenRouter says this API key has insufficient credits. Use a free '
+        'model, add credits to the OpenRouter account, or check that this API '
+        'key has a non-zero credit limit.',
+      );
+    }
+
+    return OpenRouterException(
+      errorMessage ?? 'OpenRouter request failed: HTTP ${response.statusCode}',
+    );
+  }
+
+  static String? _extractErrorMessage(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return null;
+
+      final error = decoded['error'];
+      if (error is Map<String, dynamic>) {
+        final message = error['message'];
+        if (message is String && message.isNotEmpty) return message;
+      }
+
+      final message = decoded['message'];
+      if (message is String && message.isNotEmpty) return message;
+    } catch (_) {
+      return body.trim().isEmpty ? null : body.trim();
+    }
+
+    return null;
+  }
+
+  @override
+  String toString() => message;
+}
+
 class EnergyAnalysis {
   const EnergyAnalysis({
     required this.physicalPercent,
@@ -106,8 +148,7 @@ class EnergyAnalysis {
       brainPercent: (json['brainPercent'] as num).toDouble().clamp(0.0, 1.0),
       status: json['status'] as String,
       potential: json['potential'] as String,
-      recommendations:
-          List<String>.from(json['recommendations'] as List),
+      recommendations: List<String>.from(json['recommendations'] as List),
     );
   }
 }
