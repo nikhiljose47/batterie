@@ -10,7 +10,7 @@ class DashboardState {
     this.errorMessage,
     this.isAnalyzing = false,
     this.analysisError,
-    this.isAiPowered = false,
+    this.hasCheckInEstimate = false,
   });
 
   final AsyncStatus status;
@@ -19,7 +19,7 @@ class DashboardState {
   final String? errorMessage;
   final bool isAnalyzing;
   final String? analysisError;
-  final bool isAiPowered;
+  final bool hasCheckInEstimate;
 
   DashboardState copyWith({
     AsyncStatus? status,
@@ -28,7 +28,7 @@ class DashboardState {
     String? errorMessage,
     bool? isAnalyzing,
     String? analysisError,
-    bool? isAiPowered,
+    bool? hasCheckInEstimate,
   }) {
     return DashboardState(
       status: status ?? this.status,
@@ -37,7 +37,7 @@ class DashboardState {
       errorMessage: errorMessage,
       isAnalyzing: isAnalyzing ?? this.isAnalyzing,
       analysisError: analysisError,
-      isAiPowered: isAiPowered ?? this.isAiPowered,
+      hasCheckInEstimate: hasCheckInEstimate ?? this.hasCheckInEstimate,
     );
   }
 }

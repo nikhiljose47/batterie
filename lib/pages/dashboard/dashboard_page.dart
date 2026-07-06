@@ -75,7 +75,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          if (state.isAiPowered)
+                          if (state.hasCheckInEstimate)
                             _AiPoweredBadge(
                               onRefresh: () => _showCheckInSheet(context),
                             ),
@@ -83,12 +83,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             _AnalysisErrorBanner(
                               message: state.analysisError!,
                             ),
-                          if (state.isAiPowered) const SizedBox(height: AppSpacing.medium),
+                          if (state.hasCheckInEstimate)
+                            const SizedBox(height: AppSpacing.medium),
                           DecoratedBox(
                             decoration: BoxDecoration(
                               color: AppColors.surfaceTint,
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusMedium),
+                              borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusMedium),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.medium),
@@ -102,7 +103,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                   children: <Widget>[
                                     Expanded(
                                       flex: 7,
-                                      child: BodyStatusCard(bodyStatus: bodyStatus),
+                                      child: BodyStatusCard(
+                                          bodyStatus: bodyStatus),
                                     ),
                                     const SizedBox(width: AppSpacing.medium),
                                     Expanded(
@@ -112,12 +114,13 @@ class _DashboardPageState extends State<DashboardPage> {
                                             .map(
                                               (battery) => Padding(
                                                 padding: EdgeInsets.only(
-                                                  bottom:
-                                                      battery == state.batteries.last
-                                                          ? 0
-                                                          : AppSpacing.medium,
+                                                  bottom: battery ==
+                                                          state.batteries.last
+                                                      ? 0
+                                                      : AppSpacing.medium,
                                                 ),
-                                                child: BatteryCard(status: battery),
+                                                child: BatteryCard(
+                                                    status: battery),
                                               ),
                                             )
                                             .toList(),
@@ -171,8 +174,8 @@ class _CheckInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton.icon(
       onPressed: onTap,
-      icon: const Icon(Icons.self_improvement_outlined),
-      label: const Text('Check in with AI'),
+      icon: const Icon(Icons.bolt_outlined),
+      label: const Text('Update energy levels'),
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(48),
         backgroundColor: AppColors.primary,
@@ -206,7 +209,7 @@ class _AnalyzingBanner extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           SizedBox(width: AppSpacing.medium),
-          Text('Analysing your energy levels…'),
+          Text('Updating your energy levels...'),
         ],
       ),
     );
@@ -227,7 +230,7 @@ class _AiPoweredBadge extends StatelessWidget {
           const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
           const SizedBox(width: AppSpacing.xSmall),
           const Text(
-            'AI-powered check-in',
+            'Latest check-in estimate',
             style: TextStyle(
               fontSize: 12,
               color: AppColors.primary,
