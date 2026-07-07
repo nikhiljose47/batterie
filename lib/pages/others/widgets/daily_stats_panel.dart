@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
@@ -7,16 +9,22 @@ import '../../../models/energy_log_record.dart';
 import '../../../models/logged_activity.dart';
 import '../../../services/energy_log_store.dart';
 
-enum StatsDay { today, yesterday }
-
 enum StatsMetric { both, physical, brain }
 
-/// Statistics for one day: filters, energy chart, averages, an editable
-/// remark, and the raw activity log — all read from the local store.
+const List<String> _weekdayLabels = <String>[
+  'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+];
+
+/// Statistics for a chosen day (today or up to 6 days back): a day rail,
+/// energy chart, averages, a plain-language summary, improvement tips, an
+/// editable remark, and the raw activity log — all read from the local store.
 class DailyStatsPanel extends StatefulWidget {
-  const DailyStatsPanel({super.key, this.store});
+  const DailyStatsPanel({super.key, this.store, this.onOpenCoach});
 
   final EnergyLogStore? store;
+
+  /// Called when the user taps the "Chat with AI coach" entry point.
+  final VoidCallback? onOpenCoach;
 
   @override
   State<DailyStatsPanel> createState() => _DailyStatsPanelState();
@@ -24,23 +32,22 @@ class DailyStatsPanel extends StatefulWidget {
 
 class _DailyStatsPanelState extends State<DailyStatsPanel> {
   static const EnergyScoreEngine _engine = EnergyScoreEngine();
+  static const int _daysBack = 7;
 
   late final EnergyLogStore _store =
       widget.store ?? SqliteEnergyLogStore.instance;
   final TextEditingController _remarkController = TextEditingController();
 
-  StatsDay _day = StatsDay.today;
+  int _dayOffset = 0; // 0 = today, 1 = yesterday, ... up to _daysBack - 1
   StatsMetric _metric = StatsMetric.both;
   List<EnergyLogRecord> _records = const <EnergyLogRecord>[];
   bool _loading = true;
   bool _remarkSaved = false;
 
-  String get _dateKey {
-    final now = DateTime.now();
-    final target =
-        _day == StatsDay.today ? now : now.subtract(const Duration(days: 1));
-    return dateKey(target);
-  }
+  DateTime get _selectedDate =>
+      DateTime.now().subtract(Duration(days: _dayOffset));
+
+  String get _dateKey => dateKey(_selectedDate);
 
   @override
   void initState() {
@@ -95,32 +102,94 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
               _records.length)
           .round();
 
+  /// Plain-language read of the day: best case "all green", otherwise names
+  /// the activity right before the lowest dip.
+  String? get _summary {
+    if (_records.isEmpty) return null;
+
+    var minPhysical = 100;
+    var minBrain = 100;
+    EnergyLogRecord? worst;
+    for (final r in _records) {
+      if (r.physicalAfter < minPhysical) minPhysical = r.physicalAfter;
+      if (r.brainAfter < minBrain) minBrain = r.brainAfter;
+      final worstSoFar =
+          worst == null ? 101 : math.min(worst.physicalAfter, worst.brainAfter);
+      if (math.min(r.physicalAfter, r.brainAfter) < worstSoFar) worst = r;
+    }
+
+    final overallMin = math.min(minPhysical, minBrain);
+    if (overallMin >= 80) return 'Great day — energy stayed 80%+ all day.';
+    if (worst == null) return 'Energy dipped to $overallMin%.';
+
+    final name = _engine.activityById(worst.activityId).name;
+    final metric = worst.physicalAfter <= worst.brainAfter ? 'physical' : 'brain';
+    final time = formatMinutes(worst.startMinutes);
+    return overallMin < 40
+        ? 'Low $metric energy after $name ($time).'
+        : 'Dipped to $overallMin% $metric after $name ($time).';
+  }
+
+  /// A couple of simple, data-driven suggestions for the selected day.
+  List<String> get _tips {
+    if (_records.isEmpty) return const <String>[];
+    final tips = <String>[];
+
+    final drainCount = _records.where((r) {
+      final a = _engine.activityById(r.activityId);
+      return a.physicalDelta + a.brainDelta < 0;
+    }).length;
+
+    if (drainCount == _records.length && _records.length >= 2) {
+      tips.add(
+        'Every logged activity drained energy — add a short walk, breathing break, or nap between draining tasks.',
+      );
+    }
+
+    final avgBrain = _avgBrain;
+    if (avgBrain != null && avgBrain < 50) {
+      tips.add(
+        'Brain energy averaged $avgBrain% — try shorter focus blocks with a break every 60–90 minutes.',
+      );
+    }
+
+    final avgPhysical = _avgPhysical;
+    if (avgPhysical != null && avgPhysical < 50) {
+      tips.add(
+        'Physical energy averaged $avgPhysical% — a brisk walk or light meal break can help recovery.',
+      );
+    }
+
+    return tips.take(2).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        // ── Filters ──────────────────────────────────────────────────────
+        // ── Day rail + metric filter ────────────────────────────────────
+        const SizedBox(height: AppSpacing.small),
+        SizedBox(
+          height: 52,
+          child: _DayRail(
+            selectedOffset: _dayOffset,
+            daysBack: _daysBack,
+            onSelect: (offset) {
+              setState(() => _dayOffset = offset);
+              _load();
+            },
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.large,
-            AppSpacing.medium,
+            AppSpacing.small,
             AppSpacing.large,
             0,
           ),
           child: Row(
             children: <Widget>[
-              _FilterChipGroup<StatsDay>(
-                value: _day,
-                options: const <(StatsDay, String)>[
-                  (StatsDay.today, 'Today'),
-                  (StatsDay.yesterday, 'Yesterday'),
-                ],
-                onChanged: (day) {
-                  setState(() => _day = day);
-                  _load();
-                },
-              ),
               const Spacer(),
               _FilterChipGroup<StatsMetric>(
                 value: _metric,
@@ -146,7 +215,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                   ),
                 )
               : _records.isEmpty
-                  ? _EmptyDay(day: _day)
+                  ? _EmptyDay(isToday: _dayOffset == 0)
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.large,
@@ -155,6 +224,19 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                         AppSpacing.medium,
                       ),
                       children: <Widget>[
+                        if (_summary != null)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.medium),
+                            child: Text(
+                              _summary!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+
                         // Chart
                         Container(
                           height: 150,
@@ -208,6 +290,22 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                             ),
                           ],
                         ),
+
+                        if (_tips.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: AppSpacing.medium),
+                          const Text(
+                            'HELP TO IMPROVE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textMuted,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.small),
+                          ..._tips.map((tip) => _TipCard(text: tip)),
+                        ],
+
                         const SizedBox(height: AppSpacing.medium),
 
                         // Remark
@@ -257,10 +355,82 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                               activityName:
                                   _engine.activityById(r.activityId).name,
                             )),
+
+                        if (widget.onOpenCoach != null) ...<Widget>[
+                          const SizedBox(height: AppSpacing.medium),
+                          _CoachEntry(onTap: widget.onOpenCoach!),
+                        ],
                       ],
                     ),
         ),
       ],
+    );
+  }
+}
+
+// ── Day rail ────────────────────────────────────────────────────────────────
+
+class _DayRail extends StatelessWidget {
+  const _DayRail({
+    required this.selectedOffset,
+    required this.daysBack,
+    required this.onSelect,
+  });
+
+  final int selectedOffset;
+  final int daysBack;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
+      itemCount: daysBack,
+      separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.small),
+      itemBuilder: (context, offset) {
+        final date = now.subtract(Duration(days: offset));
+        final selected = offset == selectedOffset;
+        final topLabel = offset == 0
+            ? 'Today'
+            : offset == 1
+                ? 'Yesterday'
+                : _weekdayLabels[date.weekday - 1];
+
+        return GestureDetector(
+          onTap: () => onSelect(offset),
+          child: Container(
+            width: offset <= 1 ? 64 : 48,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary : AppColors.surfaceTint,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(
+                  topLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppColors.textMuted,
+                  ),
+                ),
+                Text(
+                  '${date.day}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -471,7 +641,7 @@ class _AverageCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -486,6 +656,97 @@ class _AverageCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Tips ──────────────────────────────────────────────────────────────────────
+
+class _TipCard extends StatelessWidget {
+  const _TipCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.small),
+      padding: const EdgeInsets.all(AppSpacing.medium),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3DC),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('💡', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF8A6D1D)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── AI coach entry point ─────────────────────────────────────────────────────
+
+class _CoachEntry extends StatelessWidget {
+  const _CoachEntry({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: <Color>[AppColors.primary, Color(0xFF7B88FF)],
+          ),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+        ),
+        child: Row(
+          children: <Widget>[
+            const CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white24,
+              child: Icon(Icons.bolt, color: Colors.white),
+            ),
+            const SizedBox(width: AppSpacing.medium),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    'AI Energy Coach',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    'Chat about sleep, focus, recovery, and more.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white),
+          ],
+        ),
       ),
     );
   }
@@ -566,9 +827,9 @@ class _LogRow extends StatelessWidget {
 }
 
 class _EmptyDay extends StatelessWidget {
-  const _EmptyDay({required this.day});
+  const _EmptyDay({required this.isToday});
 
-  final StatsDay day;
+  final bool isToday;
 
   @override
   Widget build(BuildContext context) {
@@ -582,9 +843,9 @@ class _EmptyDay extends StatelessWidget {
                 size: 32, color: AppColors.textMuted),
             const SizedBox(height: AppSpacing.small),
             Text(
-              day == StatsDay.today
+              isToday
                   ? 'Nothing logged today yet.\nAdd activities from the You tab.'
-                  : 'Nothing was logged yesterday.',
+                  : 'Nothing was logged on this day.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 12,

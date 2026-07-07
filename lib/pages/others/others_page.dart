@@ -10,7 +10,7 @@ import '../../state/async_view_state.dart';
 import '../chat/chat_page.dart';
 import 'others_controller.dart';
 import 'widgets/daily_stats_panel.dart';
-import 'widgets/person_status_card.dart';
+import 'widgets/person_status_rail.dart';
 
 class OthersPage extends StatefulWidget {
   const OthersPage({super.key});
@@ -60,100 +60,46 @@ class _OthersPageState extends State<OthersPage> {
               onRetry: _controller.load,
             );
           case AsyncStatus.success:
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                return Column(
-                  children: <Widget>[
-                    // ── Top 60 % — daily statistics ─────────────────────
-                    SizedBox(
-                      height: constraints.maxHeight * 0.6,
-                      child: const DailyStatsPanel(),
-                    ),
-                    const Divider(height: 1, color: AppColors.outline),
-                    // ── Bottom 40 % — AI coach + people ────────────────
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(AppSpacing.large),
-                        itemCount: state.people.length + 1,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: AppSpacing.medium),
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return _AiChatBanner(
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const ChatPage(),
-                                ),
-                              ),
-                            );
-                          }
-                          return PersonStatusCard(
-                              person: state.people[index - 1]);
-                        },
+            return Column(
+              children: <Widget>[
+                // ── Others' status, WhatsApp-status-style rail ────────────
+                const SizedBox(height: AppSpacing.small),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.large),
+                  child: Row(
+                    children: <Widget>[
+                      Text(
+                        'STATUS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textMuted,
+                          letterSpacing: 1.0,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.small),
+                SizedBox(
+                  height: 92,
+                  child: PersonStatusRail(people: state.people),
+                ),
+                const SizedBox(height: AppSpacing.small),
+                const Divider(height: 1, color: AppColors.outline),
+
+                // ── Your own detailed log, stats, and tips ─────────────────
+                Expanded(
+                  child: DailyStatsPanel(
+                    onOpenCoach: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const ChatPage()),
                     ),
-                  ],
-                );
-              },
+                  ),
+                ),
+              ],
             );
         }
       },
-    );
-  }
-}
-
-class _AiChatBanner extends StatelessWidget {
-  const _AiChatBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: <Color>[AppColors.primary, Color(0xFF7B88FF)],
-          ),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-        ),
-        child: Row(
-          children: <Widget>[
-            const CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.bolt, color: Colors.white),
-            ),
-            const SizedBox(width: AppSpacing.medium),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text(
-                    'AI Energy Coach',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  Text(
-                    'Chat about sleep, focus, recovery, and more.',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.white),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -174,12 +174,12 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
     }
   }
 
-  /// Tick + label for every hour. Major ticks at 0 / 6 / 12 / 18 are taller
-  /// and labelled in a slightly larger font for orientation.
+  /// Tick for every hour; a clear "7 AM" / "12 PM" style label every 3 hours
+  /// so there's always room to read it without crowding.
   List<Widget> _buildHourMarks() {
     return List<Widget>.generate(25, (hour) {
       final x = hour * 60 * _pixelsPerMinute;
-      final isMajor = hour % 6 == 0;
+      final isMajor = hour % 3 == 0;
       return Positioned(
         left: x,
         bottom: 0,
@@ -189,20 +189,21 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
           children: <Widget>[
             Container(
               width: 1,
-              height: isMajor ? 10 : 6,
+              height: isMajor ? 10 : 5,
               color: isMajor ? AppColors.textMuted : AppColors.outline,
             ),
-            Padding(
-              padding: const EdgeInsets.only(left: 2, bottom: 2),
-              child: Text(
-                _hourLabel(hour),
-                style: TextStyle(
-                  fontSize: isMajor ? 9 : 8,
-                  color: isMajor ? AppColors.textMuted : AppColors.outline,
-                  fontWeight: isMajor ? FontWeight.w600 : FontWeight.normal,
+            if (isMajor)
+              Padding(
+                padding: const EdgeInsets.only(left: 2, bottom: 2),
+                child: Text(
+                  _hourLabel(hour),
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       );
@@ -249,7 +250,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
         decoration: BoxDecoration(
           color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withOpacity(0.4)),
+          border: Border.all(color: accent.withValues(alpha:0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +271,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
               style: TextStyle(
                 fontSize: 9,
-                color: accent.withOpacity(0.75),
+                color: accent.withValues(alpha:0.75),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -300,8 +301,8 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
 
   String _hourLabel(int hour) {
     final h = hour % 24;
-    if (h == 0) return '12a';
-    if (h == 12) return '12p';
-    return h < 12 ? '${h}a' : '${h - 12}p';
+    if (h == 0) return '12 AM';
+    if (h == 12) return '12 PM';
+    return h < 12 ? '$h AM' : '${h - 12} PM';
   }
 }

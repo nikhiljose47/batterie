@@ -4,7 +4,7 @@ class AppStrings {
   static const String appName = 'Energy Health';
   static const String settings = 'Settings';
   static const String youTab = 'You';
-  static const String othersTab = 'Others';
+  static const String othersTab = 'Circle';
   static const String newsTab = 'News';
   static const String currentBodyStatus = 'Current body status';
   static const String potentialToday = 'Potential today';

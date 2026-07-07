@@ -87,11 +87,12 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       ),
+      // Swipe left/right between tabs, WhatsApp-style. The dashboard's rail
+      // still scrolls fine underneath — the deepest scrollable under the
+      // finger wins the gesture, so dragging on the rail scrolls the rail,
+      // and dragging anywhere else changes tabs.
       body: TabBarView(
         controller: _tabController,
-        // Disabled — the dashboard's rail relies on horizontal drag/scroll,
-        // which would otherwise fight with a swipeable tab view.
-        physics: const NeverScrollableScrollPhysics(),
         children: const <Widget>[
           DashboardPage(),
           OthersPage(),
