@@ -126,9 +126,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               return Container(
                 key: _viewportKey,
                 decoration: BoxDecoration(
-                  color: isHovering
-                      ? AppColors.surfaceTint
-                      : Colors.white,
+                  color: isHovering ? AppColors.surfaceTint : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isHovering ? AppColors.primary : AppColors.outline,
@@ -160,8 +158,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   }
 
   void _handleDrop(DragTargetDetails<String> details) {
-    final box =
-        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    final box = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
     final local = box.globalToLocal(details.offset);
     final minutes =
@@ -231,11 +228,10 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
     return widget.activities.map((logged) {
       final activity = _engine.activityById(logged.activityId);
       final isGain = activity.physicalDelta + activity.brainDelta > 0;
-      final accent = isGain
-          ? AppColors.energyBrainAccent
-          : AppColors.energyPhysicalAccent;
-      final width = (logged.durationMinutes * _pixelsPerMinute)
-          .clamp(64.0, _dayWidth);
+      final accent =
+          isGain ? AppColors.energyBrainAccent : AppColors.energyPhysicalAccent;
+      final width =
+          (logged.durationMinutes * _pixelsPerMinute).clamp(64.0, _dayWidth);
 
       return Positioned(
         left: logged.startMinutes * _pixelsPerMinute,
@@ -255,11 +251,10 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             height: 56,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: isGain
-                  ? AppColors.energyBrainBg
-                  : AppColors.energyPhysicalBg,
+              color:
+                  isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accent.withValues(alpha: 0.4)),
+              border: Border.all(color: accent.withOpacity(0.4)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,7 +275,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
                   '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
                   style: TextStyle(
                     fontSize: 9,
-                    color: accent.withValues(alpha: 0.75),
+                    color: accent.withOpacity(0.75),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

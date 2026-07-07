@@ -93,7 +93,7 @@ class _EnergyLevelCardState extends State<EnergyLevelCard> {
               widget.subtitle,
               style: TextStyle(
                 fontSize: 11,
-                color: widget.accentColor.withValues(alpha: 0.72),
+                color: widget.accentColor.withOpacity(0.72),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -130,7 +130,7 @@ class _TrendBadge extends StatelessWidget {
             key: const ValueKey<String>('down'),
             Icons.arrow_drop_down_rounded,
             size: 20,
-            color: color.withValues(alpha: 0.7),
+            color: color.withOpacity(0.7),
           ),
       },
     );
@@ -171,7 +171,7 @@ class _BatteryGauge extends StatelessWidget {
               child: Container(
                 height: 7,
                 decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.45),
+                  color: accentColor.withOpacity(0.45),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(3)),
                 ),
@@ -183,10 +183,10 @@ class _BatteryGauge extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: accentColor.withValues(alpha: 0.45),
+                    color: accentColor.withOpacity(0.45),
                     width: 2.5,
                   ),
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Colors.white.withOpacity(0.5),
                 ),
                 padding: const EdgeInsets.all(3),
                 child: ClipRRect(
@@ -206,7 +206,7 @@ class _BatteryGauge extends StatelessWidget {
                                 end: Alignment.topCenter,
                                 colors: <Color>[
                                   _fillColor,
-                                  _fillColor.withValues(alpha: 0.75),
+                                  _fillColor.withOpacity(0.75),
                                 ],
                               ),
                             ),
@@ -222,9 +222,8 @@ class _BatteryGauge extends StatelessWidget {
                               Icon(
                                 Icons.bolt_rounded,
                                 size: 18,
-                                color: percent > 0.55
-                                    ? Colors.white
-                                    : _fillColor,
+                                color:
+                                    percent > 0.55 ? Colors.white : _fillColor,
                               ),
                             Text(
                               '$pct%',
@@ -232,9 +231,8 @@ class _BatteryGauge extends StatelessWidget {
                                 fontSize: 26,
                                 fontWeight: FontWeight.w800,
                                 height: 1.1,
-                                color: percent > 0.55
-                                    ? Colors.white
-                                    : accentColor,
+                                color:
+                                    percent > 0.55 ? Colors.white : accentColor,
                               ),
                             ),
                           ],

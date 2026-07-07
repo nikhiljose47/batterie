@@ -293,14 +293,11 @@ class _FilterChipGroup<T> extends StatelessWidget {
           return GestureDetector(
             onTap: () => onChanged(option.$1),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 color: selected ? Colors.white : Colors.transparent,
                 borderRadius: BorderRadius.circular(14),
-                border: selected
-                    ? Border.all(color: AppColors.outline)
-                    : null,
+                border: selected ? Border.all(color: AppColors.outline) : null,
               ),
               child: Text(
                 option.$2,
@@ -343,8 +340,8 @@ class _EnergyChartPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(
-          canvas, Offset(0, y - (level == 0 ? 12 : 0) - (level == 1.0 ? -2 : 0)));
+      textPainter.paint(canvas,
+          Offset(0, y - (level == 0 ? 12 : 0) - (level == 1.0 ? -2 : 0)));
     }
 
     if (records.isEmpty) return;
@@ -367,8 +364,7 @@ class _EnergyChartPainter extends CustomPainter {
 
       final path = Path();
       for (var i = 0; i < records.length; i++) {
-        final point =
-            Offset(xFor(records[i].startMinutes), yFor(values[i]));
+        final point = Offset(xFor(records[i].startMinutes), yFor(values[i]));
         if (i == 0) {
           path.moveTo(point.dx, point.dy);
         } else {
@@ -422,8 +418,7 @@ class _ChartLegend extends StatelessWidget {
             const SizedBox(width: 4),
             Text(
               label,
-              style:
-                  const TextStyle(fontSize: 10, color: AppColors.textMuted),
+              style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
             ),
           ],
         );
@@ -476,7 +471,7 @@ class _AverageCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10,
-              color: color.withValues(alpha: 0.8),
+              color: color.withOpacity(0.8),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
