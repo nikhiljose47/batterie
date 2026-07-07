@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../models/day_template.dart';
 import '../models/energy_log_record.dart';
 
 /// Storage contract for daily energy data.
@@ -20,6 +21,13 @@ abstract class EnergyLogStore {
   Future<void> saveRemark(String date, String remark);
 
   Future<String?> remarkForDate(String date);
+
+  /// Creates or updates (by id) a user-saved day template.
+  Future<void> saveTemplate(DayTemplate template);
+
+  Future<List<DayTemplate>> customTemplates();
+
+  Future<void> deleteTemplate(String id);
 }
 
 /// SQLite implementation. Works on Android/iOS out of the box; on Windows
@@ -44,7 +52,7 @@ class SqliteEnergyLogStore implements EnergyLogStore {
 
     final db = await openDatabase(
       p.join(dir, 'energy_logs.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE energy_logs(
@@ -65,6 +73,26 @@ class SqliteEnergyLogStore implements EnergyLogStore {
             remark TEXT NOT NULL
           )
         ''');
+        await db.execute('''
+          CREATE TABLE day_templates(
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            emoji TEXT NOT NULL,
+            items TEXT NOT NULL
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS day_templates(
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              emoji TEXT NOT NULL,
+              items TEXT NOT NULL
+            )
+          ''');
+        }
       },
     );
     _db = db;
@@ -117,5 +145,41 @@ class SqliteEnergyLogStore implements EnergyLogStore {
     );
     if (rows.isEmpty) return null;
     return rows.first['remark'] as String?;
+  }
+
+  @override
+  Future<void> saveTemplate(DayTemplate template) async {
+    final db = await _database;
+    await db.insert(
+      'day_templates',
+      <String, Object?>{
+        'id': template.id,
+        'name': template.name,
+        'emoji': template.emoji,
+        'items': template.encodeItems(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<List<DayTemplate>> customTemplates() async {
+    final db = await _database;
+    final rows = await db.query('day_templates', orderBy: 'name ASC');
+    return rows
+        .map((row) => DayTemplate(
+              id: row['id'] as String,
+              name: row['name'] as String,
+              emoji: row['emoji'] as String,
+              items: DayTemplate.decodeItems(row['items'] as String),
+              isCustom: true,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<void> deleteTemplate(String id) async {
+    final db = await _database;
+    await db.delete('day_templates', where: 'id = ?', whereArgs: [id]);
   }
 }

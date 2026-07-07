@@ -249,7 +249,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
         decoration: BoxDecoration(
           color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withOpacity(0.4)),
+          border: Border.all(color: accent.withValues(alpha:0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +270,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
               style: TextStyle(
                 fontSize: 9,
-                color: accent.withOpacity(0.75),
+                color: accent.withValues(alpha:0.75),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

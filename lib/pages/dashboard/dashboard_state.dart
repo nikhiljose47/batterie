@@ -1,6 +1,7 @@
 import '../../models/battery_status.dart';
 import '../../models/body_status.dart';
 import '../../models/logged_activity.dart';
+import '../../models/timeline_point.dart';
 import '../../state/async_view_state.dart';
 
 class DashboardState {
@@ -9,6 +10,7 @@ class DashboardState {
     this.bodyStatus,
     this.batteries = const <BatteryStatus>[],
     this.loggedActivities = const <LoggedActivity>[],
+    this.timelinePoints = const <TimelinePoint>[],
     this.errorMessage,
     this.isAnalyzing = false,
     this.analysisError,
@@ -19,6 +21,10 @@ class DashboardState {
   final BodyStatus? bodyStatus;
   final List<BatteryStatus> batteries;
   final List<LoggedActivity> loggedActivities;
+
+  /// Predicted physical/brain energy right after each logged activity,
+  /// in chronological order — drives the outcome summary card.
+  final List<TimelinePoint> timelinePoints;
   final String? errorMessage;
   final bool isAnalyzing;
   final String? analysisError;
@@ -29,6 +35,7 @@ class DashboardState {
     BodyStatus? bodyStatus,
     List<BatteryStatus>? batteries,
     List<LoggedActivity>? loggedActivities,
+    List<TimelinePoint>? timelinePoints,
     String? errorMessage,
     bool? isAnalyzing,
     String? analysisError,
@@ -39,6 +46,7 @@ class DashboardState {
       bodyStatus: bodyStatus ?? this.bodyStatus,
       batteries: batteries ?? this.batteries,
       loggedActivities: loggedActivities ?? this.loggedActivities,
+      timelinePoints: timelinePoints ?? this.timelinePoints,
       errorMessage: errorMessage,
       isAnalyzing: isAnalyzing ?? this.isAnalyzing,
       analysisError: analysisError,

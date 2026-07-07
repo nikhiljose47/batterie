@@ -11,9 +11,12 @@ import '../../shared/widgets/loading_state_view.dart';
 import '../../state/async_view_state.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_state.dart';
+import 'energy_outcome.dart';
 import 'widgets/activity_timeline_rail.dart';
 import 'widgets/check_in_sheet.dart';
+import 'widgets/day_planner_sheet.dart';
 import 'widgets/energy_level_card.dart';
+import 'widgets/energy_outcome_card.dart';
 
 // Curated quick-log shortcuts; each maps straight to an engine activity.
 typedef _QuickActivity = ({String activityId, String emoji, String label});
@@ -86,107 +89,114 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // Everything above the input bar lives in one scroll view with fixed
+  // pixel heights (no percentage-of-available-height math). That way the
+  // keyboard opening just shrinks the scrollable area — nothing squishes
+  // or overflows, it simply scrolls, same as a chat app.
   Widget _buildBody(BuildContext context, DashboardState state) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final topHeight = constraints.maxHeight * 0.38;
+    final outcome = computeEnergyOutcome(state.timelinePoints, const EnergyScoreEngine());
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            // ── Top — two energy batteries side by side ─────────────────
-            SizedBox(
-              height: topHeight,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.large,
-                  AppSpacing.medium,
-                  AppSpacing.large,
-                  0,
+    return Column(
+      children: <Widget>[
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.large,
+              AppSpacing.medium,
+              AppSpacing.large,
+              AppSpacing.small,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // ── Outcome strip — predicted shape of the day ───────────
+                EnergyOutcomeCard(
+                  outcome: outcome,
+                  onPlanDay: () => _showPlannerSheet(context),
                 ),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: EnergyLevelCard(
-                        label: AppStrings.physicalEnergy,
-                        percent: state.batteries.isNotEmpty
-                            ? state.batteries[0].percent
-                            : 0.72,
-                        subtitle: state.batteries.isNotEmpty
-                            ? state.batteries[0].subtitle
-                            : '',
-                        accentColor: AppColors.energyPhysicalAccent,
-                        backgroundColor: AppColors.energyPhysicalBg,
-                        icon: Icons.fitness_center_rounded,
+                const SizedBox(height: AppSpacing.medium),
+
+                // ── Two energy batteries side by side ────────────────────
+                SizedBox(
+                  height: 224,
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: EnergyLevelCard(
+                          label: AppStrings.physicalEnergy,
+                          percent: state.batteries.isNotEmpty
+                              ? state.batteries[0].percent
+                              : 0.72,
+                          subtitle: state.batteries.isNotEmpty
+                              ? state.batteries[0].subtitle
+                              : '',
+                          accentColor: AppColors.energyPhysicalAccent,
+                          backgroundColor: AppColors.energyPhysicalBg,
+                          icon: Icons.fitness_center_rounded,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.medium),
-                    Expanded(
-                      child: EnergyLevelCard(
-                        label: AppStrings.brainEnergy,
-                        percent: state.batteries.length > 1
-                            ? state.batteries[1].percent
-                            : 0.74,
-                        subtitle: state.batteries.length > 1
-                            ? state.batteries[1].subtitle
-                            : '',
-                        accentColor: AppColors.energyBrainAccent,
-                        backgroundColor: AppColors.energyBrainBg,
-                        icon: Icons.psychology_rounded,
+                      const SizedBox(width: AppSpacing.medium),
+                      Expanded(
+                        child: EnergyLevelCard(
+                          label: AppStrings.brainEnergy,
+                          percent: state.batteries.length > 1
+                              ? state.batteries[1].percent
+                              : 0.74,
+                          subtitle: state.batteries.length > 1
+                              ? state.batteries[1].subtitle
+                              : '',
+                          accentColor: AppColors.energyBrainAccent,
+                          backgroundColor: AppColors.energyBrainBg,
+                          icon: Icons.psychology_rounded,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
+                const SizedBox(height: AppSpacing.medium),
 
-            // ── Middle — scrollable: rail + quick log ────────────────────
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.large,
-                  AppSpacing.medium,
-                  AppSpacing.large,
-                  AppSpacing.small,
+                if (state.analysisError != null)
+                  _AnalysisErrorBanner(message: state.analysisError!),
+                ActivityTimelineRail(
+                  activities: state.loggedActivities,
+                  onDropActivity: (activityId, startMinutes) => _controller
+                      .logActivity(activityId, startMinutes: startMinutes),
+                  onMoveActivity: (loggedId, startMinutes) =>
+                      _controller.updateLoggedActivity(loggedId,
+                          startMinutes: startMinutes),
+                  onEditRequest: _showEditActivitySheet,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    if (state.analysisError != null)
-                      _AnalysisErrorBanner(message: state.analysisError!),
-                    ActivityTimelineRail(
-                      activities: state.loggedActivities,
-                      onDropActivity: (activityId, startMinutes) => _controller
-                          .logActivity(activityId, startMinutes: startMinutes),
-                      onMoveActivity: (loggedId, startMinutes) =>
-                          _controller.updateLoggedActivity(loggedId,
-                              startMinutes: startMinutes),
-                      onEditRequest: _showEditActivitySheet,
-                    ),
-                    const SizedBox(height: AppSpacing.medium),
-                    _QuickLogSection(
-                      isLoading: state.isAnalyzing,
-                      searchController: _searchController,
-                      searchQuery: _searchQuery,
-                      onSelect: (activityId) =>
-                          _controller.logActivity(activityId),
-                      onAdvanced: () => _showCheckInSheet(context),
-                    ),
-                  ],
+                const SizedBox(height: AppSpacing.medium),
+                _QuickLogSection(
+                  isLoading: state.isAnalyzing,
+                  searchController: _searchController,
+                  searchQuery: _searchQuery,
+                  onSelect: (activityId) =>
+                      _controller.logActivity(activityId),
+                  onAdvanced: () => _showCheckInSheet(context),
                 ),
-              ),
+              ],
             ),
+          ),
+        ),
 
-            // ── Bottom — ChatGPT-style text input ────────────────────────
-            _ActivityInputBar(
-              controller: _textController,
-              focusNode: _focusNode,
-              isLoading: state.isAnalyzing,
-              onSubmit: _submitText,
-            ),
-          ],
-        );
-      },
+        // ── Bottom — ChatGPT-style text input, always above the keyboard ──
+        _ActivityInputBar(
+          controller: _textController,
+          focusNode: _focusNode,
+          isLoading: state.isAnalyzing,
+          onSubmit: _submitText,
+        ),
+      ],
+    );
+  }
+
+  void _showPlannerSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DayPlannerSheet(controller: _controller),
     );
   }
 
@@ -369,7 +379,7 @@ class _QuickLogSection extends StatelessWidget {
               hintText: 'Search activities…',
               hintStyle: TextStyle(
                 fontSize: 12,
-                color: AppColors.textMuted.withOpacity(0.6),
+                color: AppColors.textMuted.withValues(alpha:0.6),
               ),
               prefixIcon: const Icon(Icons.search_rounded,
                   size: 18, color: AppColors.textMuted),
@@ -540,7 +550,7 @@ class _ActivityInputBar extends StatelessWidget {
             const Border(top: BorderSide(color: AppColors.outline, width: 0.5)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -563,7 +573,7 @@ class _ActivityInputBar extends StatelessWidget {
                 hintText: '"walked 30 min", "gym 1h", "took a nap"…',
                 hintStyle: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textMuted.withOpacity(0.6),
+                  color: AppColors.textMuted.withValues(alpha:0.6),
                 ),
                 filled: true,
                 fillColor: AppColors.scaffoldBackground,

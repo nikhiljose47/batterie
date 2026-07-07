@@ -13,7 +13,6 @@ class AppSpacing {
   static const double filterBarHeight = 48;
   static const double metricLabelWidth = 48;
   static const double metricValueWidth = 44;
-  static const double bottomNavigationIconSize = 22;
   static const double batteryHeight = 248;
   static const double batteryMeterWidth = 68;
   static const double batteryMeterHeight = 132;

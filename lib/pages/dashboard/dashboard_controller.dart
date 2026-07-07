@@ -7,9 +7,11 @@ import '../../constants/app_strings.dart';
 import '../../engine/energy_score_engine.dart';
 import '../../models/battery_status.dart';
 import '../../models/body_status.dart';
+import '../../models/day_template.dart';
 import '../../models/energy_check_in.dart';
 import '../../models/energy_log_record.dart';
 import '../../models/logged_activity.dart';
+import '../../models/timeline_point.dart';
 import '../../repositories/energy_health_repository.dart';
 import '../../services/energy_log_store.dart';
 import '../../services/open_router_service.dart';
@@ -180,6 +182,36 @@ class DashboardController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Replaces today's whole rail with [template]'s items — used by the day
+  /// planner sheet to lay out a full day in one action.
+  void applyTemplate(DayTemplate template) {
+    final now = DateTime.now();
+    final entries = template.items
+        .map((item) => LoggedActivity(
+              id: 'log_${_entryCounter++}_${now.microsecondsSinceEpoch}',
+              activityId: item.activityId,
+              startMinutes: item.startMinutes.clamp(0, 1439),
+              durationMinutes: item.durationMinutes,
+            ))
+        .toList();
+
+    _state = _state.copyWith(
+      loggedActivities: entries,
+      hasCheckInEstimate: true,
+      analysisError: null,
+    );
+    _recomputeFromTimeline();
+    notifyListeners();
+  }
+
+  Future<List<DayTemplate>> loadCustomTemplates() => _logStore.customTemplates();
+
+  Future<void> saveCustomTemplate(DayTemplate template) =>
+      _logStore.saveTemplate(template);
+
+  Future<void> deleteCustomTemplate(String id) =>
+      _logStore.deleteTemplate(id);
+
   /// Replays every timeline activity in chronological order on top of the
   /// daily baseline, so the batteries always reflect the whole day.
   /// Each intermediate state is persisted so the stats tab can chart the day.
@@ -190,6 +222,7 @@ class DashboardController extends ChangeNotifier {
 
     final today = dateKey(DateTime.now());
     final records = <EnergyLogRecord>[];
+    final points = <TimelinePoint>[];
     for (final item in sorted) {
       energy = _energyScoreEngine.applyActivity(
         energy,
@@ -205,6 +238,12 @@ class DashboardController extends ChangeNotifier {
         activityId: item.activityId,
         physicalAfter: energy.physical,
         brainAfter: energy.brain,
+      ));
+      points.add(TimelinePoint(
+        startMinutes: item.startMinutes,
+        activityId: item.activityId,
+        physical: energy.physical,
+        brain: energy.brain,
       ));
     }
     unawaited(
@@ -230,6 +269,7 @@ class DashboardController extends ChangeNotifier {
           color: AppColors.brainEnergy,
         ),
       ],
+      timelinePoints: points,
       bodyStatus: _state.bodyStatus == null || lastActivity == null
           ? _state.bodyStatus
           : BodyStatus(

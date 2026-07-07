@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
 import '../dashboard/dashboard_page.dart';
@@ -14,80 +15,90 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   late final HomeController _controller;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _controller = HomeController();
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _controller.state.selectedIndex,
+    );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _controller.updateSelectedIndex(_tabController.index);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return Scaffold(
-          appBar: AppBar(
-            toolbarHeight: 48,
-            scrolledUnderElevation: 0,
-            title: const Text(
-              AppStrings.appName,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 40,
+        scrolledUnderElevation: 0,
+        titleSpacing: AppSpacing.large,
+        title: const Text(
+          AppStrings.appName,
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        actions: <Widget>[
+          IconButton(
+            tooltip: AppStrings.settings,
+            onPressed: _showSettingsSheet,
+            icon: const Icon(Icons.settings_outlined, size: 18),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(34),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(bottom: BorderSide(color: AppColors.outline)),
             ),
-            actions: <Widget>[
-              IconButton(
-                tooltip: AppStrings.settings,
-                onPressed: _showSettingsSheet,
-                icon: const Icon(Icons.settings_outlined, size: 20),
-              ),
-            ],
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 2,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textMuted,
+              labelPadding: EdgeInsets.zero,
+              tabs: const <Widget>[
+                _ThinTab(icon: Icons.bolt_outlined, label: AppStrings.youTab),
+                _ThinTab(
+                    icon: Icons.groups_2_outlined,
+                    label: AppStrings.othersTab),
+                _ThinTab(
+                    icon: Icons.article_outlined, label: AppStrings.newsTab),
+              ],
+            ),
           ),
-          body: _buildSelectedPage(_controller.state.selectedIndex),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _controller.state.selectedIndex,
-            onTap: _controller.updateSelectedIndex,
-            iconSize: AppSpacing.bottomNavigationIconSize,
-            selectedFontSize: 10,
-            unselectedFontSize: 10,
-            type: BottomNavigationBarType.fixed,
-            items: const <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(Icons.bolt_outlined),
-                label: AppStrings.youTab,
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.groups_2_outlined),
-                label: AppStrings.othersTab,
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.article_outlined),
-                label: AppStrings.newsTab,
-              ),
-            ],
-          ),
-        );
-      },
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        // Disabled — the dashboard's rail relies on horizontal drag/scroll,
+        // which would otherwise fight with a swipeable tab view.
+        physics: const NeverScrollableScrollPhysics(),
+        children: const <Widget>[
+          DashboardPage(),
+          OthersPage(),
+          NewsPage(),
+        ],
+      ),
     );
-  }
-
-  Widget _buildSelectedPage(int selectedIndex) {
-    switch (selectedIndex) {
-      case 1:
-        return const OthersPage();
-      case 2:
-        return const NewsPage();
-      case 0:
-      default:
-        return const DashboardPage();
-    }
   }
 
   void _showSettingsSheet() {
@@ -111,6 +122,30 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Compact icon+label tab, sized to keep the whole top bar thin.
+class _ThinTab extends StatelessWidget {
+  const _ThinTab({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tab(
+      height: 34,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 15),
+          const SizedBox(width: 5),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 }
