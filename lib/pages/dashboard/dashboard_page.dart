@@ -3,27 +3,30 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
+import '../../engine/energy_score_engine.dart';
+import '../../models/logged_activity.dart';
 import '../../shared/widgets/empty_state_view.dart';
 import '../../shared/widgets/error_state_view.dart';
 import '../../shared/widgets/loading_state_view.dart';
 import '../../state/async_view_state.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_state.dart';
+import 'widgets/activity_timeline_rail.dart';
 import 'widgets/check_in_sheet.dart';
 import 'widgets/energy_level_card.dart';
 
-// Quick-log shortcut chips shown below the energy cards.
-typedef _QuickActivity = ({String emoji, String label, String hint});
+// Curated quick-log shortcuts; each maps straight to an engine activity.
+typedef _QuickActivity = ({String activityId, String emoji, String label});
 
 const List<_QuickActivity> _kQuickActivities = <_QuickActivity>[
-  (emoji: '🚶', label: 'Walk',      hint: 'I walked for 30 minutes'),
-  (emoji: '🏃', label: 'Run',       hint: 'I jogged for 30 minutes'),
-  (emoji: '🏋️', label: 'Gym',       hint: 'gym workout 30 minutes'),
-  (emoji: '😴', label: 'Nap',       hint: 'I took a 20 minute nap'),
-  (emoji: '🧘', label: 'Meditate',  hint: 'I meditated for 15 minutes'),
-  (emoji: '💻', label: 'Deep work', hint: 'focused coding work 60 minutes'),
-  (emoji: '📱', label: 'Scrolling', hint: 'I was scrolling social media 30 minutes'),
-  (emoji: '🍽️', label: 'Break',     hint: 'I took a meal break away from my desk'),
+  (activityId: 'brisk_walking', emoji: '🚶', label: 'Walk'),
+  (activityId: 'running_easy_pace', emoji: '🏃', label: 'Run'),
+  (activityId: 'hiit_workout', emoji: '🏋️', label: 'Gym'),
+  (activityId: 'power_nap_10_20_min', emoji: '😴', label: 'Nap'),
+  (activityId: 'mindfulness_meditation', emoji: '🧘', label: 'Meditate'),
+  (activityId: 'focused_coding', emoji: '💻', label: 'Deep work'),
+  (activityId: 'social_media_scrolling', emoji: '📱', label: 'Scrolling'),
+  (activityId: 'meal_break_away_from_desk', emoji: '🍽️', label: 'Break'),
 ];
 
 class DashboardPage extends StatefulWidget {
@@ -36,18 +39,24 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final DashboardController _controller;
   final TextEditingController _textController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _controller = DashboardController()..load();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text.trim());
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _textController.dispose();
+    _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -80,12 +89,12 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildBody(BuildContext context, DashboardState state) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final topHeight = constraints.maxHeight * 0.40;
+        final topHeight = constraints.maxHeight * 0.38;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // ── Top 40 % — two energy level cards side by side ──────────
+            // ── Top — two energy batteries side by side ─────────────────
             SizedBox(
               height: topHeight,
               child: Padding(
@@ -131,37 +140,43 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
 
-            // ── Status badges ────────────────────────────────────────────
-            if (state.hasCheckInEstimate || state.analysisError != null)
-              Padding(
+            // ── Middle — scrollable: rail + quick log ────────────────────
+            Expanded(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.large,
                   AppSpacing.medium,
                   AppSpacing.large,
-                  0,
+                  AppSpacing.small,
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    if (state.hasCheckInEstimate)
-                      _AiPoweredBadge(
-                        onRefresh: () => _showCheckInSheet(context),
-                      ),
                     if (state.analysisError != null)
                       _AnalysisErrorBanner(message: state.analysisError!),
+                    ActivityTimelineRail(
+                      activities: state.loggedActivities,
+                      onDropActivity: (activityId, startMinutes) =>
+                          _controller.logActivity(activityId,
+                              startMinutes: startMinutes),
+                      onEditRequest: _showEditActivitySheet,
+                      onAdjustDuration: _adjustDuration,
+                    ),
+                    const SizedBox(height: AppSpacing.medium),
+                    _QuickLogSection(
+                      isLoading: state.isAnalyzing,
+                      searchController: _searchController,
+                      searchQuery: _searchQuery,
+                      onSelect: (activityId) =>
+                          _controller.logActivity(activityId),
+                      onAdvanced: () => _showCheckInSheet(context),
+                    ),
                   ],
                 ),
               ),
-
-            // ── Quick activity chips ─────────────────────────────────────
-            _QuickActivitiesRow(
-              isLoading: state.isAnalyzing,
-              onSelect: _submitText,
-              onAdvanced: () => _showCheckInSheet(context),
             ),
 
-            const Spacer(),
-
-            // ── Bottom text input (ChatGPT / Claude style) ───────────────
+            // ── Bottom — ChatGPT-style text input ────────────────────────
             _ActivityInputBar(
               controller: _textController,
               focusNode: _focusNode,
@@ -181,6 +196,41 @@ class _DashboardPageState extends State<DashboardPage> {
     _focusNode.unfocus();
   }
 
+  void _adjustDuration(LoggedActivity logged, int deltaMinutes) {
+    final newDuration =
+        (logged.durationMinutes + deltaMinutes).clamp(10, 240);
+    final activity =
+        const EnergyScoreEngine().activityById(logged.activityId);
+
+    if (newDuration == logged.durationMinutes) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(
+            deltaMinutes > 0
+                ? '${activity.name} is already at the 240 min maximum'
+                : '${activity.name} is already at the 10 min minimum',
+          ),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ));
+      return;
+    }
+
+    _controller.updateLoggedActivity(logged.id,
+        durationMinutes: newDuration);
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(
+          '${activity.name} ${deltaMinutes > 0 ? '+30' : '−30'} min → $newDuration min',
+        ),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
+
   void _showCheckInSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -189,92 +239,313 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (_) => CheckInSheet(onSubmit: _controller.analyzeCheckIn),
     );
   }
+
+  void _showEditActivitySheet(LoggedActivity logged) {
+    const engine = EnergyScoreEngine();
+    final activity = engine.activityById(logged.activityId);
+    var start = logged.startMinutes.toDouble();
+    var duration = logged.durationMinutes.toDouble().clamp(10.0, 240.0);
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xLarge,
+            0,
+            AppSpacing.xLarge,
+            AppSpacing.xLarge,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '${activityEmojis[logged.activityId] ?? '⚡'} ${activity.name}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.large),
+              Row(
+                children: <Widget>[
+                  const Expanded(child: Text('Start time')),
+                  Text(
+                    formatMinutes(start.round()),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              Slider(
+                value: start,
+                min: 0,
+                max: 1425,
+                divisions: 95,
+                onChanged: (v) => setSheetState(() => start = v),
+              ),
+              Row(
+                children: <Widget>[
+                  const Expanded(child: Text('Duration')),
+                  Text(
+                    '${duration.round()} min',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              Slider(
+                value: duration,
+                min: 10,
+                max: 240,
+                divisions: 23,
+                onChanged: (v) => setSheetState(() => duration = v),
+              ),
+              const SizedBox(height: AppSpacing.medium),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _controller.removeLoggedActivity(logged.id);
+                        Navigator.of(sheetContext).pop();
+                      },
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text('Remove'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.medium),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        _controller.updateLoggedActivity(
+                          logged.id,
+                          startMinutes: start.round(),
+                          durationMinutes: duration.round(),
+                        );
+                        Navigator.of(sheetContext).pop();
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-// ── Quick-log chip row ────────────────────────────────────────────────────────
+// ── Quick log: search + draggable chips ──────────────────────────────────────
 
-class _QuickActivitiesRow extends StatelessWidget {
-  const _QuickActivitiesRow({
+class _QuickLogSection extends StatelessWidget {
+  const _QuickLogSection({
     required this.isLoading,
+    required this.searchController,
+    required this.searchQuery,
     required this.onSelect,
     required this.onAdvanced,
   });
 
   final bool isLoading;
+  final TextEditingController searchController;
+  final String searchQuery;
   final ValueChanged<String> onSelect;
   final VoidCallback onAdvanced;
 
+  List<({String activityId, String emoji, String label})> get _visibleChips {
+    if (searchQuery.isEmpty) return _kQuickActivities;
+    final q = searchQuery.toLowerCase();
+    return EnergyScoreEngine.activities
+        .where((a) => a.name.toLowerCase().contains(q))
+        .map((a) => (
+              activityId: a.id,
+              emoji: activityEmojis[a.id] ?? '⚡',
+              label: a.name,
+            ))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.large,
-        AppSpacing.medium,
-        AppSpacing.large,
-        0,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Text(
-            'QUICK LOG',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textMuted,
-              letterSpacing: 1.0,
+    final chips = _visibleChips;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Row(
+          children: <Widget>[
+            Text(
+              'QUICK LOG',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMuted,
+                letterSpacing: 1.0,
+              ),
             ),
+            Spacer(),
+            Text(
+              'tap to log now · hold and drag to the rail',
+              style: TextStyle(fontSize: 9, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.small),
+        SizedBox(
+          height: 36,
+          child: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search activities…',
+              hintStyle: TextStyle(
+                fontSize: 12,
+                color: AppColors.textMuted.withValues(alpha: 0.6),
+              ),
+              prefixIcon: const Icon(Icons.search_rounded,
+                  size: 18, color: AppColors.textMuted),
+              suffixIcon: searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      color: AppColors.textMuted,
+                      onPressed: searchController.clear,
+                    ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: EdgeInsets.zero,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(color: AppColors.outline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(color: AppColors.outline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 1),
+              ),
+            ),
+            style: const TextStyle(fontSize: 12),
           ),
-          const SizedBox(height: AppSpacing.small),
+        ),
+        const SizedBox(height: AppSpacing.small),
+        if (chips.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.small),
+            child: Text(
+              'No matching activity — try the text box below, AI will estimate it.',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          )
+        else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
             child: Row(
               children: <Widget>[
-                ..._kQuickActivities.map(
-                  (a) => Padding(
+                ...chips.map(
+                  (chip) => Padding(
                     padding: const EdgeInsets.only(right: AppSpacing.small),
-                    child: ActionChip(
-                      avatar: Text(a.emoji,
-                          style: const TextStyle(fontSize: 14)),
-                      label: Text(a.label),
-                      onPressed: isLoading ? null : () => onSelect(a.hint),
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: const BorderSide(color: AppColors.outline),
-                      ),
-                      labelStyle: const TextStyle(
-                          fontSize: 12, color: AppColors.textMuted),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xSmall),
+                    child: _DraggableActivityChip(
+                      activityId: chip.activityId,
+                      emoji: chip.emoji,
+                      label: chip.label,
+                      enabled: !isLoading,
+                      onTap: () => onSelect(chip.activityId),
                     ),
                   ),
                 ),
-                ActionChip(
-                  avatar: const Icon(Icons.tune_rounded,
-                      size: 14, color: AppColors.primary),
-                  label: const Text('More'),
-                  onPressed: isLoading ? null : onAdvanced,
-                  backgroundColor: AppColors.surfaceTint,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: const BorderSide(
-                        color: AppColors.primary, width: 0.5),
+                if (searchQuery.isEmpty)
+                  ActionChip(
+                    avatar: const Icon(Icons.tune_rounded,
+                        size: 14, color: AppColors.primary),
+                    label: const Text('More'),
+                    onPressed: isLoading ? null : onAdvanced,
+                    backgroundColor: AppColors.surfaceTint,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(
+                          color: AppColors.primary, width: 0.5),
+                    ),
+                    labelStyle: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xSmall),
                   ),
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xSmall),
-                ),
               ],
             ),
           ),
-        ],
+      ],
+    );
+  }
+}
+
+/// Chip that logs on tap and can be long-pressed and dragged onto the rail.
+class _DraggableActivityChip extends StatelessWidget {
+  const _DraggableActivityChip({
+    required this.activityId,
+    required this.emoji,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String activityId;
+  final String emoji;
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  Widget _chip(BuildContext context, {bool dragging = false}) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: dragging ? AppColors.surfaceTint : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: dragging ? AppColors.primary : AppColors.outline,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: dragging ? AppColors.primary : AppColors.textMuted,
+                fontWeight: dragging ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return Opacity(opacity: 0.5, child: _chip(context));
+
+    return LongPressDraggable<String>(
+      data: activityId,
+      feedback: _chip(context, dragging: true),
+      childWhenDragging: Opacity(opacity: 0.35, child: _chip(context)),
+      child: GestureDetector(onTap: onTap, child: _chip(context)),
     );
   }
 }
@@ -403,47 +674,6 @@ class _SendButton extends StatelessWidget {
                 ),
               ),
             ),
-    );
-  }
-}
-
-// ── Status badges (reused from old layout) ────────────────────────────────────
-
-class _AiPoweredBadge extends StatelessWidget {
-  const _AiPoweredBadge({required this.onRefresh});
-
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.small),
-      child: Row(
-        children: <Widget>[
-          const Icon(Icons.auto_awesome, size: 13, color: AppColors.primary),
-          const SizedBox(width: AppSpacing.xSmall),
-          const Text(
-            'Latest check-in estimate',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.primary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: onRefresh,
-            child: const Text(
-              'Update',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.primary,
-                decoration: TextDecoration.underline,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

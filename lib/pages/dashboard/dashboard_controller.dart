@@ -6,6 +6,7 @@ import '../../engine/energy_score_engine.dart';
 import '../../models/battery_status.dart';
 import '../../models/body_status.dart';
 import '../../models/energy_check_in.dart';
+import '../../models/logged_activity.dart';
 import '../../repositories/energy_health_repository.dart';
 import '../../services/open_router_service.dart';
 import '../../services/settings_service.dart';
@@ -101,6 +102,107 @@ class DashboardController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Timeline rail ───────────────────────────────────────────────────
+
+  int _entryCounter = 0;
+
+  /// Adds an activity to the day timeline (from a chip tap, drag-drop, or
+  /// text input) and recomputes energy from the whole day's sequence.
+  void logActivity(String activityId,
+      {int? startMinutes, int? durationMinutes}) {
+    final now = DateTime.now();
+    final entry = LoggedActivity(
+      id: 'log_${_entryCounter++}_${now.microsecondsSinceEpoch}',
+      activityId: activityId,
+      startMinutes:
+          (startMinutes ?? now.hour * 60 + now.minute).clamp(0, 1439),
+      durationMinutes:
+          durationMinutes ?? _defaultDurations[activityId] ?? 30,
+    );
+
+    _state = _state.copyWith(
+      loggedActivities: <LoggedActivity>[..._state.loggedActivities, entry],
+      hasCheckInEstimate: true,
+      analysisError: null,
+    );
+    _recomputeFromTimeline();
+    notifyListeners();
+  }
+
+  void updateLoggedActivity(String id,
+      {int? startMinutes, int? durationMinutes}) {
+    _state = _state.copyWith(
+      loggedActivities: _state.loggedActivities
+          .map((a) => a.id == id
+              ? a.copyWith(
+                  startMinutes: startMinutes,
+                  durationMinutes: durationMinutes,
+                )
+              : a)
+          .toList(),
+    );
+    _recomputeFromTimeline();
+    notifyListeners();
+  }
+
+  void removeLoggedActivity(String id) {
+    _state = _state.copyWith(
+      loggedActivities:
+          _state.loggedActivities.where((a) => a.id != id).toList(),
+    );
+    _recomputeFromTimeline();
+    notifyListeners();
+  }
+
+  /// Replays every timeline activity in chronological order on top of the
+  /// daily baseline, so the batteries always reflect the whole day.
+  void _recomputeFromTimeline() {
+    var energy = _energyScoreEngine.createDailyBaseline(28, 7.0, 0.7);
+    final sorted = <LoggedActivity>[..._state.loggedActivities]
+      ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+
+    for (final item in sorted) {
+      energy = _energyScoreEngine.applyActivity(
+        energy,
+        item.activityId,
+        item.durationMinutes,
+        28,
+      );
+    }
+
+    final lastActivity = sorted.isEmpty
+        ? null
+        : _energyScoreEngine.activityById(sorted.last.activityId);
+
+    _state = _state.copyWith(
+      batteries: <BatteryStatus>[
+        BatteryStatus(
+          title: AppStrings.physicalEnergy,
+          percent: energy.physical / 100,
+          subtitle: _percentLabel(energy.physical / 100),
+          color: AppColors.bodyEnergy,
+        ),
+        BatteryStatus(
+          title: AppStrings.brainEnergy,
+          percent: energy.brain / 100,
+          subtitle: _percentLabel(energy.brain / 100),
+          color: AppColors.brainEnergy,
+        ),
+      ],
+      bodyStatus: _state.bodyStatus == null || lastActivity == null
+          ? _state.bodyStatus
+          : BodyStatus(
+              status:
+                  'Physical ${energy.physical}% and brain ${energy.brain}% after ${sorted.length} logged ${sorted.length == 1 ? 'activity' : 'activities'} today.',
+              potential: _state.bodyStatus!.potential,
+              previousActivity:
+                  '${lastActivity.name} for ${sorted.last.durationMinutes} min.',
+              supportNote: _state.bodyStatus!.supportNote,
+              recommendedActions: _state.bodyStatus!.recommendedActions,
+            ),
+    );
+  }
+
   // Accepts free-text like "walked 30 min" or "gym 1h".
   // First attempts a local keyword → activity match; falls back to OpenRouter.
   Future<void> processActivityText(String text) async {
@@ -109,18 +211,7 @@ class DashboardController extends ChangeNotifier {
 
     final match = _matchActivity(trimmed);
     if (match != null) {
-      await analyzeCheckIn(EnergyCheckIn(
-        age: 28,
-        sleepHours: 7.0,
-        sleepQuality: 0.7,
-        activityId: match.activityId,
-        durationMinutes: match.durationMinutes,
-        stressLevel: 0.3,
-        illnessOrPain: 0.0,
-        heatExposure: 0.0,
-        fitnessLevel: 0.5,
-        notes: trimmed,
-      ));
+      logActivity(match.activityId, durationMinutes: match.durationMinutes);
       return;
     }
 
