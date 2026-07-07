@@ -120,7 +120,7 @@ class _CheckInSheetState extends State<CheckInSheet> {
           ),
           const SizedBox(height: AppSpacing.small),
           DropdownButtonFormField<String>(
-            value: _activityId,
+            initialValue: _activityId,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'What have you mostly been doing?',
