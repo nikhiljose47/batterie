@@ -18,4 +18,10 @@ class AppColors {
   static const Color outline = Color(0xFFE1E5F0);
   static const Color textMuted = Color(0xFF667085);
   static const Color batteryTrack = Color(0xFFF0F3FA);
+
+  // Energy level card backgrounds and accents
+  static const Color energyPhysicalBg = Color(0xFFDFF4FF);
+  static const Color energyPhysicalAccent = Color(0xFF0080B3);
+  static const Color energyBrainBg = Color(0xFFE0F5EA);
+  static const Color energyBrainAccent = Color(0xFF00875A);
 }

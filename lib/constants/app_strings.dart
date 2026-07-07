@@ -12,6 +12,8 @@ class AppStrings {
   static const String notAlone = 'You are not alone';
   static const String physicalBattery = 'Physical battery';
   static const String brainBattery = 'Brain battery';
+  static const String physicalEnergy = 'Physical energy';
+  static const String brainEnergy = 'Brain energy';
   static const String othersTitle = 'Others status';
   static const String bodyMetric = 'Body';
   static const String brainMetric = 'Brain';

@@ -36,12 +36,17 @@ class _HomePageState extends State<HomePage> {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text(AppStrings.appName),
+            toolbarHeight: 48,
+            scrolledUnderElevation: 0,
+            title: const Text(
+              AppStrings.appName,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
             actions: <Widget>[
               IconButton(
                 tooltip: AppStrings.settings,
                 onPressed: _showSettingsSheet,
-                icon: const Icon(Icons.settings_outlined),
+                icon: const Icon(Icons.settings_outlined, size: 20),
               ),
             ],
           ),
@@ -50,6 +55,8 @@ class _HomePageState extends State<HomePage> {
             currentIndex: _controller.state.selectedIndex,
             onTap: _controller.updateSelectedIndex,
             iconSize: AppSpacing.bottomNavigationIconSize,
+            selectedFontSize: 10,
+            unselectedFontSize: 10,
             type: BottomNavigationBarType.fixed,
             items: const <BottomNavigationBarItem>[
               BottomNavigationBarItem(
