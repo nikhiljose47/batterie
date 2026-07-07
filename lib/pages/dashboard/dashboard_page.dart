@@ -94,7 +94,8 @@ class _DashboardPageState extends State<DashboardPage> {
   // keyboard opening just shrinks the scrollable area — nothing squishes
   // or overflows, it simply scrolls, same as a chat app.
   Widget _buildBody(BuildContext context, DashboardState state) {
-    final outcome = computeEnergyOutcome(state.timelinePoints, const EnergyScoreEngine());
+    final outcome =
+        computeEnergyOutcome(state.timelinePoints, const EnergyScoreEngine());
 
     return Column(
       children: <Widget>[
@@ -171,8 +172,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   isLoading: state.isAnalyzing,
                   searchController: _searchController,
                   searchQuery: _searchQuery,
-                  onSelect: (activityId) =>
-                      _controller.logActivity(activityId),
+                  onSelect: (activityId) => _controller.logActivity(activityId),
                   onAdvanced: () => _showCheckInSheet(context),
                 ),
               ],
@@ -379,7 +379,7 @@ class _QuickLogSection extends StatelessWidget {
               hintText: 'Search activities…',
               hintStyle: TextStyle(
                 fontSize: 12,
-                color: AppColors.textMuted.withValues(alpha:0.6),
+                color: AppColors.textMuted.withOpacity(0.6),
               ),
               prefixIcon: const Icon(Icons.search_rounded,
                   size: 18, color: AppColors.textMuted),
@@ -550,7 +550,7 @@ class _ActivityInputBar extends StatelessWidget {
             const Border(top: BorderSide(color: AppColors.outline, width: 0.5)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -573,7 +573,7 @@ class _ActivityInputBar extends StatelessWidget {
                 hintText: '"walked 30 min", "gym 1h", "took a nap"…',
                 hintStyle: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textMuted.withValues(alpha:0.6),
+                  color: AppColors.textMuted.withOpacity(0.6),
                 ),
                 filled: true,
                 fillColor: AppColors.scaffoldBackground,

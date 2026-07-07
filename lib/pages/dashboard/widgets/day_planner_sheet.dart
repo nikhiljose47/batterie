@@ -245,7 +245,7 @@ class _TemplateCard extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 1),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
+                                color: AppColors.primary.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Text(
@@ -280,8 +280,8 @@ class _TemplateCard extends StatelessWidget {
                   ),
                 TextButton(
                   onPressed: onCustomize,
-                  child: const Text('Customize',
-                      style: TextStyle(fontSize: 12)),
+                  child:
+                      const Text('Customize', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),

@@ -143,7 +143,7 @@ class _AiChatBanner extends StatelessWidget {
                   Text(
                     'Chat about sleep, focus, recovery, and more.',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha:0.8),
+                      color: Colors.white.withOpacity(0.8),
                       fontSize: 12,
                     ),
                   ),
