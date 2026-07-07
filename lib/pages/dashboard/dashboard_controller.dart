@@ -142,10 +142,8 @@ class DashboardController extends ChangeNotifier {
     final entry = LoggedActivity(
       id: 'log_${_entryCounter++}_${now.microsecondsSinceEpoch}',
       activityId: activityId,
-      startMinutes:
-          (startMinutes ?? now.hour * 60 + now.minute).clamp(0, 1439),
-      durationMinutes:
-          durationMinutes ?? _defaultDurations[activityId] ?? 30,
+      startMinutes: (startMinutes ?? now.hour * 60 + now.minute).clamp(0, 1439),
+      durationMinutes: durationMinutes ?? _defaultDurations[activityId] ?? 30,
     );
 
     _state = _state.copyWith(
@@ -317,37 +315,72 @@ class DashboardController extends ChangeNotifier {
     return 'Very low — rest now';
   }
 
-  static const Map<String, List<String>> _keywordMap =
-      <String, List<String>>{
+  static const Map<String, List<String>> _keywordMap = <String, List<String>>{
     'focused_coding': <String>[
-      'cod', 'program', 'dev', 'develop', 'work', 'study', 'focus', 'task',
+      'cod',
+      'program',
+      'dev',
+      'develop',
+      'work',
+      'study',
+      'focus',
+      'task',
     ],
     'email_and_message_backlog': <String>[
-      'email', 'message', 'slack', 'admin', 'inbox', 'reply',
+      'email',
+      'message',
+      'slack',
+      'admin',
+      'inbox',
+      'reply',
     ],
     'video_meeting_for_work': <String>[
-      'meeting', 'call', 'zoom', 'teams', 'conference',
+      'meeting',
+      'call',
+      'zoom',
+      'teams',
+      'conference',
     ],
     'social_media_scrolling': <String>[
-      'social', 'scroll', 'instagram', 'twitter', 'tiktok', 'reels',
-      'facebook', 'youtube',
+      'social',
+      'scroll',
+      'instagram',
+      'twitter',
+      'tiktok',
+      'reels',
+      'facebook',
+      'youtube',
     ],
     'easy_walking': <String>['easy walk', 'stroll', 'slow walk', 'leisurely'],
     'brisk_walking': <String>['walk', 'brisk'],
     'running_easy_pace': <String>['run', 'jog'],
     'hiit_workout': <String>[
-      'hiit', 'gym', 'workout', 'weight', 'lift', 'exercise', 'training',
+      'hiit',
+      'gym',
+      'workout',
+      'weight',
+      'lift',
+      'exercise',
+      'training',
       'sports',
     ],
     'cooking_light_meal': <String>['cook', 'kitchen', 'meal prep', 'bake'],
     'deep_house_cleaning': <String>['clean', 'chore', 'errands', 'housework'],
     'slow_breathing_exercise': <String>['breath', 'breathe', 'breathing'],
     'mindfulness_meditation': <String>[
-      'meditat', 'mindful', 'yoga', 'zen', 'stretching',
+      'meditat',
+      'mindful',
+      'yoga',
+      'zen',
+      'stretching',
     ],
     'power_nap_10_20_min': <String>['nap'],
     'meal_break_away_from_desk': <String>[
-      'break', 'lunch', 'dinner', 'breakfast', 'meal',
+      'break',
+      'lunch',
+      'dinner',
+      'breakfast',
+      'meal',
     ],
   };
 

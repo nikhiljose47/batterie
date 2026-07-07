@@ -57,8 +57,8 @@ class SqliteEnergyLogStore implements EnergyLogStore {
             brain_after INTEGER NOT NULL
           )
         ''');
-        await db.execute(
-            'CREATE INDEX idx_energy_logs_date ON energy_logs(date)');
+        await db
+            .execute('CREATE INDEX idx_energy_logs_date ON energy_logs(date)');
         await db.execute('''
           CREATE TABLE daily_remarks(
             date TEXT PRIMARY KEY,

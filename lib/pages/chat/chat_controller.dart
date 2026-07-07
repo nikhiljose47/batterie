@@ -15,7 +15,8 @@ class ChatController extends ChangeNotifier {
   final OpenRouterService _openRouterService;
   final SettingsService _settingsService;
 
-  static const _systemPrompt = '''You are an empathetic energy and wellness coach inside the Batterie app. Your role is to help users understand their physical and mental energy patterns, offer practical advice, and support their day.
+  static const _systemPrompt =
+      '''You are an empathetic energy and wellness coach inside the Batterie app. Your role is to help users understand their physical and mental energy patterns, offer practical advice, and support their day.
 
 Keep answers concise, warm, and actionable. You can ask follow-up questions about sleep, nutrition, movement, stress, or mood. Never give medical diagnoses.''';
 

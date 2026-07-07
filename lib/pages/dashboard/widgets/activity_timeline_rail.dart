@@ -190,9 +190,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             Container(
               width: 1,
               height: isMajor ? 10 : 6,
-              color: isMajor
-                  ? AppColors.textMuted
-                  : AppColors.outline,
+              color: isMajor ? AppColors.textMuted : AppColors.outline,
             ),
             Padding(
               padding: const EdgeInsets.only(left: 2, bottom: 2),
@@ -201,8 +199,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
                 style: TextStyle(
                   fontSize: isMajor ? 9 : 8,
                   color: isMajor ? AppColors.textMuted : AppColors.outline,
-                  fontWeight:
-                      isMajor ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isMajor ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ),
@@ -252,7 +249,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
         decoration: BoxDecoration(
           color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withValues(alpha: 0.4)),
+          border: Border.all(color: accent.withOpacity(0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,7 +270,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
               style: TextStyle(
                 fontSize: 9,
-                color: accent.withValues(alpha: 0.75),
+                color: accent.withOpacity(0.75),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

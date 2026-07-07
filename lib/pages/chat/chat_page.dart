@@ -103,10 +103,8 @@ class _ChatPageState extends State<ChatPage> {
                         },
                       ),
               ),
-              if (state.error != null)
-                _ErrorBanner(message: state.error!),
-              if (state.isSending)
-                const _TypingIndicator(),
+              if (state.error != null) _ErrorBanner(message: state.error!),
+              if (state.isSending) const _TypingIndicator(),
               _InputBar(
                 controller: _textController,
                 isSending: state.isSending,
@@ -292,7 +290,8 @@ class _ThreeDotsState extends State<_ThreeDots>
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(3, (i) {
             final offset = ((_controller.value * 3 - i) % 1.0).abs();
-            final opacity = offset < 0.5 ? 1.0 - offset * 2 : (offset - 0.5) * 2;
+            final opacity =
+                offset < 0.5 ? 1.0 - offset * 2 : (offset - 0.5) * 2;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Opacity(
@@ -372,13 +371,11 @@ class _InputBar extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: 'Ask your energy coach...',
                   border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppSpacing.xLarge),
+                    borderRadius: BorderRadius.circular(AppSpacing.xLarge),
                     borderSide: const BorderSide(color: AppColors.outline),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppSpacing.xLarge),
+                    borderRadius: BorderRadius.circular(AppSpacing.xLarge),
                     borderSide: const BorderSide(color: AppColors.outline),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
