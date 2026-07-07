@@ -471,7 +471,7 @@ class _AverageCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

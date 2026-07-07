@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../engine/energy_score_engine.dart';
 import '../../../models/logged_activity.dart';
 
 /// Horizontal 24-hour rail. Auto-scrolls so "now" sits near the left edge,
-/// shows a live now-indicator, renders logged activities as editable cards,
-/// and accepts quick-log chips via drag-and-drop.
+/// shows a live now-indicator, renders logged activities as draggable cards,
+/// and accepts quick-log chips via drag-and-drop from outside the rail.
 class ActivityTimelineRail extends StatefulWidget {
   const ActivityTimelineRail({
     super.key,
     required this.activities,
     required this.onDropActivity,
+    required this.onMoveActivity,
     required this.onEditRequest,
-    required this.onAdjustDuration,
   });
 
   final List<LoggedActivity> activities;
 
-  /// Called when a chip is dropped: (activityId, startMinutes).
+  /// External chip dropped onto the rail → create a new entry.
   final void Function(String activityId, int startMinutes) onDropActivity;
-  final ValueChanged<LoggedActivity> onEditRequest;
 
-  /// Called on hold (+30) or double-tap (−30): (activity, deltaMinutes).
-  final void Function(LoggedActivity activity, int deltaMinutes)
-      onAdjustDuration;
+  /// Existing card dragged within the rail → update its start time.
+  final void Function(String loggedId, int startMinutes) onMoveActivity;
+
+  final ValueChanged<LoggedActivity> onEditRequest;
 
   @override
   State<ActivityTimelineRail> createState() => _ActivityTimelineRailState();
@@ -79,7 +78,6 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               ),
             ),
             const SizedBox(width: 8),
-            // Now indication (left side of the rail header)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -111,7 +109,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             ),
             const Spacer(),
             const Text(
-              'tap edit · hold +30m · 2×tap −30m',
+              'tap edit · hold & drag to move',
               style: TextStyle(fontSize: 9, color: AppColors.textMuted),
             ),
           ],
@@ -165,35 +163,49 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
         ((local.dx + _scrollController.offset) / _pixelsPerMinute).round();
     // Snap to 15-minute steps
     final snapped = ((minutes / 15).round() * 15).clamp(0, 1425);
-    widget.onDropActivity(details.data, snapped);
+
+    final data = details.data;
+    if (data.startsWith('move:')) {
+      // Internal card drag — just update the start time
+      widget.onMoveActivity(data.substring(5), snapped);
+    } else {
+      // External chip drop — create a new logged entry
+      widget.onDropActivity(data, snapped);
+    }
   }
 
+  /// Tick + label for every hour. Major ticks at 0 / 6 / 12 / 18 are taller
+  /// and labelled in a slightly larger font for orientation.
   List<Widget> _buildHourMarks() {
     return List<Widget>.generate(25, (hour) {
       final x = hour * 60 * _pixelsPerMinute;
-      final showLabel = hour % 3 == 0;
+      final isMajor = hour % 6 == 0;
       return Positioned(
         left: x,
         bottom: 0,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Container(
               width: 1,
-              height: showLabel ? 10 : 6,
-              color: AppColors.outline,
+              height: isMajor ? 10 : 6,
+              color: isMajor
+                  ? AppColors.textMuted
+                  : AppColors.outline,
             ),
-            if (showLabel)
-              Padding(
-                padding: const EdgeInsets.only(left: 2, bottom: 2),
-                child: Text(
-                  _hourLabel(hour),
-                  style: const TextStyle(
-                    fontSize: 9,
-                    color: AppColors.textMuted,
-                  ),
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 2),
+              child: Text(
+                _hourLabel(hour),
+                style: TextStyle(
+                  fontSize: isMajor ? 9 : 8,
+                  color: isMajor ? AppColors.textMuted : AppColors.outline,
+                  fontWeight:
+                      isMajor ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
+            ),
           ],
         ),
       );
@@ -233,55 +245,56 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
       final width =
           (logged.durationMinutes * _pixelsPerMinute).clamp(64.0, _dayWidth);
 
+      final card = Container(
+        width: width,
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accent.withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              '${activityEmojis[logged.activityId] ?? '⚡'} ${activity.name}',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: accent,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
+              style: TextStyle(
+                fontSize: 9,
+                color: accent.withValues(alpha: 0.75),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      );
+
       return Positioned(
         left: logged.startMinutes * _pixelsPerMinute,
         top: 6,
-        child: GestureDetector(
-          onTap: () => widget.onEditRequest(logged),
-          onLongPress: () {
-            HapticFeedback.mediumImpact();
-            widget.onAdjustDuration(logged, 30);
-          },
-          onDoubleTap: () {
-            HapticFeedback.lightImpact();
-            widget.onAdjustDuration(logged, -30);
-          },
-          child: Container(
-            width: width,
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color:
-                  isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accent.withOpacity(0.4)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  '${activityEmojis[logged.activityId] ?? '⚡'} ${activity.name}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: accent,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: accent.withOpacity(0.75),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+        child: LongPressDraggable<String>(
+          data: 'move:${logged.id}',
+          feedback: Material(
+            color: Colors.transparent,
+            child: Opacity(opacity: 0.85, child: card),
+          ),
+          childWhenDragging: Opacity(opacity: 0.28, child: card),
+          child: GestureDetector(
+            onTap: () => widget.onEditRequest(logged),
+            child: card,
           ),
         ),
       );
@@ -290,8 +303,8 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
 
   String _hourLabel(int hour) {
     final h = hour % 24;
-    if (h == 0) return '12 AM';
-    if (h == 12) return '12 PM';
-    return h < 12 ? '$h AM' : '${h - 12} PM';
+    if (h == 0) return '12a';
+    if (h == 12) return '12p';
+    return h < 12 ? '${h}a' : '${h - 12}p';
   }
 }

@@ -158,8 +158,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       activities: state.loggedActivities,
                       onDropActivity: (activityId, startMinutes) => _controller
                           .logActivity(activityId, startMinutes: startMinutes),
+                      onMoveActivity: (loggedId, startMinutes) =>
+                          _controller.updateLoggedActivity(loggedId,
+                              startMinutes: startMinutes),
                       onEditRequest: _showEditActivitySheet,
-                      onAdjustDuration: _adjustDuration,
                     ),
                     const SizedBox(height: AppSpacing.medium),
                     _QuickLogSection(
@@ -193,38 +195,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _controller.processActivityText(text);
     _textController.clear();
     _focusNode.unfocus();
-  }
-
-  void _adjustDuration(LoggedActivity logged, int deltaMinutes) {
-    final newDuration = (logged.durationMinutes + deltaMinutes).clamp(10, 240);
-    final activity = const EnergyScoreEngine().activityById(logged.activityId);
-
-    if (newDuration == logged.durationMinutes) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(
-            deltaMinutes > 0
-                ? '${activity.name} is already at the 240 min maximum'
-                : '${activity.name} is already at the 10 min minimum',
-          ),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ));
-      return;
-    }
-
-    _controller.updateLoggedActivity(logged.id, durationMinutes: newDuration);
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(
-          '${activity.name} ${deltaMinutes > 0 ? '+30' : '−30'} min → $newDuration min',
-        ),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ));
   }
 
   void _showCheckInSheet(BuildContext context) {
@@ -399,7 +369,7 @@ class _QuickLogSection extends StatelessWidget {
               hintText: 'Search activities…',
               hintStyle: TextStyle(
                 fontSize: 12,
-                color: AppColors.textMuted.withOpacity(0.6),
+                color: AppColors.textMuted.withValues(alpha:0.6),
               ),
               prefixIcon: const Icon(Icons.search_rounded,
                   size: 18, color: AppColors.textMuted),
@@ -570,7 +540,7 @@ class _ActivityInputBar extends StatelessWidget {
             const Border(top: BorderSide(color: AppColors.outline, width: 0.5)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -593,7 +563,7 @@ class _ActivityInputBar extends StatelessWidget {
                 hintText: '"walked 30 min", "gym 1h", "took a nap"…',
                 hintStyle: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textMuted.withOpacity(0.6),
+                  color: AppColors.textMuted.withValues(alpha:0.6),
                 ),
                 filled: true,
                 fillColor: AppColors.scaffoldBackground,
