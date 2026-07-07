@@ -9,6 +9,7 @@ import '../../shared/widgets/loading_state_view.dart';
 import '../../state/async_view_state.dart';
 import '../chat/chat_page.dart';
 import 'others_controller.dart';
+import 'widgets/daily_stats_panel.dart';
 import 'widgets/person_status_card.dart';
 
 class OthersPage extends StatefulWidget {
@@ -59,44 +60,40 @@ class _OthersPageState extends State<OthersPage> {
               onRetry: _controller.load,
             );
           case AsyncStatus.success:
-            return ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.large),
-              itemCount: state.people.length + 1,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.medium),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              AppStrings.othersTitle,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          FilledButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.person_add_alt_1),
-                            label: const Text(AppStrings.addPerson),
-                          ),
-                        ],
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
+                  children: <Widget>[
+                    // ── Top 60 % — daily statistics ─────────────────────
+                    SizedBox(
+                      height: constraints.maxHeight * 0.6,
+                      child: const DailyStatsPanel(),
+                    ),
+                    const Divider(height: 1, color: AppColors.outline),
+                    // ── Bottom 40 % — AI coach + people ────────────────
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(AppSpacing.large),
+                        itemCount: state.people.length + 1,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppSpacing.medium),
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return _AiChatBanner(
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const ChatPage(),
+                                ),
+                              ),
+                            );
+                          }
+                          return PersonStatusCard(
+                              person: state.people[index - 1]);
+                        },
                       ),
-                      const SizedBox(height: AppSpacing.medium),
-                      _AiChatBanner(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ChatPage(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                return PersonStatusCard(person: state.people[index - 1]);
+                    ),
+                  ],
+                );
               },
             );
         }

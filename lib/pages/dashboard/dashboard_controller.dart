@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../constants/app_colors.dart';
@@ -6,8 +8,10 @@ import '../../engine/energy_score_engine.dart';
 import '../../models/battery_status.dart';
 import '../../models/body_status.dart';
 import '../../models/energy_check_in.dart';
+import '../../models/energy_log_record.dart';
 import '../../models/logged_activity.dart';
 import '../../repositories/energy_health_repository.dart';
+import '../../services/energy_log_store.dart';
 import '../../services/open_router_service.dart';
 import '../../services/settings_service.dart';
 import '../../state/async_view_state.dart';
@@ -17,11 +21,14 @@ class DashboardController extends ChangeNotifier {
   DashboardController({
     EnergyHealthRepository? repository,
     EnergyScoreEngine? energyScoreEngine,
+    EnergyLogStore? logStore,
   })  : repository = repository ?? const EnergyHealthRepository(),
-        _energyScoreEngine = energyScoreEngine ?? const EnergyScoreEngine();
+        _energyScoreEngine = energyScoreEngine ?? const EnergyScoreEngine(),
+        _logStore = logStore ?? SqliteEnergyLogStore.instance;
 
   final EnergyHealthRepository repository;
   final EnergyScoreEngine _energyScoreEngine;
+  final EnergyLogStore _logStore;
 
   DashboardState _state = const DashboardState();
 
@@ -43,6 +50,27 @@ class DashboardController extends ChangeNotifier {
         batteries: batteries,
         hasCheckInEstimate: false,
       );
+
+      // Restore anything already logged today so the rail and batteries
+      // survive app restarts. Storage failure must not break the dashboard.
+      List<EnergyLogRecord> saved = const <EnergyLogRecord>[];
+      try {
+        saved = await _logStore.recordsForDate(dateKey(DateTime.now()));
+      } catch (_) {}
+      if (saved.isNotEmpty) {
+        _state = _state.copyWith(
+          loggedActivities: saved
+              .map((r) => LoggedActivity(
+                    id: r.id,
+                    activityId: r.activityId,
+                    startMinutes: r.startMinutes,
+                    durationMinutes: r.durationMinutes,
+                  ))
+              .toList(),
+          hasCheckInEstimate: true,
+        );
+        _recomputeFromTimeline();
+      }
     } catch (_) {
       _state = _state.copyWith(
         status: AsyncStatus.error,
@@ -156,11 +184,14 @@ class DashboardController extends ChangeNotifier {
 
   /// Replays every timeline activity in chronological order on top of the
   /// daily baseline, so the batteries always reflect the whole day.
+  /// Each intermediate state is persisted so the stats tab can chart the day.
   void _recomputeFromTimeline() {
     var energy = _energyScoreEngine.createDailyBaseline(28, 7.0, 0.7);
     final sorted = <LoggedActivity>[..._state.loggedActivities]
       ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 
+    final today = dateKey(DateTime.now());
+    final records = <EnergyLogRecord>[];
     for (final item in sorted) {
       energy = _energyScoreEngine.applyActivity(
         energy,
@@ -168,7 +199,19 @@ class DashboardController extends ChangeNotifier {
         item.durationMinutes,
         28,
       );
+      records.add(EnergyLogRecord(
+        id: item.id,
+        date: today,
+        startMinutes: item.startMinutes,
+        durationMinutes: item.durationMinutes,
+        activityId: item.activityId,
+        physicalAfter: energy.physical,
+        brainAfter: energy.brain,
+      ));
     }
+    unawaited(
+      _logStore.saveDay(today, records).catchError((Object _) {}),
+    );
 
     final lastActivity = sorted.isEmpty
         ? null
