@@ -4,9 +4,12 @@ import '../../../constants/app_colors.dart';
 import '../../../engine/energy_score_engine.dart';
 import '../../../models/logged_activity.dart';
 
-/// Horizontal 24-hour rail. Auto-scrolls so "now" sits near the left edge,
-/// shows a live now-indicator, renders logged activities as draggable cards,
-/// and accepts quick-log chips via drag-and-drop from outside the rail.
+/// Horizontal timeline rail with a compressed sleep zone (12 AM – 8 AM) and
+/// a full-density awake zone (8 AM – 12 AM next day).
+///
+/// The sleep zone is squeezed to [_sleepPxPerMin] so those 8 hours take only
+/// ~120 px instead of the full proportional width. The awake zone uses
+/// [_awakePxPerMin] (2× the original density), giving activity cards more room.
 class ActivityTimelineRail extends StatefulWidget {
   const ActivityTimelineRail({
     super.key,
@@ -18,10 +21,10 @@ class ActivityTimelineRail extends StatefulWidget {
 
   final List<LoggedActivity> activities;
 
-  /// External chip dropped onto the rail â†’ create a new entry.
+  /// External chip dropped onto the rail → create a new entry.
   final void Function(String activityId, int startMinutes) onDropActivity;
 
-  /// Existing card dragged within the rail â†’ update its start time.
+  /// Existing card dragged within the rail → update its start time.
   final void Function(String loggedId, int startMinutes) onMoveActivity;
 
   final ValueChanged<LoggedActivity> onEditRequest;
@@ -31,15 +34,21 @@ class ActivityTimelineRail extends StatefulWidget {
 }
 
 class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
-  static const double _pixelsPerMinute = 1.2;
-  static const double _dayWidth = 24 * 60 * _pixelsPerMinute;
+  // ── Time-to-pixel mapping ────────────────────────────────────────────────
+  static const int _sleepEndMinute = 8 * 60; // 480 — sleep zone 0 → 8 AM
+  static const double _sleepPxPerMin = 0.25; // very compressed
+  static const double _awakePxPerMin = 2.0; // comfortable card density
+  static const double _sleepZoneW =
+      _sleepEndMinute * _sleepPxPerMin; // 120 px
+  static const double _awakeZoneW =
+      (24 * 60 - _sleepEndMinute) * _awakePxPerMin; // 1920 px
+  static const double _dayWidth = _sleepZoneW + _awakeZoneW; // 2040 px
+
+  // ── Vertical layout (awake zone) ─────────────────────────────────────────
   static const double _railHeight = 124;
-  static const int _sleepStartMinutes = 0;
-  static const int _sleepDurationMinutes = 8 * 60;
-  static const double _sleepTop = 8;
-  static const double _sleepHeight = 26;
-  static const double _activityTop = 40;
-  static const double _axisTop = 90;
+  static const double _activityTop = 8;
+  static const double _activityHeight = 50;
+  static const double _axisTop = 88;
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _viewportKey = GlobalKey();
@@ -50,12 +59,25 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
     return now.hour * 60 + now.minute;
   }
 
+  /// Minute-of-day → x pixel on the canvas.
+  double _minuteToX(int m) {
+    if (m <= _sleepEndMinute) return m * _sleepPxPerMin;
+    return _sleepZoneW + (m - _sleepEndMinute) * _awakePxPerMin;
+  }
+
+  /// X pixel on the canvas → minute-of-day.
+  int _xToMinute(double x) {
+    if (x <= _sleepZoneW) return (x / _sleepPxPerMin).round();
+    return _sleepEndMinute +
+        ((x - _sleepZoneW) / _awakePxPerMin).round();
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      final target = (_nowMinutes * _pixelsPerMinute - 72)
+      final target = (_minuteToX(_nowMinutes) - 72)
           .clamp(0.0, _scrollController.position.maxScrollExtent);
       _scrollController.jumpTo(target);
     });
@@ -85,7 +107,8 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             ),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: AppColors.surfaceTint,
                 borderRadius: BorderRadius.circular(10),
@@ -116,7 +139,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             const Spacer(),
             const Flexible(
               child: Text(
-                'sleep prefilled · hold & drag activities',
+                'hold & drag to move',
                 textAlign: TextAlign.end,
                 style: TextStyle(fontSize: 9, color: AppColors.textMuted),
               ),
@@ -133,10 +156,14 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               return Container(
                 key: _viewportKey,
                 decoration: BoxDecoration(
-                  color: isHovering ? AppColors.surfaceTint : Colors.white,
+                  color: isHovering
+                      ? AppColors.surfaceTint
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isHovering ? AppColors.primary : AppColors.outline,
+                    color: isHovering
+                        ? AppColors.primary
+                        : AppColors.outline,
                     width: isHovering ? 1.5 : 1,
                   ),
                 ),
@@ -149,7 +176,6 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
                     height: _railHeight,
                     child: Stack(
                       children: <Widget>[
-                        _buildSleepShade(),
                         _buildSleepBlock(),
                         ..._buildHourMarks(),
                         ..._buildActivityCards(),
@@ -167,30 +193,127 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   }
 
   void _handleDrop(DragTargetDetails<String> details) {
-    final box = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    final box =
+        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
     final local = box.globalToLocal(details.offset);
-    final minutes =
-        ((local.dx + _scrollController.offset) / _pixelsPerMinute).round();
-    // Snap to 15-minute steps
-    final snapped = ((minutes / 15).round() * 15).clamp(0, 1425);
+    final rawMinutes =
+        _xToMinute(local.dx + _scrollController.offset);
+    final snapped =
+        ((rawMinutes / 15).round() * 15).clamp(0, 1425);
 
     final data = details.data;
     if (data.startsWith('move:')) {
-      // Internal card drag â€” just update the start time
       widget.onMoveActivity(data.substring(5), snapped);
     } else {
-      // External chip drop â€” create a new logged entry
       widget.onDropActivity(data, snapped);
     }
   }
 
-  /// Tick for every hour; a readable compact label every 2 hours.
+  // ── Sleep block — full-height night zone ───────────────────────────────
+
+  // Fixed star dot positions: (x, y, diameter) within the 120 × 124 block.
+  static const List<(double, double, double)> _stars = <(double, double, double)>[
+    (8.0, 10.0, 2.5),
+    (38.0, 5.0, 1.8),
+    (72.0, 14.0, 2.2),
+    (105.0, 8.0, 1.6),
+    (18.0, 42.0, 1.4),
+    (55.0, 34.0, 2.0),
+    (95.0, 50.0, 1.8),
+    (28.0, 72.0, 1.6),
+    (82.0, 78.0, 2.4),
+    (10.0, 95.0, 1.4),
+    (60.0, 105.0, 1.8),
+    (100.0, 98.0, 1.2),
+  ];
+
+  Widget _buildSleepBlock() {
+    return Positioned(
+      left: 0,
+      top: 0,
+      width: _sleepZoneW,
+      bottom: 0,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[Color(0xFF0D0F2B), Color(0xFF1A1C4A)],
+          ),
+        ),
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
+          children: <Widget>[
+            // Star field
+            for (final s in _stars)
+              Positioned(
+                left: s.$1,
+                top: s.$2,
+                child: Container(
+                  width: s.$3,
+                  height: s.$3,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+
+            // Central content
+            const Positioned.fill(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Text('🌙', style: TextStyle(fontSize: 18)),
+                  SizedBox(height: 2),
+                  Text('🦉', style: TextStyle(fontSize: 13)),
+                  SizedBox(height: 5),
+                  Text(
+                    'Sleep',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFAAAED6),
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  SizedBox(height: 1),
+                  Text(
+                    '12 AM – 8 AM',
+                    style: TextStyle(
+                      fontSize: 7,
+                      color: Color(0xFF6B6F9A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Right-edge separator
+            const Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: SizedBox(
+                width: 1,
+                child: ColoredBox(color: Color(0xFF3A3D6E)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Hour axis — awake zone only (8 AM → 12 AM) ─────────────────────────
+
   List<Widget> _buildHourMarks() {
-    return List<Widget>.generate(25, (hour) {
-      final x = hour * 60 * _pixelsPerMinute;
+    final marks = <Widget>[];
+    for (var hour = 8; hour <= 24; hour++) {
+      final x = _minuteToX(hour * 60);
       final isMajor = hour % 2 == 0;
-      return Stack(
+      marks.add(Stack(
         children: <Widget>[
           Positioned(
             left: x,
@@ -219,74 +342,15 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               ),
             ),
         ],
-      );
-    });
+      ));
+    }
+    return marks;
   }
 
-  Widget _buildSleepShade() {
-    const left = _sleepStartMinutes * _pixelsPerMinute;
-    const width = _sleepDurationMinutes * _pixelsPerMinute;
-
-    return Positioned(
-      left: left,
-      top: 0,
-      width: width,
-      bottom: 0,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.bedtimeBg.withOpacity(0.22),
-          border: const Border(
-            right: BorderSide(color: AppColors.outline),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSleepBlock() {
-    const left = _sleepStartMinutes * _pixelsPerMinute;
-    const width = _sleepDurationMinutes * _pixelsPerMinute;
-
-    return Positioned(
-      left: left,
-      top: _sleepTop,
-      child: Container(
-        width: width,
-        height: _sleepHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppColors.bedtimeBg,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: AppColors.bedtimeAccent.withOpacity(0.35)),
-        ),
-        child: Row(
-          children: <Widget>[
-            const Icon(
-              Icons.bedtime_rounded,
-              size: 14,
-              color: AppColors.bedtimeAccent,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                'Sleep · ${formatMinutes(_sleepStartMinutes)} - ${formatMinutes(_sleepStartMinutes + _sleepDurationMinutes)}',
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.bedtimeAccent,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ── Now indicator ────────────────────────────────────────────────────────
 
   Widget _buildNowLine() {
-    final x = _nowMinutes * _pixelsPerMinute;
+    final x = _minuteToX(_nowMinutes);
     return Positioned(
       left: x - 1,
       top: 0,
@@ -309,30 +373,39 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
     );
   }
 
+  // ── Activity cards ───────────────────────────────────────────────────────
+
   List<Widget> _buildActivityCards() {
     return widget.activities.map((logged) {
       final activity = _engine.activityById(logged.activityId);
       final isGain = activity.physicalDelta + activity.brainDelta > 0;
-      final accent =
-          isGain ? AppColors.energyBrainAccent : AppColors.energyPhysicalAccent;
-      final width =
-          (logged.durationMinutes * _pixelsPerMinute).clamp(64.0, _dayWidth);
+      final accent = isGain
+          ? AppColors.energyBrainAccent
+          : AppColors.energyPhysicalAccent;
+
+      final left = _minuteToX(logged.startMinutes);
+      final right =
+          _minuteToX(logged.startMinutes + logged.durationMinutes);
+      final width = (right - left).clamp(64.0, _dayWidth);
 
       final card = Container(
         width: width,
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        height: _activityHeight,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
+          color: isGain
+              ? AppColors.energyBrainBg
+              : AppColors.energyPhysicalBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withOpacity(0.4)),
+          border: Border.all(color: accent.withValues(alpha: 0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              '${activityEmojis[logged.activityId] ?? 'âš¡'} ${activity.name}',
+              '${activityEmojis[logged.activityId] ?? '⚡'} ${activity.name}',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -343,10 +416,10 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             ),
             const SizedBox(height: 2),
             Text(
-              '${formatMinutes(logged.startMinutes)} Â· ${logged.durationMinutes} min',
+              '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
               style: TextStyle(
                 fontSize: 9,
-                color: accent.withOpacity(0.75),
+                color: accent.withValues(alpha: 0.75),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -356,7 +429,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
       );
 
       return Positioned(
-        left: logged.startMinutes * _pixelsPerMinute,
+        left: left,
         top: _activityTop,
         child: LongPressDraggable<String>(
           data: 'move:${logged.id}',
