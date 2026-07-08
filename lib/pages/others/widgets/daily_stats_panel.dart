@@ -12,7 +12,13 @@ import '../../../services/energy_log_store.dart';
 enum StatsMetric { both, physical, brain }
 
 const List<String> _weekdayLabels = <String>[
-  'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun',
 ];
 
 /// Statistics for a chosen day (today or up to 6 days back): a day rail,
@@ -123,7 +129,8 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     if (worst == null) return 'Energy dipped to $overallMin%.';
 
     final name = _engine.activityById(worst.activityId).name;
-    final metric = worst.physicalAfter <= worst.brainAfter ? 'physical' : 'brain';
+    final metric =
+        worst.physicalAfter <= worst.brainAfter ? 'physical' : 'brain';
     final time = formatMinutes(worst.startMinutes);
     return overallMin < 40
         ? 'Low $metric energy after $name ($time).'
@@ -226,8 +233,8 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                       children: <Widget>[
                         if (_summary != null)
                           Padding(
-                            padding:
-                                const EdgeInsets.only(bottom: AppSpacing.medium),
+                            padding: const EdgeInsets.only(
+                                bottom: AppSpacing.medium),
                             child: Text(
                               _summary!,
                               style: const TextStyle(
@@ -641,7 +648,7 @@ class _AverageCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10,
-              color: color.withValues(alpha: 0.8),
+              color: color.withOpacity(0.8),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -737,7 +744,7 @@ class _CoachEntry extends StatelessWidget {
                   Text(
                     'Chat about sleep, focus, recovery, and more.',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withOpacity(0.8),
                       fontSize: 12,
                     ),
                   ),

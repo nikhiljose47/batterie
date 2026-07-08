@@ -87,9 +87,13 @@ const List<DayTemplate> prefilledDayTemplates = <DayTemplate>[
     emoji: '🧭',
     items: <TemplateActivity>[
       TemplateActivity(
-          activityId: 'brisk_walking', startMinutes: 7 * 60, durationMinutes: 20),
+          activityId: 'brisk_walking',
+          startMinutes: 7 * 60,
+          durationMinutes: 20),
       TemplateActivity(
-          activityId: 'focused_coding', startMinutes: 9 * 60, durationMinutes: 90),
+          activityId: 'focused_coding',
+          startMinutes: 9 * 60,
+          durationMinutes: 90),
       TemplateActivity(
           activityId: 'meal_break_away_from_desk',
           startMinutes: 12 * 60 + 30,
@@ -118,9 +122,13 @@ const List<DayTemplate> prefilledDayTemplates = <DayTemplate>[
           startMinutes: 7 * 60 + 30,
           durationMinutes: 20),
       TemplateActivity(
-          activityId: 'focused_coding', startMinutes: 9 * 60, durationMinutes: 120),
+          activityId: 'focused_coding',
+          startMinutes: 9 * 60,
+          durationMinutes: 120),
       TemplateActivity(
-          activityId: 'easy_walking', startMinutes: 13 * 60, durationMinutes: 15),
+          activityId: 'easy_walking',
+          startMinutes: 13 * 60,
+          durationMinutes: 15),
       TemplateActivity(
           activityId: 'slow_breathing_exercise',
           startMinutes: 20 * 60,
@@ -137,7 +145,9 @@ const List<DayTemplate> prefilledDayTemplates = <DayTemplate>[
           startMinutes: 8 * 60,
           durationMinutes: 20),
       TemplateActivity(
-          activityId: 'easy_walking', startMinutes: 10 * 60, durationMinutes: 25),
+          activityId: 'easy_walking',
+          startMinutes: 10 * 60,
+          durationMinutes: 25),
       TemplateActivity(
           activityId: 'cooking_light_meal',
           startMinutes: 12 * 60,
@@ -158,15 +168,21 @@ const List<DayTemplate> prefilledDayTemplates = <DayTemplate>[
     emoji: '💻',
     items: <TemplateActivity>[
       TemplateActivity(
-          activityId: 'focused_coding', startMinutes: 8 * 60, durationMinutes: 120),
+          activityId: 'focused_coding',
+          startMinutes: 8 * 60,
+          durationMinutes: 120),
       TemplateActivity(
           activityId: 'meal_break_away_from_desk',
           startMinutes: 11 * 60,
           durationMinutes: 30),
       TemplateActivity(
-          activityId: 'focused_coding', startMinutes: 13 * 60, durationMinutes: 120),
+          activityId: 'focused_coding',
+          startMinutes: 13 * 60,
+          durationMinutes: 120),
       TemplateActivity(
-          activityId: 'brisk_walking', startMinutes: 16 * 60, durationMinutes: 20),
+          activityId: 'brisk_walking',
+          startMinutes: 16 * 60,
+          durationMinutes: 20),
       TemplateActivity(
           activityId: 'email_and_message_backlog',
           startMinutes: 17 * 60,

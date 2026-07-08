@@ -65,7 +65,9 @@ class PersonStatusRail extends StatelessWidget {
                         backgroundColor: AppColors.surfaceTint,
                         foregroundColor: AppColors.primary,
                         child: Text(
-                          person.name.isEmpty ? '?' : person.name.substring(0, 1),
+                          person.name.isEmpty
+                              ? '?'
+                              : person.name.substring(0, 1),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -75,13 +77,15 @@ class PersonStatusRail extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   person.name.split(' ').first,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '${(person.energyPercent * 100).round()}%',
-                  style: const TextStyle(fontSize: 9, color: AppColors.textMuted),
+                  style:
+                      const TextStyle(fontSize: 9, color: AppColors.textMuted),
                 ),
               ],
             ),

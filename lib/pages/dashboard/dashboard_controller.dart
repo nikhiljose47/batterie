@@ -204,13 +204,13 @@ class DashboardController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<DayTemplate>> loadCustomTemplates() => _logStore.customTemplates();
+  Future<List<DayTemplate>> loadCustomTemplates() =>
+      _logStore.customTemplates();
 
   Future<void> saveCustomTemplate(DayTemplate template) =>
       _logStore.saveTemplate(template);
 
-  Future<void> deleteCustomTemplate(String id) =>
-      _logStore.deleteTemplate(id);
+  Future<void> deleteCustomTemplate(String id) => _logStore.deleteTemplate(id);
 
   /// Replays every timeline activity in chronological order on top of the
   /// daily baseline, so the batteries always reflect the whole day.

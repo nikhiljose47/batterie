@@ -44,7 +44,14 @@ class TemplateEditorSheet extends StatefulWidget {
 class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
   static const EnergyScoreEngine _engine = EnergyScoreEngine();
   static const List<String> _emojiChoices = <String>[
-    '🧭', '🏋️', '🌿', '💻', '⚡', '🌙', '🍃', '🎯',
+    '🧭',
+    '🏋️',
+    '🌿',
+    '💻',
+    '⚡',
+    '🌙',
+    '🍃',
+    '🎯',
   ];
 
   late final TextEditingController _nameController;
@@ -61,7 +68,8 @@ class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
           ? ''
           : (initial.isCustom ? initial.name : '${initial.name} (custom)'),
     );
-    _items = List<TemplateActivity>.of(initial?.items ?? const <TemplateActivity>[]);
+    _items =
+        List<TemplateActivity>.of(initial?.items ?? const <TemplateActivity>[]);
     _emoji = initial?.emoji ?? _emojiChoices.first;
   }
 
@@ -71,9 +79,8 @@ class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
     super.dispose();
   }
 
-  List<TemplateActivity> get _sortedItems =>
-      List<TemplateActivity>.of(_items)
-        ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+  List<TemplateActivity> get _sortedItems => List<TemplateActivity>.of(_items)
+    ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 
   void _addActivity(String activityId) {
     final defaultDuration = _engine.activityById(activityId).referenceMinutes;
@@ -151,9 +158,8 @@ class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        setState(() => _items = _items
-                            .where((i) => i != item)
-                            .toList());
+                        setState(() =>
+                            _items = _items.where((i) => i != item).toList());
                         Navigator.of(sheetContext).pop();
                       },
                       icon: const Icon(Icons.delete_outline, size: 18),
@@ -287,7 +293,8 @@ class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
                                     : AppColors.outline,
                               ),
                             ),
-                            child: Text(e, style: const TextStyle(fontSize: 16)),
+                            child:
+                                Text(e, style: const TextStyle(fontSize: 16)),
                           ),
                         ),
                       ),
@@ -322,7 +329,8 @@ class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.small),
                     child: Text(
                       'No activities yet — add some from below.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style:
+                          TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
                   )
                 else
@@ -416,7 +424,8 @@ class _TemplateEditorSheetState extends State<TemplateEditorSheet> {
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.bookmark_add_outlined, size: 18),
                         label: const Text('Save as template'),

@@ -78,8 +78,7 @@ class _HomePageState extends State<HomePage>
               tabs: const <Widget>[
                 _ThinTab(icon: Icons.bolt_outlined, label: AppStrings.youTab),
                 _ThinTab(
-                    icon: Icons.groups_2_outlined,
-                    label: AppStrings.othersTab),
+                    icon: Icons.groups_2_outlined, label: AppStrings.othersTab),
                 _ThinTab(
                     icon: Icons.article_outlined, label: AppStrings.newsTab),
               ],
@@ -144,7 +143,9 @@ class _ThinTab extends StatelessWidget {
         children: <Widget>[
           Icon(icon, size: 15),
           const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
         ],
       ),
     );

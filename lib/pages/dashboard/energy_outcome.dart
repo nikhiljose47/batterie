@@ -39,8 +39,9 @@ EnergyOutcome computeEnergyOutcome(
       minBrain = point.brain;
     }
     final pointWorst = math.min(point.physical, point.brain);
-    final currentWorst =
-        worstPoint == null ? 101 : math.min(worstPoint.physical, worstPoint.brain);
+    final currentWorst = worstPoint == null
+        ? 101
+        : math.min(worstPoint.physical, worstPoint.brain);
     if (pointWorst < currentWorst) {
       worstPoint = point;
       worstMetricIsPhysical = point.physical <= point.brain;
