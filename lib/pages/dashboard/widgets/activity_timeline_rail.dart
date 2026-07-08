@@ -18,10 +18,10 @@ class ActivityTimelineRail extends StatefulWidget {
 
   final List<LoggedActivity> activities;
 
-  /// External chip dropped onto the rail → create a new entry.
+  /// External chip dropped onto the rail â†’ create a new entry.
   final void Function(String activityId, int startMinutes) onDropActivity;
 
-  /// Existing card dragged within the rail → update its start time.
+  /// Existing card dragged within the rail â†’ update its start time.
   final void Function(String loggedId, int startMinutes) onMoveActivity;
 
   final ValueChanged<LoggedActivity> onEditRequest;
@@ -33,7 +33,13 @@ class ActivityTimelineRail extends StatefulWidget {
 class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   static const double _pixelsPerMinute = 1.2;
   static const double _dayWidth = 24 * 60 * _pixelsPerMinute;
-  static const double _railHeight = 92;
+  static const double _railHeight = 124;
+  static const int _sleepStartMinutes = 0;
+  static const int _sleepDurationMinutes = 8 * 60;
+  static const double _sleepTop = 8;
+  static const double _sleepHeight = 26;
+  static const double _activityTop = 40;
+  static const double _axisTop = 90;
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _viewportKey = GlobalKey();
@@ -108,9 +114,12 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               ),
             ),
             const Spacer(),
-            const Text(
-              'tap edit · hold & drag to move',
-              style: TextStyle(fontSize: 9, color: AppColors.textMuted),
+            const Flexible(
+              child: Text(
+                'sleep prefilled · hold & drag activities',
+                textAlign: TextAlign.end,
+                style: TextStyle(fontSize: 9, color: AppColors.textMuted),
+              ),
             ),
           ],
         ),
@@ -140,6 +149,8 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
                     height: _railHeight,
                     child: Stack(
                       children: <Widget>[
+                        _buildSleepShade(),
+                        _buildSleepBlock(),
                         ..._buildHourMarks(),
                         ..._buildActivityCards(),
                         _buildNowLine(),
@@ -166,37 +177,39 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
 
     final data = details.data;
     if (data.startsWith('move:')) {
-      // Internal card drag — just update the start time
+      // Internal card drag â€” just update the start time
       widget.onMoveActivity(data.substring(5), snapped);
     } else {
-      // External chip drop — create a new logged entry
+      // External chip drop â€” create a new logged entry
       widget.onDropActivity(data, snapped);
     }
   }
 
-  /// Tick for every hour; a clear "7 AM" / "12 PM" style label every 3 hours
-  /// so there's always room to read it without crowding.
+  /// Tick for every hour; a readable compact label every 2 hours.
   List<Widget> _buildHourMarks() {
     return List<Widget>.generate(25, (hour) {
       final x = hour * 60 * _pixelsPerMinute;
-      final isMajor = hour % 3 == 0;
-      return Positioned(
-        left: x,
-        bottom: 0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
+      final isMajor = hour % 2 == 0;
+      return Stack(
+        children: <Widget>[
+          Positioned(
+            left: x,
+            top: isMajor ? _axisTop : _axisTop + 5,
+            child: Container(
               width: 1,
-              height: isMajor ? 10 : 5,
+              height: isMajor ? 12 : 7,
               color: isMajor ? AppColors.textMuted : AppColors.outline,
             ),
-            if (isMajor)
-              Padding(
-                padding: const EdgeInsets.only(left: 2, bottom: 2),
+          ),
+          if (isMajor)
+            Positioned(
+              left: (x - 18).clamp(0.0, _dayWidth - 40),
+              top: _axisTop + 16,
+              child: SizedBox(
+                width: 40,
                 child: Text(
                   _hourLabel(hour),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
@@ -204,10 +217,72 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       );
     });
+  }
+
+  Widget _buildSleepShade() {
+    const left = _sleepStartMinutes * _pixelsPerMinute;
+    const width = _sleepDurationMinutes * _pixelsPerMinute;
+
+    return Positioned(
+      left: left,
+      top: 0,
+      width: width,
+      bottom: 0,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.bedtimeBg.withOpacity(0.22),
+          border: const Border(
+            right: BorderSide(color: AppColors.outline),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSleepBlock() {
+    const left = _sleepStartMinutes * _pixelsPerMinute;
+    const width = _sleepDurationMinutes * _pixelsPerMinute;
+
+    return Positioned(
+      left: left,
+      top: _sleepTop,
+      child: Container(
+        width: width,
+        height: _sleepHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppColors.bedtimeBg,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: AppColors.bedtimeAccent.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: <Widget>[
+            const Icon(
+              Icons.bedtime_rounded,
+              size: 14,
+              color: AppColors.bedtimeAccent,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Sleep · ${formatMinutes(_sleepStartMinutes)} - ${formatMinutes(_sleepStartMinutes + _sleepDurationMinutes)}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.bedtimeAccent,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildNowLine() {
@@ -245,7 +320,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
 
       final card = Container(
         width: width,
-        height: 56,
+        height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
           color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
@@ -257,7 +332,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              '${activityEmojis[logged.activityId] ?? '⚡'} ${activity.name}',
+              '${activityEmojis[logged.activityId] ?? 'âš¡'} ${activity.name}',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -268,7 +343,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             ),
             const SizedBox(height: 2),
             Text(
-              '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
+              '${formatMinutes(logged.startMinutes)} Â· ${logged.durationMinutes} min',
               style: TextStyle(
                 fontSize: 9,
                 color: accent.withOpacity(0.75),
@@ -282,7 +357,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
 
       return Positioned(
         left: logged.startMinutes * _pixelsPerMinute,
-        top: 6,
+        top: _activityTop,
         child: LongPressDraggable<String>(
           data: 'move:${logged.id}',
           feedback: Material(

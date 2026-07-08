@@ -14,7 +14,6 @@ import 'dashboard_state.dart';
 import 'energy_outcome.dart';
 import 'widgets/activity_timeline_rail.dart';
 import 'widgets/check_in_sheet.dart';
-import 'widgets/day_planner_sheet.dart';
 import 'widgets/energy_level_card.dart';
 import 'widgets/energy_outcome_card.dart';
 
@@ -33,7 +32,9 @@ const List<_QuickActivity> _kQuickActivities = <_QuickActivity>[
 ];
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  const DashboardPage({super.key, this.controller});
+
+  final DashboardController? controller;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -41,6 +42,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   late final DashboardController _controller;
+  late final bool _ownsController;
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -50,7 +52,11 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _controller = DashboardController()..load();
+    _ownsController = widget.controller == null;
+    _controller = widget.controller ?? DashboardController();
+    if (_ownsController) {
+      _controller.load();
+    }
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim());
     });
@@ -58,7 +64,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
     _textController.dispose();
     _searchController.dispose();
     _focusNode.dispose();
@@ -114,7 +122,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 // ── Outcome strip — predicted shape of the day ───────────
                 EnergyOutcomeCard(
                   outcome: outcome,
-                  onPlanDay: () => _showPlannerSheet(context),
                 ),
                 const SizedBox(height: AppSpacing.medium),
 
@@ -139,12 +146,12 @@ class _DashboardPageState extends State<DashboardPage> {
                           Expanded(
                             child: EnergyLevelCard(
                               label: AppStrings.physicalEnergy,
-                              percent: _showLowest &&
-                                      state.lowestPhysicalAt != -1
-                                  ? state.lowestPhysical / 100
-                                  : (state.batteries.isNotEmpty
-                                      ? state.batteries[0].percent
-                                      : 0.72),
+                              percent:
+                                  _showLowest && state.lowestPhysicalAt != -1
+                                      ? state.lowestPhysical / 100
+                                      : (state.batteries.isNotEmpty
+                                          ? state.batteries[0].percent
+                                          : 0.72),
                               subtitle: _showLowest &&
                                       state.lowestPhysicalAt != -1
                                   ? 'Lowest at ${formatMinutes(state.lowestPhysicalAt)}'
@@ -160,14 +167,12 @@ class _DashboardPageState extends State<DashboardPage> {
                           Expanded(
                             child: EnergyLevelCard(
                               label: AppStrings.brainEnergy,
-                              percent: _showLowest &&
-                                      state.lowestBrainAt != -1
+                              percent: _showLowest && state.lowestBrainAt != -1
                                   ? state.lowestBrain / 100
                                   : (state.batteries.length > 1
                                       ? state.batteries[1].percent
                                       : 0.74),
-                              subtitle: _showLowest &&
-                                      state.lowestBrainAt != -1
+                              subtitle: _showLowest && state.lowestBrainAt != -1
                                   ? 'Lowest at ${formatMinutes(state.lowestBrainAt)}'
                                   : (state.batteries.length > 1
                                       ? state.batteries[1].subtitle
@@ -216,15 +221,6 @@ class _DashboardPageState extends State<DashboardPage> {
           onSubmit: _submitText,
         ),
       ],
-    );
-  }
-
-  void _showPlannerSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => DayPlannerSheet(controller: _controller),
     );
   }
 

@@ -11,9 +11,14 @@ import 'template_editor_sheet.dart';
 /// ones. Tap a card to apply it instantly, or tap Customize to tweak it
 /// (and optionally save it as a new custom template) before applying.
 class DayPlannerSheet extends StatefulWidget {
-  const DayPlannerSheet({super.key, required this.controller});
+  const DayPlannerSheet({
+    super.key,
+    required this.controller,
+    this.asPage = false,
+  });
 
   final DashboardController controller;
+  final bool asPage;
 
   @override
   State<DayPlannerSheet> createState() => _DayPlannerSheetState();
@@ -95,91 +100,148 @@ class _DayPlannerSheetState extends State<DayPlannerSheet> {
   Widget build(BuildContext context) {
     final templates = <DayTemplate>[...prefilledDayTemplates, ..._custom];
 
+    if (widget.asPage) {
+      return _PlannerContent(
+        loading: _loading,
+        templates: templates,
+        onClose: null,
+        onNewTemplate: () => _openEditor(null),
+        onApply: _applyDirect,
+        onCustomize: _openEditor,
+        onDelete: _deleteCustom,
+      );
+    }
+
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.4,
       maxChildSize: 0.92,
       expand: false,
       builder: (context, scrollController) {
-        return Column(
-          children: <Widget>[
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.outline,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.large, AppSpacing.medium, AppSpacing.large, 0),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text('Plan your day',
-                            style: Theme.of(context).textTheme.titleLarge),
-                        const Text(
-                          'Pick a shape for today, then customize it.',
-                          style: TextStyle(
-                              fontSize: 12, color: AppColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.large,
-                        AppSpacing.small,
-                        AppSpacing.large,
-                        AppSpacing.xLarge,
-                      ),
-                      itemCount: templates.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == templates.length) {
-                          return Padding(
-                            padding:
-                                const EdgeInsets.only(top: AppSpacing.small),
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openEditor(null),
-                              icon: const Icon(Icons.add_rounded, size: 18),
-                              label: const Text('New custom template'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(44),
-                              ),
-                            ),
-                          );
-                        }
-                        final template = templates[index];
-                        return _TemplateCard(
-                          template: template,
-                          onApply: () => _applyDirect(template),
-                          onCustomize: () => _openEditor(template),
-                          onDelete: template.isCustom
-                              ? () => _deleteCustom(template)
-                              : null,
-                        );
-                      },
-                    ),
-            ),
-          ],
+        return _PlannerContent(
+          loading: _loading,
+          templates: templates,
+          scrollController: scrollController,
+          onClose: () => Navigator.of(context).pop(),
+          onNewTemplate: () => _openEditor(null),
+          onApply: _applyDirect,
+          onCustomize: _openEditor,
+          onDelete: _deleteCustom,
         );
       },
+    );
+  }
+}
+
+class _PlannerContent extends StatelessWidget {
+  const _PlannerContent({
+    required this.loading,
+    required this.templates,
+    required this.onNewTemplate,
+    required this.onApply,
+    required this.onCustomize,
+    required this.onDelete,
+    this.scrollController,
+    this.onClose,
+  });
+
+  final bool loading;
+  final List<DayTemplate> templates;
+  final ScrollController? scrollController;
+  final VoidCallback? onClose;
+  final VoidCallback onNewTemplate;
+  final ValueChanged<DayTemplate> onApply;
+  final ValueChanged<DayTemplate?> onCustomize;
+  final ValueChanged<DayTemplate> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        if (onClose != null) ...<Widget>[
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.outline,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.large,
+            AppSpacing.medium,
+            AppSpacing.large,
+            0,
+          ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Plan your day',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const Text(
+                      'Pick a shape for today, then customize it.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onClose != null)
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.large,
+                    AppSpacing.small,
+                    AppSpacing.large,
+                    AppSpacing.xLarge,
+                  ),
+                  itemCount: templates.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == templates.length) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.small),
+                        child: OutlinedButton.icon(
+                          onPressed: onNewTemplate,
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('New custom template'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
+                        ),
+                      );
+                    }
+                    final template = templates[index];
+                    return _TemplateCard(
+                      template: template,
+                      onApply: () => onApply(template),
+                      onCustomize: () => onCustomize(template),
+                      onDelete:
+                          template.isCustom ? () => onDelete(template) : null,
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

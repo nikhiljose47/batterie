@@ -216,7 +216,7 @@ class DashboardController extends ChangeNotifier {
   /// daily baseline, so the batteries always reflect the whole day.
   /// Each intermediate state is persisted so the stats tab can chart the day.
   void _recomputeFromTimeline() {
-    var energy = _energyScoreEngine.createDailyBaseline(28, 7.0, 0.7);
+    var energy = _energyScoreEngine.createDailyBaseline(28, 8.0, 0.7);
     final sorted = <LoggedActivity>[..._state.loggedActivities]
       ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 
@@ -255,17 +255,21 @@ class DashboardController extends ChangeNotifier {
         : _energyScoreEngine.activityById(sorted.last.activityId);
 
     // Find lowest physical and brain across today's predicted timeline.
-    double lowestPhysical = points.isEmpty ? energy.physical : points.first.physical;
+    double lowestPhysical = points.isEmpty
+        ? energy.physical.toDouble()
+        : points.first.physical.toDouble();
     int lowestPhysicalAt = points.isEmpty ? -1 : points.first.startMinutes;
-    double lowestBrain = points.isEmpty ? energy.brain : points.first.brain;
+    double lowestBrain = points.isEmpty
+        ? energy.brain.toDouble()
+        : points.first.brain.toDouble();
     int lowestBrainAt = points.isEmpty ? -1 : points.first.startMinutes;
     for (final p in points) {
       if (p.physical < lowestPhysical) {
-        lowestPhysical = p.physical;
+        lowestPhysical = p.physical.toDouble();
         lowestPhysicalAt = p.startMinutes;
       }
       if (p.brain < lowestBrain) {
-        lowestBrain = p.brain;
+        lowestBrain = p.brain.toDouble();
         lowestBrainAt = p.startMinutes;
       }
     }

@@ -6,12 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   testWidgets('shows the Energy Health tab shell', (WidgetTester tester) async {
     await tester.pumpWidget(const EnergyHealthApp());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text(AppStrings.appName), findsOneWidget);
     expect(find.text(AppStrings.youTab), findsOneWidget);
     expect(find.text(AppStrings.othersTab), findsOneWidget);
     expect(find.text(AppStrings.newsTab), findsOneWidget);
-    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
   });
 }

@@ -24,4 +24,6 @@ class AppColors {
   static const Color energyPhysicalAccent = Color(0xFF0080B3);
   static const Color energyBrainBg = Color(0xFFE0F5EA);
   static const Color energyBrainAccent = Color(0xFF00875A);
+  static const Color bedtimeBg = Color(0xFFE9E6FF);
+  static const Color bedtimeAccent = Color(0xFF5D4BB7);
 }

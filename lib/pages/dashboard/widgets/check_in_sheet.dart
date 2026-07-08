@@ -17,7 +17,7 @@ class _CheckInSheetState extends State<CheckInSheet> {
   final TextEditingController _notesController = TextEditingController();
 
   int _age = 28;
-  double _sleepHours = 7.0;
+  double _sleepHours = 8.0;
   double _sleepQuality = 0.7;
   String _activityId = EnergyScoreEngine.activities.first.id;
   double _durationMinutes = 60;
