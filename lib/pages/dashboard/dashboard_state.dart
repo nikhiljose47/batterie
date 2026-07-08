@@ -15,6 +15,10 @@ class DashboardState {
     this.isAnalyzing = false,
     this.analysisError,
     this.hasCheckInEstimate = false,
+    this.lowestPhysical = 100.0,
+    this.lowestPhysicalAt = -1,
+    this.lowestBrain = 100.0,
+    this.lowestBrainAt = -1,
   });
 
   final AsyncStatus status;
@@ -30,6 +34,14 @@ class DashboardState {
   final String? analysisError;
   final bool hasCheckInEstimate;
 
+  /// Lowest predicted energy values across today's timeline.
+  /// Values are 0–100. [lowestPhysicalAt] / [lowestBrainAt] are minutes
+  /// from midnight (-1 when no timeline data is available).
+  final double lowestPhysical;
+  final int lowestPhysicalAt;
+  final double lowestBrain;
+  final int lowestBrainAt;
+
   DashboardState copyWith({
     AsyncStatus? status,
     BodyStatus? bodyStatus,
@@ -40,6 +52,10 @@ class DashboardState {
     bool? isAnalyzing,
     String? analysisError,
     bool? hasCheckInEstimate,
+    double? lowestPhysical,
+    int? lowestPhysicalAt,
+    double? lowestBrain,
+    int? lowestBrainAt,
   }) {
     return DashboardState(
       status: status ?? this.status,
@@ -51,6 +67,10 @@ class DashboardState {
       isAnalyzing: isAnalyzing ?? this.isAnalyzing,
       analysisError: analysisError,
       hasCheckInEstimate: hasCheckInEstimate ?? this.hasCheckInEstimate,
+      lowestPhysical: lowestPhysical ?? this.lowestPhysical,
+      lowestPhysicalAt: lowestPhysicalAt ?? this.lowestPhysicalAt,
+      lowestBrain: lowestBrain ?? this.lowestBrain,
+      lowestBrainAt: lowestBrainAt ?? this.lowestBrainAt,
     );
   }
 }

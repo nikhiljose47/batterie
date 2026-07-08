@@ -45,6 +45,7 @@ class _DashboardPageState extends State<DashboardPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   String _searchQuery = '';
+  bool _showLowest = false;
 
   @override
   void initState() {
@@ -118,41 +119,68 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: AppSpacing.medium),
 
                 // ── Two energy batteries side by side ────────────────────
-                SizedBox(
-                  height: 224,
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: EnergyLevelCard(
-                          label: AppStrings.physicalEnergy,
-                          percent: state.batteries.isNotEmpty
-                              ? state.batteries[0].percent
-                              : 0.72,
-                          subtitle: state.batteries.isNotEmpty
-                              ? state.batteries[0].subtitle
-                              : '',
-                          accentColor: AppColors.energyPhysicalAccent,
-                          backgroundColor: AppColors.energyPhysicalBg,
-                          icon: Icons.fitness_center_rounded,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    // Toggle: current vs lowest energy view
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: _EnergyViewToggle(
+                        showLowest: _showLowest,
+                        onToggle: () =>
+                            setState(() => _showLowest = !_showLowest),
                       ),
-                      const SizedBox(width: AppSpacing.medium),
-                      Expanded(
-                        child: EnergyLevelCard(
-                          label: AppStrings.brainEnergy,
-                          percent: state.batteries.length > 1
-                              ? state.batteries[1].percent
-                              : 0.74,
-                          subtitle: state.batteries.length > 1
-                              ? state.batteries[1].subtitle
-                              : '',
-                          accentColor: AppColors.energyBrainAccent,
-                          backgroundColor: AppColors.energyBrainBg,
-                          icon: Icons.psychology_rounded,
-                        ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 224,
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: EnergyLevelCard(
+                              label: AppStrings.physicalEnergy,
+                              percent: _showLowest &&
+                                      state.lowestPhysicalAt != -1
+                                  ? state.lowestPhysical / 100
+                                  : (state.batteries.isNotEmpty
+                                      ? state.batteries[0].percent
+                                      : 0.72),
+                              subtitle: _showLowest &&
+                                      state.lowestPhysicalAt != -1
+                                  ? 'Lowest at ${formatMinutes(state.lowestPhysicalAt)}'
+                                  : (state.batteries.isNotEmpty
+                                      ? state.batteries[0].subtitle
+                                      : ''),
+                              accentColor: AppColors.energyPhysicalAccent,
+                              backgroundColor: AppColors.energyPhysicalBg,
+                              icon: Icons.fitness_center_rounded,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.medium),
+                          Expanded(
+                            child: EnergyLevelCard(
+                              label: AppStrings.brainEnergy,
+                              percent: _showLowest &&
+                                      state.lowestBrainAt != -1
+                                  ? state.lowestBrain / 100
+                                  : (state.batteries.length > 1
+                                      ? state.batteries[1].percent
+                                      : 0.74),
+                              subtitle: _showLowest &&
+                                      state.lowestBrainAt != -1
+                                  ? 'Lowest at ${formatMinutes(state.lowestBrainAt)}'
+                                  : (state.batteries.length > 1
+                                      ? state.batteries[1].subtitle
+                                      : ''),
+                              accentColor: AppColors.energyBrainAccent,
+                              backgroundColor: AppColors.energyBrainBg,
+                              icon: Icons.psychology_rounded,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.medium),
 
@@ -649,6 +677,92 @@ class _SendButton extends StatelessWidget {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// Compact pill toggle that switches the battery view between current energy
+/// and the predicted lowest-energy point of the day.
+class _EnergyViewToggle extends StatelessWidget {
+  const _EnergyViewToggle({
+    required this.showLowest,
+    required this.onToggle,
+  });
+
+  final bool showLowest;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceTint,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.outline),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _Pill(
+              icon: Icons.bolt_rounded,
+              label: 'Now',
+              selected: !showLowest,
+            ),
+            _Pill(
+              icon: Icons.trending_down_rounded,
+              label: 'Low',
+              selected: showLowest,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.icon,
+    required this.label,
+    required this.selected,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.primary : Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            icon,
+            size: 13,
+            color: selected ? Colors.white : AppColors.textMuted,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : AppColors.textMuted,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -254,6 +254,22 @@ class DashboardController extends ChangeNotifier {
         ? null
         : _energyScoreEngine.activityById(sorted.last.activityId);
 
+    // Find lowest physical and brain across today's predicted timeline.
+    double lowestPhysical = points.isEmpty ? energy.physical : points.first.physical;
+    int lowestPhysicalAt = points.isEmpty ? -1 : points.first.startMinutes;
+    double lowestBrain = points.isEmpty ? energy.brain : points.first.brain;
+    int lowestBrainAt = points.isEmpty ? -1 : points.first.startMinutes;
+    for (final p in points) {
+      if (p.physical < lowestPhysical) {
+        lowestPhysical = p.physical;
+        lowestPhysicalAt = p.startMinutes;
+      }
+      if (p.brain < lowestBrain) {
+        lowestBrain = p.brain;
+        lowestBrainAt = p.startMinutes;
+      }
+    }
+
     _state = _state.copyWith(
       batteries: <BatteryStatus>[
         BatteryStatus(
@@ -270,6 +286,10 @@ class DashboardController extends ChangeNotifier {
         ),
       ],
       timelinePoints: points,
+      lowestPhysical: lowestPhysical,
+      lowestPhysicalAt: lowestPhysicalAt,
+      lowestBrain: lowestBrain,
+      lowestBrainAt: lowestBrainAt,
       bodyStatus: _state.bodyStatus == null || lastActivity == null
           ? _state.bodyStatus
           : BodyStatus(
