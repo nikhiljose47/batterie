@@ -11,6 +11,7 @@ import '../news/news_page.dart';
 import '../others/others_page.dart';
 import '../profile/profile_page.dart';
 import '../profile/templates_page.dart';
+import '../services/services_page.dart';
 import '../weather/weather_controller.dart';
 import 'home_controller.dart';
 
@@ -70,6 +71,22 @@ class _HomePageState extends State<HomePage>
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         actions: <Widget>[
+          // Services hub — all the mini-apps (trackers, calculators…).
+          InkWell(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ServicesPage()),
+            ),
+            borderRadius: BorderRadius.circular(8),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(
+                Icons.widgets_outlined,
+                size: 19,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
           // Location chip — "Location off" until we have a fix, then the
           // short lat,lon code. Tapping re-requests / refreshes.
           _LocationChip(controller: _weatherController),
