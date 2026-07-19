@@ -3,6 +3,7 @@ class AppStrings {
 
   static const String appName = 'Energy Health';
   static const String settings = 'Settings';
+  static const String homeTab = 'Home';
   static const String youTab = 'You';
   static const String othersTab = 'Circle';
   static const String newsTab = 'News';
