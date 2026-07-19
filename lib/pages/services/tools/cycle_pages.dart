@@ -132,8 +132,8 @@ class _CyclePageState extends State<CyclePage> {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFCE4EC),
                       borderRadius: BorderRadius.circular(10),
@@ -168,8 +168,8 @@ class _CyclePageState extends State<CyclePage> {
               ),
               icon: const Icon(Icons.water_drop_rounded, size: 16),
               label: const Text('My period started today',
-                  style: TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  style:
+                      TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
             ),
           ),
           const SizedBox(height: 6),
@@ -254,11 +254,9 @@ class _CycleStat extends StatelessWidget {
     return Column(
       children: <Widget>[
         Text('$emoji $value',
-            style:
-                const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
         Text(label,
-            style:
-                const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+            style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
         Text(sub,
             style: const TextStyle(
                 fontSize: 10,
@@ -328,11 +326,24 @@ class _SettingSlider extends StatelessWidget {
 
 /// Baby size per week (subset; nearest match is shown).
 const Map<int, String> _babySizes = <int, String>{
-  4: '🌱 poppy seed', 6: '🫛 pea', 8: '🫐 raspberry', 10: '🍓 strawberry',
-  12: '🍋 lime', 14: '🍋 lemon', 16: '🥑 avocado', 18: '🫑 bell pepper',
-  20: '🍌 banana', 22: '🥥 coconut', 24: '🌽 corn cob', 26: '🥬 lettuce',
-  28: '🍆 eggplant', 30: '🥦 big broccoli', 32: '🎃 squash',
-  34: '🍈 cantaloupe', 36: '🍍 pineapple', 38: '🍉 small watermelon',
+  4: '🌱 poppy seed',
+  6: '🫛 pea',
+  8: '🫐 raspberry',
+  10: '🍓 strawberry',
+  12: '🍋 lime',
+  14: '🍋 lemon',
+  16: '🥑 avocado',
+  18: '🫑 bell pepper',
+  20: '🍌 banana',
+  22: '🥥 coconut',
+  24: '🌽 corn cob',
+  26: '🥬 lettuce',
+  28: '🍆 eggplant',
+  30: '🥦 big broccoli',
+  32: '🎃 squash',
+  34: '🍈 cantaloupe',
+  36: '🍍 pineapple',
+  38: '🍉 small watermelon',
   40: '👶 ready to meet you',
 };
 
@@ -417,8 +428,8 @@ class _PregnancyPageState extends State<PregnancyPage> {
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('I know my due date',
-                  style: TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  style:
+                      TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
             ),
           ),
           const SizedBox(height: 8),
@@ -431,8 +442,8 @@ class _PregnancyPageState extends State<PregnancyPage> {
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Calculate from last period',
-                  style: TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  style:
+                      TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -481,8 +492,8 @@ class _PregnancyPageState extends State<PregnancyPage> {
                   daysLeft > 0
                       ? '$daysLeft days to go · due ${svcDayLabel(svcDay(_due!))}'
                       : 'Due date reached — any day now! 💕',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textMuted),
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
               ],
             ),

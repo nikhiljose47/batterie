@@ -126,12 +126,10 @@ class CurrentWeather {
 
   static CurrentWeather fromJson(Map<String, dynamic> json) => CurrentWeather(
         temperatureC: (json['temperatureC'] as num).toDouble(),
-        apparentTemperatureC:
-            (json['apparentTemperatureC'] as num).toDouble(),
+        apparentTemperatureC: (json['apparentTemperatureC'] as num).toDouble(),
         humidityPercent: (json['humidityPercent'] as num).toInt(),
         windSpeedKph: (json['windSpeedKph'] as num).toDouble(),
-        condition:
-            WeatherCondition.fromJson(json['condition'] as String?),
+        condition: WeatherCondition.fromJson(json['condition'] as String?),
         isDay: json['isDay'] as bool? ?? true,
       );
 }
@@ -164,8 +162,7 @@ class DailyForecast {
 
   static DailyForecast fromJson(Map<String, dynamic> json) => DailyForecast(
         date: DateTime.parse(json['date'] as String),
-        condition:
-            WeatherCondition.fromJson(json['condition'] as String?),
+        condition: WeatherCondition.fromJson(json['condition'] as String?),
         tempMinC: (json['tempMinC'] as num).toDouble(),
         tempMaxC: (json['tempMaxC'] as num).toDouble(),
         precipitationProbability: json['precipitationProbability'] as int?,
@@ -245,8 +242,8 @@ class WeatherSnapshot {
   static WeatherSnapshot fromJson(Map<String, dynamic> json) => WeatherSnapshot(
         location:
             UserLocation.fromJson(json['location'] as Map<String, dynamic>),
-        current: CurrentWeather.fromJson(
-            json['current'] as Map<String, dynamic>),
+        current:
+            CurrentWeather.fromJson(json['current'] as Map<String, dynamic>),
         daily: (json['daily'] as List<dynamic>)
             .map((e) => DailyForecast.fromJson(e as Map<String, dynamic>))
             .toList(),

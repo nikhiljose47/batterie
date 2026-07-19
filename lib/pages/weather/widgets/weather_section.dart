@@ -75,8 +75,7 @@ class _WeatherSectionState extends State<WeatherSection> {
       case WeatherStatus.permissionDenied:
       case WeatherStatus.permissionDeniedForever:
         return _WeatherPermissionState(
-          permanent:
-              state.status == WeatherStatus.permissionDeniedForever,
+          permanent: state.status == WeatherStatus.permissionDeniedForever,
           onRetry: _controller.refresh,
         );
       case WeatherStatus.serviceDisabled:
@@ -86,7 +85,9 @@ class _WeatherSectionState extends State<WeatherSection> {
           body:
               'Turn on location services in your device settings to see local weather.',
           actionLabel: 'Open location settings',
-          onAction: () async { await Geolocator.openLocationSettings(); },
+          onAction: () async {
+            await Geolocator.openLocationSettings();
+          },
         );
       case WeatherStatus.error:
         return _WeatherMessageState(
@@ -133,8 +134,7 @@ class _WeatherContent extends StatelessWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            Icon(current.condition.icon,
-                size: 42, color: scheme.primary),
+            Icon(current.condition.icon, size: 42, color: scheme.primary),
             const SizedBox(width: AppSpacing.medium),
             Expanded(
               child: Column(
@@ -197,8 +197,8 @@ class _WeatherContent extends StatelessWidget {
               return Column(
                 children: children
                     .map((c) => Padding(
-                          padding: const EdgeInsets.only(
-                              bottom: AppSpacing.small),
+                          padding:
+                              const EdgeInsets.only(bottom: AppSpacing.small),
                           child: c,
                         ))
                     .toList(),
@@ -325,7 +325,7 @@ class _ForecastList extends StatelessWidget {
               Divider(
                 height: 1,
                 thickness: 1,
-                color: scheme.outlineVariant.withValues(alpha: 0.4),
+                color: scheme.outlineVariant.withOpacity(0.4),
                 indent: 16,
                 endIndent: 16,
               ),

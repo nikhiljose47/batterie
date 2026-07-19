@@ -301,13 +301,12 @@ class _LocationChip extends StatelessWidget {
           onTap: controller.refresh,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: fg.withValues(alpha: 0.35),
+                color: fg.withOpacity(0.35),
                 width: 0.8,
               ),
             ),

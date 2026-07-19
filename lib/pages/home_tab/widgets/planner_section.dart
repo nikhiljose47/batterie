@@ -58,8 +58,8 @@ class _PlannerSectionState extends State<PlannerSection> {
     const step = _regularCardHeight + _cardGap;
     // +1 because the wake card sits above index 0 in the list.
     final visualIndex = _currentIndex + 1;
-    final offset = (visualIndex * step - 18)
-        .clamp(0.0, (plannerSlots.length + 2) * step);
+    final offset =
+        (visualIndex * step - 18).clamp(0.0, (plannerSlots.length + 2) * step);
     _scrollController = ScrollController(initialScrollOffset: offset);
     _loadTravelBack();
   }
@@ -84,8 +84,8 @@ class _PlannerSectionState extends State<PlannerSection> {
           continue;
         }
         for (final record in records) {
-          final slotIndex = plannerSlots.indexWhere(
-              (s) => s.contains(record.startMinutes));
+          final slotIndex =
+              plannerSlots.indexWhere((s) => s.contains(record.startMinutes));
           if (slotIndex == -1) continue;
 
           final score = record.physicalAfter + record.brainAfter;
@@ -301,13 +301,13 @@ class _PlannerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(isCurrent ? 22 : 16),
         border: Border.all(
           color: isCurrent
-              ? AppColors.primary.withValues(alpha: 0.55)
-              : AppColors.outline.withValues(alpha: 0.8),
+              ? AppColors.primary.withOpacity(0.55)
+              : AppColors.outline.withOpacity(0.8),
           width: isCurrent ? 1.6 : 1,
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: isCurrent ? 0.10 : 0.04),
+            color: Colors.black.withOpacity(isCurrent ? 0.10 : 0.04),
             blurRadius: isCurrent ? 20 : 8,
             offset: Offset(0, isCurrent ? 6 : 3),
           ),
@@ -329,18 +329,15 @@ class _PlannerCard extends StatelessWidget {
                       // Spotlight: a soft tinted wash behind the main
                       // content so the eye lands there first.
                       ? Container(
-                          padding:
-                              const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14),
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: <Color>[
-                                AppColors.surfaceTint
-                                    .withValues(alpha: 0.55),
-                                AppColors.surfaceTint
-                                    .withValues(alpha: 0.15),
+                                AppColors.surfaceTint.withOpacity(0.55),
+                                AppColors.surfaceTint.withOpacity(0.15),
                               ],
                             ),
                           ),
@@ -457,8 +454,7 @@ class _PlannerCard extends StatelessWidget {
       return _CurrentWeatherBlock(weather: weather, crowd: advice.crowd);
     }
     if (slotForecast != null) {
-      return _SlotForecastBlock(
-          forecast: slotForecast!, crowd: advice.crowd);
+      return _SlotForecastBlock(forecast: slotForecast!, crowd: advice.crowd);
     }
     final tags = <Widget>[
       if (weatherTag != null) _Tag(label: weatherTag!, emphasized: true),
@@ -496,7 +492,7 @@ class _PlannerCard extends StatelessWidget {
             style: TextStyle(
               fontSize: isCurrent ? 9 : 8,
               fontStyle: FontStyle.italic,
-              color: AppColors.textMuted.withValues(alpha: 0.9),
+              color: AppColors.textMuted.withOpacity(0.9),
             ),
           ),
         ),
@@ -521,14 +517,13 @@ class _CurrentWeatherBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
           Icon(Icons.cloud_queue_rounded,
-              size: 22,
-              color: AppColors.primary.withValues(alpha: 0.45)),
+              size: 22, color: AppColors.primary.withOpacity(0.45)),
           const SizedBox(height: 4),
           Text(
             'Loading',
             style: TextStyle(
               fontSize: 9,
-              color: AppColors.textMuted.withValues(alpha: 0.7),
+              color: AppColors.textMuted.withOpacity(0.7),
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -564,7 +559,7 @@ class _CurrentWeatherBlock extends StatelessWidget {
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.w600,
-            color: Colors.black.withValues(alpha: 0.55),
+            color: Colors.black.withOpacity(0.55),
             letterSpacing: 0.2,
           ),
         ),
@@ -573,7 +568,7 @@ class _CurrentWeatherBlock extends StatelessWidget {
           'Feels ${current.apparentTemperatureC.round()}°',
           style: TextStyle(
             fontSize: 9,
-            color: AppColors.textMuted.withValues(alpha: 0.85),
+            color: AppColors.textMuted.withOpacity(0.85),
           ),
         ),
         const Spacer(),
@@ -583,7 +578,7 @@ class _CurrentWeatherBlock extends StatelessWidget {
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: Colors.black.withValues(alpha: 0.6),
+              color: Colors.black.withOpacity(0.6),
             ),
           ),
         const SizedBox(height: 2),
@@ -591,7 +586,7 @@ class _CurrentWeatherBlock extends StatelessWidget {
           '💧${current.humidityPercent}%  💨${current.windSpeedKph.round()}',
           style: TextStyle(
             fontSize: 9,
-            color: AppColors.textMuted.withValues(alpha: 0.85),
+            color: AppColors.textMuted.withOpacity(0.85),
           ),
         ),
       ],
@@ -615,7 +610,7 @@ class _SlotForecastBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
         Icon(forecast.condition.icon,
-            size: 18, color: AppColors.primary.withValues(alpha: 0.85)),
+            size: 18, color: AppColors.primary.withOpacity(0.85)),
         const SizedBox(height: 2),
         Text(
           '${forecast.temperatureC.round()}°',
@@ -633,7 +628,7 @@ class _SlotForecastBlock extends StatelessWidget {
             style: TextStyle(
               fontSize: 8.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textMuted.withValues(alpha: 0.9),
+              color: AppColors.textMuted.withOpacity(0.9),
             ),
           ),
         ],
@@ -661,10 +656,10 @@ class _PreviousBestLine extends StatelessWidget {
         vertical: emphasized ? 4 : 3,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceTint.withValues(alpha: 0.7),
+        color: AppColors.surfaceTint.withOpacity(0.7),
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.28),
+          color: AppColors.primary.withOpacity(0.28),
           width: 0.8,
         ),
       ),
@@ -699,15 +694,14 @@ class _PreviousBestPlaceholder extends StatelessWidget {
       children: <Widget>[
         Text('🏆',
             style: TextStyle(
-                fontSize: 10,
-                color: AppColors.textMuted.withValues(alpha: 0.5))),
+                fontSize: 10, color: AppColors.textMuted.withOpacity(0.5))),
         const SizedBox(width: 5),
         Text(
           'No past best yet',
           style: TextStyle(
             fontSize: 10,
             fontStyle: FontStyle.italic,
-            color: AppColors.textMuted.withValues(alpha: 0.6),
+            color: AppColors.textMuted.withOpacity(0.6),
           ),
         ),
       ],
@@ -738,20 +732,22 @@ class _WakeSleepCard extends StatelessWidget {
     // Dawn: warm sunrise wash. Night: cool moonlit indigo.
     final gradientColors = _isWake
         ? const <Color>[Color(0xFFFFF5D6), Color(0xFFFFE0B2), Color(0xFFFFD1A6)]
-        : const <Color>[Color(0xFF1B1E4A), Color(0xFF2E2F6E), Color(0xFF3D3E85)];
+        : const <Color>[
+            Color(0xFF1B1E4A),
+            Color(0xFF2E2F6E),
+            Color(0xFF3D3E85)
+          ];
     final foreground = _isWake ? const Color(0xFF3A2A0F) : Colors.white;
     final subFg = _isWake
-        ? const Color(0xFF3A2A0F).withValues(alpha: 0.65)
-        : Colors.white.withValues(alpha: 0.75);
+        ? const Color(0xFF3A2A0F).withOpacity(0.65)
+        : Colors.white.withOpacity(0.75);
     final tipBg = _isWake
-        ? Colors.white.withValues(alpha: 0.65)
-        : Colors.white.withValues(alpha: 0.12);
+        ? Colors.white.withOpacity(0.65)
+        : Colors.white.withOpacity(0.12);
     final tipBorder = _isWake
-        ? const Color(0xFFB88A3A).withValues(alpha: 0.35)
-        : Colors.white.withValues(alpha: 0.25);
-    final titleFg = _isWake
-        ? const Color(0xFFB86A00)
-        : const Color(0xFFB5B8FF);
+        ? const Color(0xFFB88A3A).withOpacity(0.35)
+        : Colors.white.withOpacity(0.25);
+    final titleFg = _isWake ? const Color(0xFFB86A00) : const Color(0xFFB5B8FF);
 
     return Container(
       height: 148,
@@ -765,15 +761,13 @@ class _WakeSleepCard extends StatelessWidget {
         ),
         border: Border.all(
           color: (_isWake ? Colors.white : Colors.white)
-              .withValues(alpha: _isWake ? 0.7 : 0.15),
+              .withOpacity(_isWake ? 0.7 : 0.15),
           width: 1,
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: (_isWake
-                    ? const Color(0xFFB88A3A)
-                    : const Color(0xFF0A0C2A))
-                .withValues(alpha: 0.18),
+            color: (_isWake ? const Color(0xFFB88A3A) : const Color(0xFF0A0C2A))
+                .withOpacity(0.18),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -824,8 +818,8 @@ class _WakeSleepCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: tipBg,
                     borderRadius: BorderRadius.circular(9),
@@ -862,7 +856,7 @@ class _WakeSleepCard extends StatelessWidget {
                   child: Icon(
                     Icons.wb_sunny_rounded,
                     size: 40,
-                    color: foreground.withValues(alpha: 0.7),
+                    color: foreground.withOpacity(0.7),
                   ),
                 ),
               ),
@@ -900,14 +894,13 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: emphasized
-            ? AppColors.surfaceTint
-            : AppColors.scaffoldBackground,
+        color:
+            emphasized ? AppColors.surfaceTint : AppColors.scaffoldBackground,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: emphasized
-              ? AppColors.primary.withValues(alpha: 0.35)
-              : AppColors.outline.withValues(alpha: 0.7),
+              ? AppColors.primary.withOpacity(0.35)
+              : AppColors.outline.withOpacity(0.7),
           width: 0.7,
         ),
       ),

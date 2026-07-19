@@ -69,8 +69,7 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-          content: Text('Check-in saved 💙'),
-          duration: Duration(seconds: 2)),
+          content: Text('Check-in saved 💙'), duration: Duration(seconds: 2)),
     );
   }
 
@@ -113,8 +112,7 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                                 divisions: 9,
                                 activeColor: AppColors.primary,
                                 inactiveColor: AppColors.surfaceTint,
-                                onChanged: (v) =>
-                                    setState(() => _slider = v),
+                                onChanged: (v) => setState(() => _slider = v),
                               ),
                             ),
                           ),
@@ -137,8 +135,7 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                           ),
                           child: Text(hasToday ? 'Update' : 'Check in',
                               style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700)),
+                                  fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ],
@@ -156,10 +153,10 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                       children: <Widget>[
                         for (var back = 13; back >= 0; back--)
                           Builder(builder: (context) {
-                            final day = DateTime.now()
-                                .subtract(Duration(days: back));
-                            final v = (_checkins[svcDay(day)] as num?)
-                                ?.toDouble();
+                            final day =
+                                DateTime.now().subtract(Duration(days: back));
+                            final v =
+                                (_checkins[svcDay(day)] as num?)?.toDouble();
                             return Container(
                               width: 14,
                               height: 8 + (v ?? 0) * 4.4,
@@ -168,12 +165,12 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                                     ? AppColors.surfaceTint
                                     : v >= 7
                                         ? const Color(0xFF2E7D32)
-                                            .withValues(alpha: 0.75)
+                                            .withOpacity(0.75)
                                         : v >= 4
                                             ? const Color(0xFFF9A825)
-                                                .withValues(alpha: 0.8)
+                                                .withOpacity(0.8)
                                             : const Color(0xFFC62828)
-                                                .withValues(alpha: 0.75),
+                                                .withOpacity(0.75),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             );
@@ -194,16 +191,14 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                         data: Theme.of(context)
                             .copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
-                          tilePadding: const EdgeInsets.symmetric(
-                              horizontal: 14),
+                          tilePadding:
+                              const EdgeInsets.symmetric(horizontal: 14),
                           title: Text(title,
                               style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700)),
+                                  fontSize: 12.5, fontWeight: FontWeight.w700)),
                           children: <Widget>[
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                               child: Text(body,
                                   style: const TextStyle(
                                       fontSize: 11.5,
@@ -223,8 +218,7 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                     color: const Color(0xFFEDE7F6),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                        color:
-                            const Color(0xFF5E35B1).withValues(alpha: 0.3)),
+                        color: const Color(0xFF5E35B1).withOpacity(0.3)),
                   ),
                   child: const Text(
                     '🧠 Tele-MANAS (govt, free, 24×7): 14416\n'

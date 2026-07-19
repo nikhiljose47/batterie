@@ -59,8 +59,14 @@ const symptomLogConfig = QuickLogConfig(
   id: 'symptoms',
   title: '🤒 Symptom Tracker',
   chips: <String>[
-    '🤕 Headache', '🤒 Fever', '🤧 Cold', '😖 Pain',
-    '🤢 Nausea', '😮‍💨 Fatigue', '😵 Dizzy', '🫁 Cough',
+    '🤕 Headache',
+    '🤒 Fever',
+    '🤧 Cold',
+    '😖 Pain',
+    '🤢 Nausea',
+    '😮‍💨 Fatigue',
+    '😵 Dizzy',
+    '🫁 Cough',
   ],
   chipRequired: true,
   textHint: 'Details (optional) — where, how bad…',
@@ -71,8 +77,14 @@ const hobbyLogConfig = QuickLogConfig(
   id: 'hobby',
   title: '🎨 Hobby Tracker',
   chips: <String>[
-    '🎸 Music', '🎨 Art', '📚 Reading', '🧵 Craft',
-    '🎮 Gaming', '🌱 Garden', '📷 Photo', '🍳 Cooking',
+    '🎸 Music',
+    '🎨 Art',
+    '📚 Reading',
+    '🧵 Craft',
+    '🎮 Gaming',
+    '🌱 Garden',
+    '📷 Photo',
+    '🍳 Cooking',
   ],
   chipRequired: true,
   numberLabel: 'Minutes',
@@ -83,7 +95,13 @@ const hobbyLogConfig = QuickLogConfig(
 const moodLogConfig = QuickLogConfig(
   id: 'mood',
   title: '🙂 Mood Tracker',
-  chips: <String>['😞 Low', '😕 Meh', '🙂 Okay', '😀 Good', '🤩 Great'],
+  chips: <String>[
+    '😞 Low',
+    '😕 Meh',
+    '🙂 Okay',
+    '😀 Good',
+    '🤩 Great'
+  ],
   chipRequired: true,
   textHint: 'Why? (optional)',
   emptyHint: 'One tap a day builds your mood picture.',
@@ -140,11 +158,15 @@ class _QuickLogPageState extends State<QuickLogPage> {
     final text = _text.text.trim();
     final num = int.tryParse(_number.text.trim());
     if (c.chipRequired && _chip == null) return;
-    if (c.textHint != null && c.chips.isEmpty && c.numberLabel == null &&
+    if (c.textHint != null &&
+        c.chips.isEmpty &&
+        c.numberLabel == null &&
         text.isEmpty) {
       return;
     }
-    if (c.numberLabel != null && c.chips.isEmpty && c.textHint == null &&
+    if (c.numberLabel != null &&
+        c.chips.isEmpty &&
+        c.textHint == null &&
         num == null) {
       return;
     }
@@ -200,8 +222,8 @@ class _QuickLogPageState extends State<QuickLogPage> {
               children: <Widget>[
                 // ── Input area ─────────────────────────────────────────
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(AppSpacing.large,
-                      AppSpacing.medium, AppSpacing.large, 0),
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.large, AppSpacing.medium, AppSpacing.large, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -212,8 +234,7 @@ class _QuickLogPageState extends State<QuickLogPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceTint
-                                .withValues(alpha: 0.6),
+                            color: AppColors.surfaceTint.withOpacity(0.6),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -233,8 +254,8 @@ class _QuickLogPageState extends State<QuickLogPage> {
                               SvcChip(
                                 label: chip,
                                 selected: _chip == chip,
-                                onTap: () => setState(() =>
-                                    _chip = _chip == chip ? null : chip),
+                                onTap: () => setState(
+                                    () => _chip = _chip == chip ? null : chip),
                               ),
                           ],
                         ),
@@ -251,8 +272,8 @@ class _QuickLogPageState extends State<QuickLogPage> {
                           if (c.numberLabel != null)
                             Expanded(
                               flex: 2,
-                              child: _input(_number, c.numberLabel!,
-                                  number: true),
+                              child:
+                                  _input(_number, c.numberLabel!, number: true),
                             ),
                           const SizedBox(width: 8),
                           InkWell(
@@ -297,8 +318,7 @@ class _QuickLogPageState extends State<QuickLogPage> {
                               SectionLabel(svcDayLabel(day)),
                               for (final (index, e) in groups[day]!)
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.only(bottom: 8),
                                   child: WhiteCard(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 10),
@@ -314,28 +334,23 @@ class _QuickLogPageState extends State<QuickLogPage> {
                                                   if (e['tag'] != null)
                                                     Text(
                                                       e['tag'] as String,
-                                                      style:
-                                                          const TextStyle(
+                                                      style: const TextStyle(
                                                         fontSize: 12,
                                                         fontWeight:
-                                                            FontWeight
-                                                                .w700,
+                                                            FontWeight.w700,
                                                       ),
                                                     ),
                                                   if (e['num'] != null) ...[
                                                     if (e['tag'] != null)
-                                                      const SizedBox(
-                                                          width: 6),
+                                                      const SizedBox(width: 6),
                                                     Text(
                                                       '${e['num']} ${c.numberUnit ?? ''}',
-                                                      style:
-                                                          const TextStyle(
+                                                      style: const TextStyle(
                                                         fontSize: 12,
                                                         fontWeight:
-                                                            FontWeight
-                                                                .w700,
-                                                        color: AppColors
-                                                            .primary,
+                                                            FontWeight.w700,
+                                                        color:
+                                                            AppColors.primary,
                                                       ),
                                                     ),
                                                   ],
@@ -344,8 +359,8 @@ class _QuickLogPageState extends State<QuickLogPage> {
                                               if (e['text'] != null)
                                                 Padding(
                                                   padding:
-                                                      const EdgeInsets
-                                                          .only(top: 2),
+                                                      const EdgeInsets.only(
+                                                          top: 2),
                                                   child: Text(
                                                     e['text'] as String,
                                                     style: const TextStyle(
@@ -365,23 +380,18 @@ class _QuickLogPageState extends State<QuickLogPage> {
                                               _clockOf(e),
                                               style: const TextStyle(
                                                   fontSize: 9,
-                                                  color: AppColors
-                                                      .textMuted),
+                                                  color: AppColors.textMuted),
                                             ),
                                             InkWell(
                                               onTap: () => _delete(index),
                                               child: Padding(
                                                 padding:
-                                                    const EdgeInsets.all(
-                                                        4),
+                                                    const EdgeInsets.all(4),
                                                 child: Icon(
-                                                  Icons
-                                                      .delete_outline_rounded,
+                                                  Icons.delete_outline_rounded,
                                                   size: 15,
-                                                  color: AppColors
-                                                      .textMuted
-                                                      .withValues(
-                                                          alpha: 0.6),
+                                                  color: AppColors.textMuted
+                                                      .withOpacity(0.6),
                                                 ),
                                               ),
                                             ),
@@ -417,21 +427,18 @@ class _QuickLogPageState extends State<QuickLogPage> {
           isDense: true,
           hintText: hint,
           hintStyle: TextStyle(
-              fontSize: 11.5,
-              color: AppColors.textMuted.withValues(alpha: 0.8)),
+              fontSize: 11.5, color: AppColors.textMuted.withOpacity(0.8)),
           filled: true,
           fillColor: Colors.white,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                BorderSide(color: AppColors.outline.withValues(alpha: 0.9)),
+            borderSide: BorderSide(color: AppColors.outline.withOpacity(0.9)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.2),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
           ),
         ),
       ),

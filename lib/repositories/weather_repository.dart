@@ -31,8 +31,7 @@ class WeatherRepository {
       final prefs = await _preferencesLoader();
       final raw = prefs.getString(_cacheKey);
       if (raw == null) return null;
-      return WeatherSnapshot.fromJson(
-          jsonDecode(raw) as Map<String, dynamic>);
+      return WeatherSnapshot.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       // A corrupted cache should never block a fresh fetch.
       return null;

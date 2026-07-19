@@ -132,10 +132,11 @@ class _ServicesPageState extends State<ServicesPage> {
                 style: const TextStyle(fontSize: 12.5),
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: 'Search a service — "water", "budget", "sleep"…',
+                  hintText:
+                      'Search a service — "water", "budget", "sleep"…',
                   hintStyle: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textMuted.withValues(alpha: 0.8),
+                    color: AppColors.textMuted.withOpacity(0.8),
                   ),
                   prefixIcon: const Icon(Icons.search_rounded,
                       size: 18, color: AppColors.textMuted),
@@ -144,8 +145,8 @@ class _ServicesPageState extends State<ServicesPage> {
                   contentPadding: EdgeInsets.zero,
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: AppColors.outline.withValues(alpha: 0.9)),
+                    borderSide:
+                        BorderSide(color: AppColors.outline.withOpacity(0.9)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -163,8 +164,7 @@ class _ServicesPageState extends State<ServicesPage> {
             height: 30,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.large),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
               children: <Widget>[
                 _CategoryChip(
                   label: 'All',
@@ -178,8 +178,8 @@ class _ServicesPageState extends State<ServicesPage> {
                     label: c.label,
                     emoji: c.emoji,
                     selected: _category == c,
-                    onTap: () => setState(
-                        () => _category = _category == c ? null : c),
+                    onTap: () =>
+                        setState(() => _category = _category == c ? null : c),
                   ),
                 ],
               ],
@@ -248,7 +248,7 @@ class _CategoryChip extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? AppColors.primary
-                : AppColors.outline.withValues(alpha: 0.9),
+                : AppColors.outline.withOpacity(0.9),
           ),
         ),
         child: Text(
@@ -281,10 +281,10 @@ class _ServiceTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+          border: Border.all(color: AppColors.outline.withOpacity(0.8)),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -313,7 +313,7 @@ class _ServiceTile extends StatelessWidget {
                     fontSize: 7.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.6,
-                    color: accent.withValues(alpha: 0.8),
+                    color: accent.withOpacity(0.8),
                   ),
                 ),
               ],
@@ -334,8 +334,7 @@ class _ServiceTile extends StatelessWidget {
               service.tagline,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 9.5, color: AppColors.textMuted),
+              style: const TextStyle(fontSize: 9.5, color: AppColors.textMuted),
             ),
           ],
         ),

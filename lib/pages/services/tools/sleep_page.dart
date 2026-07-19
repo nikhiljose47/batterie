@@ -62,8 +62,7 @@ class _SleepPageState extends State<SleepPage> {
     await ServiceStore.saveList(key, _entries);
   }
 
-  String _fmtH(int minutes) =>
-      '${(minutes / 60).toStringAsFixed(1)} h';
+  String _fmtH(int minutes) => '${(minutes / 60).toStringAsFixed(1)} h';
 
   @override
   Widget build(BuildContext context) {
@@ -94,12 +93,10 @@ class _SleepPageState extends State<SleepPage> {
                           children: <Widget>[
                             Text(last7.isEmpty ? '—' : _fmtH(avg),
                                 style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800)),
+                                    fontSize: 20, fontWeight: FontWeight.w800)),
                             const Text('7-day average',
                                 style: TextStyle(
-                                    fontSize: 9.5,
-                                    color: AppColors.textMuted)),
+                                    fontSize: 9.5, color: AppColors.textMuted)),
                           ],
                         ),
                       ),
@@ -121,8 +118,7 @@ class _SleepPageState extends State<SleepPage> {
                             ),
                             const Text('sleep debt vs 8 h',
                                 style: TextStyle(
-                                    fontSize: 9.5,
-                                    color: AppColors.textMuted)),
+                                    fontSize: 9.5, color: AppColors.textMuted)),
                           ],
                         ),
                       ),
@@ -144,8 +140,7 @@ class _SleepPageState extends State<SleepPage> {
                         children: <Widget>[
                           Expanded(
                             child: SvcChip(
-                              label:
-                                  '🛏️ Bed ${_bed.format(context)}',
+                              label: '🛏️ Bed ${_bed.format(context)}',
                               selected: true,
                               onTap: () async {
                                 final picked = await showTimePicker(
@@ -159,8 +154,7 @@ class _SleepPageState extends State<SleepPage> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: SvcChip(
-                              label:
-                                  '⏰ Wake ${_wake.format(context)}',
+                              label: '⏰ Wake ${_wake.format(context)}',
                               selected: true,
                               onTap: () async {
                                 final picked = await showTimePicker(
@@ -188,16 +182,14 @@ class _SleepPageState extends State<SleepPage> {
                             onPressed: _log,
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 18),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 18),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
+                                  borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text('Log',
                                 style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700)),
+                                    fontSize: 12, fontWeight: FontWeight.w700)),
                           ),
                         ],
                       ),
@@ -207,8 +199,7 @@ class _SleepPageState extends State<SleepPage> {
                 const SizedBox(height: 6),
 
                 if (_entries.isEmpty)
-                  const EmptyHint(
-                      'Log a night to start seeing your pattern.'),
+                  const EmptyHint('Log a night to start seeing your pattern.'),
                 if (_entries.isNotEmpty) const SectionLabel('Nights'),
                 for (final e in _entries.take(14))
                   Padding(
@@ -223,16 +214,14 @@ class _SleepPageState extends State<SleepPage> {
                             child: Text(
                               svcDayLabel(e['day'] as String? ?? '?'),
                               style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700),
+                                  fontSize: 11, fontWeight: FontWeight.w700),
                             ),
                           ),
                           Expanded(
                             child: Text(
                               '${e['bed']} → ${e['wake']}',
                               style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textMuted),
+                                  fontSize: 11, color: AppColors.textMuted),
                             ),
                           ),
                           Text(
@@ -240,8 +229,7 @@ class _SleepPageState extends State<SleepPage> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
-                              color: ((e['minutes'] as num?)?.toInt() ??
-                                          0) >=
+                              color: ((e['minutes'] as num?)?.toInt() ?? 0) >=
                                       targetMinutes
                                   ? const Color(0xFF2E7D32)
                                   : const Color(0xFFEF6C00),
@@ -252,8 +240,7 @@ class _SleepPageState extends State<SleepPage> {
                             onTap: () => _delete(e),
                             child: Icon(Icons.close_rounded,
                                 size: 15,
-                                color: AppColors.textMuted
-                                    .withValues(alpha: 0.6)),
+                                color: AppColors.textMuted.withOpacity(0.6)),
                           ),
                         ],
                       ),

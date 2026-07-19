@@ -131,13 +131,13 @@ const WakeSleepCopy sleepCardContent = WakeSleepCopy(
 // Order matters — every mode's advice list uses these indices.
 
 const List<TimeSlot> plannerSlots = <TimeSlot>[
-  TimeSlot(startHour: 9, endHour: 11),   // 0 · 09–11
-  TimeSlot(startHour: 11, endHour: 13),  // 1 · 11–13
-  TimeSlot(startHour: 13, endHour: 15),  // 2 · 13–15
-  TimeSlot(startHour: 15, endHour: 17),  // 3 · 15–17
-  TimeSlot(startHour: 17, endHour: 19),  // 4 · 17–19
-  TimeSlot(startHour: 19, endHour: 21),  // 5 · 19–21
-  TimeSlot(startHour: 21, endHour: 22),  // 6 · 21–22
+  TimeSlot(startHour: 9, endHour: 11), // 0 · 09–11
+  TimeSlot(startHour: 11, endHour: 13), // 1 · 11–13
+  TimeSlot(startHour: 13, endHour: 15), // 2 · 13–15
+  TimeSlot(startHour: 15, endHour: 17), // 3 · 15–17
+  TimeSlot(startHour: 17, endHour: 19), // 4 · 17–19
+  TimeSlot(startHour: 19, endHour: 21), // 5 · 19–21
+  TimeSlot(startHour: 21, endHour: 22), // 6 · 21–22
 ];
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -462,8 +462,7 @@ const List<ModeAdvice> _nicotineFree = <ModeAdvice>[
 // One line per mode. Keys must match the mode ids in `home_tab_page.dart`'s
 // `_dayModes` list. Add a mode → add one line. Remove a mode → remove one.
 
-const Map<String, List<ModeAdvice>> modeAdviceMap =
-    <String, List<ModeAdvice>>{
+const Map<String, List<ModeAdvice>> modeAdviceMap = <String, List<ModeAdvice>>{
   'normal': _normal,
   'athletic': _athletic,
   'gym': _gym,

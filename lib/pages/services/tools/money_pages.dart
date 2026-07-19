@@ -8,8 +8,14 @@ import 'toolkit.dart';
 // expense data), and Subscriptions / Bill Reminders (recurring items).
 
 const List<String> expenseCategories = <String>[
-  '🍔 Food', '🚌 Travel', '🛍️ Shopping', '💡 Utilities',
-  '🎬 Fun', '🩺 Health', '🏠 Rent', '📦 Other',
+  '🍔 Food',
+  '🚌 Travel',
+  '🛍️ Shopping',
+  '💡 Utilities',
+  '🎬 Fun',
+  '🩺 Health',
+  '🏠 Rent',
+  '📦 Other',
 ];
 
 const String _expensesKey = 'svc.expenses.entries';
@@ -133,20 +139,18 @@ class _LedgerPageState extends State<LedgerPage> {
                                   child: Text(entry.key,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style:
-                                          const TextStyle(fontSize: 10.5)),
+                                      style: const TextStyle(fontSize: 10.5)),
                                 ),
                                 Expanded(
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(3),
                                     child: LinearProgressIndicator(
-                                      value: total == 0
-                                          ? 0
-                                          : entry.value / total,
+                                      value:
+                                          total == 0 ? 0 : entry.value / total,
                                       minHeight: 6,
                                       color: AppColors.primary,
                                       backgroundColor: AppColors.surfaceTint
-                                          .withValues(alpha: 0.7),
+                                          .withOpacity(0.7),
                                     ),
                                   ),
                                 ),
@@ -241,23 +245,20 @@ class _LedgerPageState extends State<LedgerPage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textMuted),
+                                    fontSize: 11, color: AppColors.textMuted),
                               ),
                             ),
                             Text(
                               '₹${((e['amount'] as num?) ?? 0).toStringAsFixed(0)}',
                               style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w800),
+                                  fontSize: 12.5, fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(width: 8),
                             InkWell(
                               onTap: () => _delete(e),
                               child: Icon(Icons.close_rounded,
                                   size: 15,
-                                  color: AppColors.textMuted
-                                      .withValues(alpha: 0.6)),
+                                  color: AppColors.textMuted.withOpacity(0.6)),
                             ),
                           ],
                         ),
@@ -382,8 +383,7 @@ class _BudgetPageState extends State<BudgetPage> {
                             Text(
                               '₹${totalSpent.toStringAsFixed(0)} of ₹${totalLimit.toStringAsFixed(0)} this month',
                               style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: AppColors.textMuted),
+                                  fontSize: 10.5, color: AppColors.textMuted),
                             ),
                           ],
                         ),
@@ -403,8 +403,7 @@ class _BudgetPageState extends State<BudgetPage> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                         child: Builder(builder: (context) {
-                          final limit =
-                              (_limits[cat] as num?)?.toDouble() ?? 0;
+                          final limit = (_limits[cat] as num?)?.toDouble() ?? 0;
                           final spent = _spent(cat);
                           final over = limit > 0 && spent > limit;
                           return Column(
@@ -441,8 +440,8 @@ class _BudgetPageState extends State<BudgetPage> {
                                     color: over
                                         ? const Color(0xFFC62828)
                                         : AppColors.primary,
-                                    backgroundColor: AppColors.surfaceTint
-                                        .withValues(alpha: 0.7),
+                                    backgroundColor:
+                                        AppColors.surfaceTint.withOpacity(0.7),
                                   ),
                                 ),
                               ],
@@ -585,8 +584,8 @@ class _RecurringPageState extends State<RecurringPage> {
     var due = DateTime(now.year, now.month, dueDay.clamp(1, lastDayThisMonth));
     if (due.isBefore(DateTime(now.year, now.month, now.day))) {
       final lastDayNextMonth = DateTime(now.year, now.month + 2, 0).day;
-      due = DateTime(
-          now.year, now.month + 1, dueDay.clamp(1, lastDayNextMonth));
+      due =
+          DateTime(now.year, now.month + 1, dueDay.clamp(1, lastDayNextMonth));
     }
     return due.difference(DateTime(now.year, now.month, now.day)).inDays;
   }
@@ -615,25 +614,23 @@ class _RecurringPageState extends State<RecurringPage> {
                         children: <Widget>[
                           Text('₹${monthlyTotal.toStringAsFixed(0)}',
                               style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800)),
-                          Text('per month · ₹${(monthlyTotal * 12).toStringAsFixed(0)}/year',
+                                  fontSize: 22, fontWeight: FontWeight.w800)),
+                          Text(
+                              'per month · ₹${(monthlyTotal * 12).toStringAsFixed(0)}/year',
                               style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: AppColors.textMuted)),
+                                  fontSize: 10.5, color: AppColors.textMuted)),
                         ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 10),
-
                 Row(
                   children: <Widget>[
                     Expanded(
                         flex: 3,
-                        child: _MoneyField(
-                            controller: _name, hint: c.nameHint)),
+                        child:
+                            _MoneyField(controller: _name, hint: c.nameHint)),
                     const SizedBox(width: 6),
                     Expanded(
                         flex: 2,
@@ -664,7 +661,6 @@ class _RecurringPageState extends State<RecurringPage> {
                   ],
                 ),
                 const SizedBox(height: 6),
-
                 if (_items.isEmpty)
                   EmptyHint(c.withPaidToggle
                       ? 'Add bills with their due day — tick them off '
@@ -672,9 +668,8 @@ class _RecurringPageState extends State<RecurringPage> {
                       : 'Add every subscription — the yearly total is '
                           'usually a surprise.'),
                 if (sorted.isNotEmpty)
-                  SectionLabel(c.withPaidToggle
-                      ? 'This month'
-                      : 'Next renewals'),
+                  SectionLabel(
+                      c.withPaidToggle ? 'This month' : 'Next renewals'),
                 for (final item in sorted)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -733,16 +728,14 @@ class _RecurringPageState extends State<RecurringPage> {
                           Text(
                             '₹${((item['amount'] as num?) ?? 0).toStringAsFixed(0)}',
                             style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800),
+                                fontSize: 12.5, fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(width: 8),
                           InkWell(
                             onTap: () => _remove(item['id'] as String),
                             child: Icon(Icons.close_rounded,
                                 size: 15,
-                                color: AppColors.textMuted
-                                    .withValues(alpha: 0.6)),
+                                color: AppColors.textMuted.withOpacity(0.6)),
                           ),
                         ],
                       ),
@@ -779,21 +772,18 @@ class _MoneyField extends StatelessWidget {
           isDense: true,
           hintText: hint,
           hintStyle: TextStyle(
-              fontSize: 11,
-              color: AppColors.textMuted.withValues(alpha: 0.8)),
+              fontSize: 11, color: AppColors.textMuted.withOpacity(0.8)),
           filled: true,
           fillColor: Colors.white,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                BorderSide(color: AppColors.outline.withValues(alpha: 0.9)),
+            borderSide: BorderSide(color: AppColors.outline.withOpacity(0.9)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.2),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
           ),
         ),
       ),

@@ -133,8 +133,7 @@ class _HabitToolPageState extends State<HabitToolPage> {
   @override
   Widget build(BuildContext context) {
     final c = widget.config;
-    final doneToday =
-        _items.where((i) => _isTicked(i['id'] as String)).length;
+    final doneToday = _items.where((i) => _isTicked(i['id'] as String)).length;
 
     return Scaffold(
       appBar: svcAppBar(c.title),
@@ -146,10 +145,10 @@ class _HabitToolPageState extends State<HabitToolPage> {
                 if (c.note != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceTint.withValues(alpha: 0.6),
+                      color: AppColors.surfaceTint.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(c.note!,
@@ -179,8 +178,7 @@ class _HabitToolPageState extends State<HabitToolPage> {
                                   ? '🎉 All done today!'
                                   : 'done today — keep going.',
                           style: const TextStyle(
-                              fontSize: 11.5,
-                              color: AppColors.textMuted),
+                              fontSize: 11.5, color: AppColors.textMuted),
                         ),
                       ),
                     ],
@@ -199,8 +197,7 @@ class _HabitToolPageState extends State<HabitToolPage> {
                           Checkbox(
                             value: _isTicked(item['id'] as String),
                             activeColor: AppColors.primary,
-                            onChanged: (_) =>
-                                _toggle(item['id'] as String),
+                            onChanged: (_) => _toggle(item['id'] as String),
                           ),
                           Expanded(
                             child: Text(
@@ -208,10 +205,9 @@ class _HabitToolPageState extends State<HabitToolPage> {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
-                                decoration:
-                                    _isTicked(item['id'] as String)
-                                        ? TextDecoration.lineThrough
-                                        : null,
+                                decoration: _isTicked(item['id'] as String)
+                                    ? TextDecoration.lineThrough
+                                    : null,
                                 color: _isTicked(item['id'] as String)
                                     ? AppColors.textMuted
                                     : const Color(0xFF2A2E3B),
@@ -230,8 +226,7 @@ class _HabitToolPageState extends State<HabitToolPage> {
                             onTap: () => _remove(item['id'] as String),
                             child: Icon(Icons.close_rounded,
                                 size: 16,
-                                color: AppColors.textMuted
-                                    .withValues(alpha: 0.6)),
+                                color: AppColors.textMuted.withOpacity(0.6)),
                           ),
                         ],
                       ),
@@ -256,8 +251,7 @@ class _HabitToolPageState extends State<HabitToolPage> {
                             hintText: c.addHint,
                             hintStyle: TextStyle(
                                 fontSize: 11.5,
-                                color: AppColors.textMuted
-                                    .withValues(alpha: 0.8)),
+                                color: AppColors.textMuted.withOpacity(0.8)),
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
@@ -265,8 +259,7 @@ class _HabitToolPageState extends State<HabitToolPage> {
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                  color: AppColors.outline
-                                      .withValues(alpha: 0.9)),
+                                  color: AppColors.outline.withOpacity(0.9)),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),

@@ -38,8 +38,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   static const int _sleepEndMinute = 8 * 60; // 480 — sleep zone 0 → 8 AM
   static const double _sleepPxPerMin = 0.25; // very compressed
   static const double _awakePxPerMin = 2.0; // comfortable card density
-  static const double _sleepZoneW =
-      _sleepEndMinute * _sleepPxPerMin; // 120 px
+  static const double _sleepZoneW = _sleepEndMinute * _sleepPxPerMin; // 120 px
   static const double _awakeZoneW =
       (24 * 60 - _sleepEndMinute) * _awakePxPerMin; // 1920 px
   static const double _dayWidth = _sleepZoneW + _awakeZoneW; // 2040 px
@@ -68,8 +67,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   /// X pixel on the canvas → minute-of-day.
   int _xToMinute(double x) {
     if (x <= _sleepZoneW) return (x / _sleepPxPerMin).round();
-    return _sleepEndMinute +
-        ((x - _sleepZoneW) / _awakePxPerMin).round();
+    return _sleepEndMinute + ((x - _sleepZoneW) / _awakePxPerMin).round();
   }
 
   @override
@@ -107,8 +105,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
             ),
             const SizedBox(width: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: AppColors.surfaceTint,
                 borderRadius: BorderRadius.circular(10),
@@ -156,14 +153,10 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               return Container(
                 key: _viewportKey,
                 decoration: BoxDecoration(
-                  color: isHovering
-                      ? AppColors.surfaceTint
-                      : Colors.white,
+                  color: isHovering ? AppColors.surfaceTint : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isHovering
-                        ? AppColors.primary
-                        : AppColors.outline,
+                    color: isHovering ? AppColors.primary : AppColors.outline,
                     width: isHovering ? 1.5 : 1,
                   ),
                 ),
@@ -193,14 +186,11 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   }
 
   void _handleDrop(DragTargetDetails<String> details) {
-    final box =
-        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    final box = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
     final local = box.globalToLocal(details.offset);
-    final rawMinutes =
-        _xToMinute(local.dx + _scrollController.offset);
-    final snapped =
-        ((rawMinutes / 15).round() * 15).clamp(0, 1425);
+    final rawMinutes = _xToMinute(local.dx + _scrollController.offset);
+    final snapped = ((rawMinutes / 15).round() * 15).clamp(0, 1425);
 
     final data = details.data;
     if (data.startsWith('move:')) {
@@ -213,7 +203,8 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
   // ── Sleep block — full-height night zone ───────────────────────────────
 
   // Fixed star dot positions: (x, y, diameter) within the 120 × 124 block.
-  static const List<(double, double, double)> _stars = <(double, double, double)>[
+  static const List<(double, double, double)> _stars =
+      <(double, double, double)>[
     (8.0, 10.0, 2.5),
     (38.0, 5.0, 1.8),
     (72.0, 14.0, 2.2),
@@ -254,7 +245,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
                   width: s.$3,
                   height: s.$3,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: Colors.white.withOpacity(0.7),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -379,26 +370,21 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
     return widget.activities.map((logged) {
       final activity = _engine.activityById(logged.activityId);
       final isGain = activity.physicalDelta + activity.brainDelta > 0;
-      final accent = isGain
-          ? AppColors.energyBrainAccent
-          : AppColors.energyPhysicalAccent;
+      final accent =
+          isGain ? AppColors.energyBrainAccent : AppColors.energyPhysicalAccent;
 
       final left = _minuteToX(logged.startMinutes);
-      final right =
-          _minuteToX(logged.startMinutes + logged.durationMinutes);
+      final right = _minuteToX(logged.startMinutes + logged.durationMinutes);
       final width = (right - left).clamp(64.0, _dayWidth);
 
       final card = Container(
         width: width,
         height: _activityHeight,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: isGain
-              ? AppColors.energyBrainBg
-              : AppColors.energyPhysicalBg,
+          color: isGain ? AppColors.energyBrainBg : AppColors.energyPhysicalBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withValues(alpha: 0.4)),
+          border: Border.all(color: accent.withOpacity(0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,7 +405,7 @@ class _ActivityTimelineRailState extends State<ActivityTimelineRail> {
               '${formatMinutes(logged.startMinutes)} · ${logged.durationMinutes} min',
               style: TextStyle(
                 fontSize: 9,
-                color: accent.withValues(alpha: 0.75),
+                color: accent.withOpacity(0.75),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

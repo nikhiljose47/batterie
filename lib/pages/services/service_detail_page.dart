@@ -37,7 +37,7 @@ class ServiceDetailPage extends StatelessWidget {
             decoration: BoxDecoration(
               color: tint,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: accent.withValues(alpha: 0.25)),
+              border: Border.all(color: accent.withOpacity(0.25)),
             ),
             child: Row(
               children: <Widget>[
@@ -60,7 +60,7 @@ class ServiceDetailPage extends StatelessWidget {
                         service.tagline,
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: Colors.black.withValues(alpha: 0.6),
+                          color: Colors.black.withOpacity(0.6),
                         ),
                       ),
                     ],
@@ -80,8 +80,7 @@ class ServiceDetailPage extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceTint,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3)),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                 ),
                 child: const Text(
                   '🚧 COMING SOON',
@@ -113,18 +112,16 @@ class ServiceDetailPage extends StatelessWidget {
           for (final feature in service.features)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: AppColors.outline.withValues(alpha: 0.8)),
+                border: Border.all(color: AppColors.outline.withOpacity(0.8)),
               ),
               child: Row(
                 children: <Widget>[
                   Icon(Icons.check_circle_outline_rounded,
-                      size: 16, color: accent.withValues(alpha: 0.7)),
+                      size: 16, color: accent.withOpacity(0.7)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

@@ -77,8 +77,7 @@ class WeatherService {
     final c = json['current'] as Map<String, dynamic>;
     return CurrentWeather(
       temperatureC: (c['temperature_2m'] as num).toDouble(),
-      apparentTemperatureC:
-          (c['apparent_temperature'] as num).toDouble(),
+      apparentTemperatureC: (c['apparent_temperature'] as num).toDouble(),
       humidityPercent: (c['relative_humidity_2m'] as num).toInt(),
       windSpeedKph: (c['wind_speed_10m'] as num).toDouble(),
       condition: WeatherCondition.fromCode((c['weather_code'] as num).toInt()),

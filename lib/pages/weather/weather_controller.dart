@@ -94,8 +94,7 @@ class WeatherController extends ChangeNotifier {
           WeatherStatus.permissionDenied,
         LocationExceptionKind.permissionDeniedForever =>
           WeatherStatus.permissionDeniedForever,
-        LocationExceptionKind.serviceDisabled =>
-          WeatherStatus.serviceDisabled,
+        LocationExceptionKind.serviceDisabled => WeatherStatus.serviceDisabled,
         _ => WeatherStatus.error,
       };
       _emit(_state.copyWith(

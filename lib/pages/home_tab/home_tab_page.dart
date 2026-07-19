@@ -94,112 +94,112 @@ class _HomeTabPageState extends State<HomeTabPage> {
 
   Widget _buildDayCard(BuildContext context) {
     return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFFF7FBF8),
-              Color(0xFFFEFAEC),
-              Color(0xFFFDF4E4),
-              Color(0xFFF2EAE2),
-            ],
-            stops: <double>[0.0, 0.4, 0.7, 1.0],
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color(0xFFF7FBF8),
+            Color(0xFFFEFAEC),
+            Color(0xFFFDF4E4),
+            Color(0xFFF2EAE2),
+          ],
+          stops: <double>[0.0, 0.4, 0.7, 1.0],
+        ),
+        // Glass shell: bright hairline like light catching a frosted edge.
+        border: Border.all(
+          color: Colors.white.withOpacity(0.9),
+          width: 1.2,
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: const Color(0xFF8B7355).withOpacity(0.10),
+            blurRadius: 18,
+            spreadRadius: -6,
+            offset: const Offset(0, 8),
           ),
-          // Glass shell: bright hairline like light catching a frosted edge.
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.9),
-            width: 1.2,
-          ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: const Color(0xFF8B7355).withValues(alpha: 0.10),
-              blurRadius: 18,
-              spreadRadius: -6,
-              offset: const Offset(0, 8),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xLarge,
+          AppSpacing.medium,
+          AppSpacing.xLarge,
+          AppSpacing.small,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // ── Header: name + current time + mode dropdown ──────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Color(0xFFE8F5E9),
+                  child: Text('🧑', style: TextStyle(fontSize: 15)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: <Widget>[
+                          const Text(
+                            'Bob',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formatMinutes(_nowMinutes.floor()),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black.withOpacity(0.55),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        _modeLabelOf(_modeId).toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _ModeDropdown(
+                  modeId: _modeId,
+                  onChanged: (id) => setState(() => _modeId = id),
+                ),
+              ],
+            ),
+
+            // Tight spacing — pull tube close to header
+            const SizedBox(height: 8),
+
+            // Tube — tight hairpin, compact height
+            SizedBox(
+              height: 132,
+              child: _DayTube(nowMinutes: _nowMinutes),
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xLarge,
-            AppSpacing.medium,
-            AppSpacing.xLarge,
-            AppSpacing.small,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // ── Header: name + current time + mode dropdown ──────────────
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: <Widget>[
-                  const CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Color(0xFFE8F5E9),
-                    child: Text('🧑', style: TextStyle(fontSize: 15)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: <Widget>[
-                            const Text(
-                              'Bob',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              formatMinutes(_nowMinutes.floor()),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black.withValues(alpha: 0.55),
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          _modeLabelOf(_modeId).toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _ModeDropdown(
-                    modeId: _modeId,
-                    onChanged: (id) => setState(() => _modeId = id),
-                  ),
-                ],
-              ),
-
-              // Tight spacing — pull tube close to header
-              const SizedBox(height: 8),
-
-              // Tube — tight hairpin, compact height
-              SizedBox(
-                height: 132,
-                child: _DayTube(nowMinutes: _nowMinutes),
-              ),
-            ],
-          ),
-        ),
+      ),
     );
   }
 
@@ -222,10 +222,10 @@ class _ModeDropdown extends StatelessWidget {
       height: 30,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.75),
+        color: Colors.white.withOpacity(0.75),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: AppColors.outline.withValues(alpha: 0.7),
+          color: AppColors.outline.withOpacity(0.7),
           width: 0.8,
         ),
       ),
@@ -341,8 +341,8 @@ class _DayTubeState extends State<_DayTube>
   }
 
   double get _progress {
-    final t = (widget.nowMinutes - _wakeMinutes) /
-        (_sleepMinutes - _wakeMinutes);
+    final t =
+        (widget.nowMinutes - _wakeMinutes) / (_sleepMinutes - _wakeMinutes);
     return t.clamp(0.0, 1.0);
   }
 
@@ -413,7 +413,7 @@ class _DayTubeState extends State<_DayTube>
                   border: Border.all(color: AppColors.primary, width: 2),
                   boxShadow: <BoxShadow>[
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 6,
                       offset: const Offset(0, 1),
                     ),
@@ -463,7 +463,7 @@ class _DayTubePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
       ..strokeCap = StrokeCap.round
-      ..color = Colors.black.withValues(alpha: 0.07)
+      ..color = Colors.black.withOpacity(0.07)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
     canvas.save();
     canvas.translate(0, 3);
@@ -479,8 +479,8 @@ class _DayTubePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: <Color>[
-          Colors.white.withValues(alpha: 0.8),
-          Colors.white.withValues(alpha: 0.45),
+          Colors.white.withOpacity(0.8),
+          Colors.white.withOpacity(0.45),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawPath(path, glassBody);
@@ -490,7 +490,7 @@ class _DayTubePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
       ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.35);
+      ..color = Colors.white.withOpacity(0.35);
     canvas.drawPath(path, rimLight);
 
     // Elapsed portion with day-to-night gradient — liquid inside the glass
@@ -508,7 +508,7 @@ class _DayTubePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = (_tubeWidth - 12) / 3
         ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: 0.22);
+        ..color = Colors.white.withOpacity(0.22);
       canvas.save();
       canvas.translate(0, -(_tubeWidth - 12) / 4);
       canvas.drawPath(done, sheen);
@@ -525,8 +525,7 @@ class _DayTubePainter extends CustomPainter {
         final start = head - glintLen;
         if (start < 0) continue;
         // Fade the glint as it approaches the "now" edge.
-        final edgeFade =
-            ((doneLen - head) / 60.0).clamp(0.0, 1.0);
+        final edgeFade = ((doneLen - head) / 60.0).clamp(0.0, 1.0);
         if (edgeFade == 0) continue;
         final glint = metric.extractPath(start, head);
         canvas.drawPath(
@@ -535,10 +534,8 @@ class _DayTubePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = (_tubeWidth - 12) / 2.6
             ..strokeCap = StrokeCap.round
-            ..color =
-                Colors.white.withValues(alpha: 0.16 * edgeFade)
-            ..maskFilter =
-                const MaskFilter.blur(BlurStyle.normal, 3),
+            ..color = Colors.white.withOpacity(0.16 * edgeFade)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
     }
@@ -566,16 +563,16 @@ class _DayTubePainter extends CustomPainter {
           2.2,
           Paint()
             ..color = isElapsed
-                ? Colors.white.withValues(alpha: 0.35)
-                : Colors.black.withValues(alpha: 0.08),
+                ? Colors.white.withOpacity(0.35)
+                : Colors.black.withOpacity(0.08),
         );
         canvas.drawCircle(
           pos,
           1.1,
           Paint()
             ..color = isElapsed
-                ? Colors.white.withValues(alpha: 0.85)
-                : Colors.black.withValues(alpha: 0.25),
+                ? Colors.white.withOpacity(0.85)
+                : Colors.black.withOpacity(0.25),
         );
       }
     }
@@ -604,8 +601,7 @@ class _DayTubePainter extends CustomPainter {
         metric.getTangentForOffset(metric.length * progress.clamp(0.0, 1.0));
     if (nowTangent != null) {
       final pos = nowTangent.position;
-      final normal =
-          Offset(-nowTangent.vector.dy, nowTangent.vector.dx);
+      final normal = Offset(-nowTangent.vector.dy, nowTangent.vector.dx);
       final n = normal / normal.distance;
       final needle = Paint()
         ..color = Colors.white
@@ -646,9 +642,7 @@ class _DayTubePainter extends CustomPainter {
           fontSize: 7.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.3,
-          color: isElapsed
-              ? Colors.white
-              : Colors.black.withValues(alpha: 0.55),
+          color: isElapsed ? Colors.white : Colors.black.withOpacity(0.55),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -667,8 +661,8 @@ class _DayTubePainter extends CustomPainter {
       rect,
       Paint()
         ..color = isElapsed
-            ? Colors.black.withValues(alpha: 0.28)
-            : Colors.white.withValues(alpha: 0.75),
+            ? Colors.black.withOpacity(0.28)
+            : Colors.white.withOpacity(0.75),
     );
     canvas.drawRRect(
       rect,
@@ -676,8 +670,8 @@ class _DayTubePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.8
         ..color = isElapsed
-            ? Colors.white.withValues(alpha: 0.45)
-            : Colors.black.withValues(alpha: 0.12),
+            ? Colors.white.withOpacity(0.45)
+            : Colors.black.withOpacity(0.12),
     );
     tp.paint(canvas, pos - Offset(tp.width / 2, tp.height / 2));
   }
@@ -691,7 +685,5 @@ class _DayTubePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DayTubePainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.flowPhase != flowPhase;
+      oldDelegate.progress != progress || oldDelegate.flowPhase != flowPhase;
 }
-
