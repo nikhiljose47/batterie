@@ -63,8 +63,18 @@ String svcDayLabel(String key) {
   final d = DateTime(parts[0], parts[1], parts[2]);
   const wd = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const mo = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
   ];
   return '${wd[d.weekday - 1]} ${d.day} ${mo[d.month - 1]}';
 }
@@ -112,7 +122,7 @@ class WhiteCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+        border: Border.all(color: AppColors.outline.withOpacity(0.8)),
       ),
       child: child,
     );
@@ -134,7 +144,7 @@ class EmptyHint extends StatelessWidget {
           style: TextStyle(
             fontSize: 11.5,
             fontStyle: FontStyle.italic,
-            color: AppColors.textMuted.withValues(alpha: 0.8),
+            color: AppColors.textMuted.withOpacity(0.8),
           ),
         ),
       ),
@@ -167,7 +177,7 @@ class SvcChip extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? AppColors.primary
-                : AppColors.outline.withValues(alpha: 0.9),
+                : AppColors.outline.withOpacity(0.9),
           ),
         ),
         child: Text(

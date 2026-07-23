@@ -187,8 +187,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
         content: Text('$minutes minutes logged. Nice work.'),
         actions: <Widget>[
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK')),
+              onPressed: () => Navigator.pop(context), child: const Text('OK')),
         ],
       ),
     );
@@ -255,8 +254,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
     double progress = 0;
     if (isUp && _fastStart != null) {
       elapsedSeconds = DateTime.now().difference(_fastStart!).inSeconds;
-      progress =
-          (elapsedSeconds / (c.presets[_preset] * 3600)).clamp(0.0, 1.0);
+      progress = (elapsedSeconds / (c.presets[_preset] * 3600)).clamp(0.0, 1.0);
     } else if (!isUp && _running) {
       final total = c.presets[_preset] * 60;
       progress = 1 - (_remainingSeconds / total);
@@ -278,10 +276,10 @@ class _TimerToolPageState extends State<TimerToolPage> {
                 if (c.note != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceTint.withValues(alpha: 0.6),
+                      color: AppColors.surfaceTint.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(c.note!,
@@ -310,8 +308,8 @@ class _TimerToolPageState extends State<TimerToolPage> {
                                 strokeWidth: 9,
                                 strokeCap: StrokeCap.round,
                                 color: AppColors.primary,
-                                backgroundColor: AppColors.surfaceTint
-                                    .withValues(alpha: 0.8),
+                                backgroundColor:
+                                    AppColors.surfaceTint.withOpacity(0.8),
                               ),
                             ),
                             Column(
@@ -319,9 +317,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
                               children: <Widget>[
                                 Text(
                                   isUp
-                                      ? (active
-                                          ? _fmt(elapsedSeconds)
-                                          : '0:00')
+                                      ? (active ? _fmt(elapsedSeconds) : '0:00')
                                       : (active
                                           ? _fmt(_remainingSeconds)
                                           : '${c.presets[_preset]}:00'),
@@ -339,8 +335,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
                                       ? 'target ${c.presets[_preset]} h'
                                       : (active ? 'remaining' : 'ready'),
                                   style: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.textMuted),
+                                      fontSize: 10, color: AppColors.textMuted),
                                 ),
                               ],
                             ),
@@ -392,8 +387,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
                                 ? (isUp ? 'End fast' : 'Stop')
                                 : c.startLabel,
                             style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700),
+                                fontSize: 13, fontWeight: FontWeight.w700),
                           ),
                         ),
                       ),

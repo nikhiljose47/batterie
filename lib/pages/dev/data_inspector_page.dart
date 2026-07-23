@@ -109,8 +109,8 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
           ),
         ];
       }
-      final pretty = const JsonEncoder.withIndent('  ')
-          .convert(jsonDecode(raw));
+      final pretty =
+          const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
       return <_InspectorEntry>[
         _InspectorEntry(title: 'weather.snapshot.v1', body: pretty),
       ];
@@ -248,8 +248,7 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
             const SizedBox(width: 8),
             Text(
               widget.source.label,
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -287,14 +286,12 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(AppSpacing.medium),
                 decoration: BoxDecoration(
-                  color: entry.isError
-                      ? const Color(0xFFFFF0F0)
-                      : Colors.white,
+                  color: entry.isError ? const Color(0xFFFFF0F0) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: entry.isError
                         ? const Color(0xFFE0A0A0)
-                        : AppColors.outline.withValues(alpha: 0.8),
+                        : AppColors.outline.withOpacity(0.8),
                   ),
                 ),
                 child: Column(
@@ -314,7 +311,7 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
                         fontSize: 11,
                         height: 1.4,
                         fontFamily: 'monospace',
-                        color: Colors.black.withValues(alpha: 0.7),
+                        color: Colors.black.withOpacity(0.7),
                       ),
                     ),
                   ],

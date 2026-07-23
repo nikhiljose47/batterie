@@ -98,10 +98,11 @@ class _TaskToolPageState extends State<TaskToolPage> {
 
     DateTime? due;
     if (c.todayOnly || c.withDate || c.withTime) {
-      final base = c.todayOnly ? DateTime.now() : (_pickedDate ?? DateTime.now());
+      final base =
+          c.todayOnly ? DateTime.now() : (_pickedDate ?? DateTime.now());
       final tod = _pickedTime;
-      due = DateTime(base.year, base.month, base.day, tod?.hour ?? 9,
-          tod?.minute ?? 0);
+      due = DateTime(
+          base.year, base.month, base.day, tod?.hour ?? 9, tod?.minute ?? 0);
     }
 
     setState(() {
@@ -167,10 +168,10 @@ class _TaskToolPageState extends State<TaskToolPage> {
                 if (c.note != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceTint.withValues(alpha: 0.6),
+                      color: AppColors.surfaceTint.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(c.note!,
@@ -195,8 +196,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
                             hintText: c.addHint,
                             hintStyle: TextStyle(
                                 fontSize: 11.5,
-                                color: AppColors.textMuted
-                                    .withValues(alpha: 0.8)),
+                                color: AppColors.textMuted.withOpacity(0.8)),
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
@@ -204,8 +204,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                  color: AppColors.outline
-                                      .withValues(alpha: 0.9)),
+                                  color: AppColors.outline.withOpacity(0.9)),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -332,9 +331,8 @@ class _TaskToolPageState extends State<TaskToolPage> {
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       decoration: done ? TextDecoration.lineThrough : null,
-                      color: done
-                          ? AppColors.textMuted
-                          : const Color(0xFF2A2E3B),
+                      color:
+                          done ? AppColors.textMuted : const Color(0xFF2A2E3B),
                     ),
                   ),
                   if (dueLabel != null)
@@ -342,8 +340,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
                       overdue ? '⚠️ $dueLabel' : dueLabel,
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight:
-                            overdue ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
                         color: overdue
                             ? const Color(0xFFC62828)
                             : AppColors.textMuted,
@@ -355,8 +352,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
             InkWell(
               onTap: () => _remove(item['id'] as String),
               child: Icon(Icons.close_rounded,
-                  size: 16,
-                  color: AppColors.textMuted.withValues(alpha: 0.6)),
+                  size: 16, color: AppColors.textMuted.withOpacity(0.6)),
             ),
           ],
         ),

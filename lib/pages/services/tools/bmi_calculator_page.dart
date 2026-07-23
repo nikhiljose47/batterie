@@ -79,10 +79,9 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: verdict.color.withValues(alpha: 0.08),
+              color: verdict.color.withOpacity(0.08),
               borderRadius: BorderRadius.circular(18),
-              border:
-                  Border.all(color: verdict.color.withValues(alpha: 0.35)),
+              border: Border.all(color: verdict.color.withOpacity(0.35)),
             ),
             child: Column(
               children: <Widget>[
@@ -111,7 +110,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: Colors.black.withValues(alpha: 0.6),
+                    color: Colors.black.withOpacity(0.6),
                   ),
                 ),
               ],
@@ -121,13 +120,11 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
 
           // Healthy range for this height
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+              border: Border.all(color: AppColors.outline.withOpacity(0.8)),
             ),
             child: Row(
               children: <Widget>[
@@ -176,7 +173,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
             style: TextStyle(
               fontSize: 10,
               fontStyle: FontStyle.italic,
-              color: AppColors.textMuted.withValues(alpha: 0.9),
+              color: AppColors.textMuted.withOpacity(0.9),
               height: 1.4,
             ),
           ),
@@ -212,7 +209,7 @@ class _SliderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+        border: Border.all(color: AppColors.outline.withOpacity(0.8)),
       ),
       child: Column(
         children: <Widget>[
@@ -242,8 +239,7 @@ class _SliderCard extends StatelessWidget {
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               trackHeight: 3,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 8),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
             ),
             child: Slider(
               value: value,

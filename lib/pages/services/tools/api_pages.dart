@@ -54,14 +54,13 @@ class _AirQualityPageState extends State<AirQualityPage> {
       final lat = (location['latitude'] as num).toDouble();
       final lon = (location['longitude'] as num).toDouble();
 
-      final uri = Uri.https('air-quality-api.open-meteo.com',
-          '/v1/air-quality', <String, String>{
+      final uri = Uri.https(
+          'air-quality-api.open-meteo.com', '/v1/air-quality', <String, String>{
         'latitude': '$lat',
         'longitude': '$lon',
         'current': 'us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide',
       });
-      final response =
-          await http.get(uri).timeout(const Duration(seconds: 12));
+      final response = await http.get(uri).timeout(const Duration(seconds: 12));
       if (response.statusCode != 200) {
         throw Exception('API error ${response.statusCode}');
       }
@@ -127,8 +126,8 @@ class _AirQualityPageState extends State<AirQualityPage> {
         children: <Widget>[
           WhiteCard(
             child: Text(_error!,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textMuted)),
+                style:
+                    const TextStyle(fontSize: 12, color: AppColors.textMuted)),
           ),
           const SizedBox(height: 10),
           OutlinedButton(onPressed: _load, child: const Text('Retry')),
@@ -185,8 +184,7 @@ class _AirQualityPageState extends State<AirQualityPage> {
               const SizedBox(width: 8),
               _PollutantCard(
                   label: 'NO₂',
-                  value: (_current?['nitrogen_dioxide'] as num?)
-                      ?.toDouble()),
+                  value: (_current?['nitrogen_dioxide'] as num?)?.toDouble()),
             ],
           ),
           const SizedBox(height: 10),
@@ -216,11 +214,11 @@ class _PollutantCard extends StatelessWidget {
         child: Column(
           children: <Widget>[
             Text(value == null ? '—' : value!.toStringAsFixed(1),
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w800)),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             Text('$label µg/m³',
-                style: const TextStyle(
-                    fontSize: 9.5, color: AppColors.textMuted)),
+                style:
+                    const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
           ],
         ),
       ),
@@ -275,8 +273,7 @@ class _HolidaysPageState extends State<HolidaysPage> {
       final year = DateTime.now().year;
       final uri =
           Uri.https('date.nager.at', '/api/v3/PublicHolidays/$year/$_country');
-      final response =
-          await http.get(uri).timeout(const Duration(seconds: 12));
+      final response = await http.get(uri).timeout(const Duration(seconds: 12));
       if (response.statusCode != 200) {
         throw Exception('API error ${response.statusCode}');
       }
@@ -310,11 +307,13 @@ class _HolidaysPageState extends State<HolidaysPage> {
     final today = DateTime.now();
     final upcoming = _holidays.where((h) {
       final d = DateTime.tryParse(h['date'] as String? ?? '');
-      return d != null && !d.isBefore(DateTime(today.year, today.month, today.day));
+      return d != null &&
+          !d.isBefore(DateTime(today.year, today.month, today.day));
     }).toList();
     final past = _holidays.where((h) {
       final d = DateTime.tryParse(h['date'] as String? ?? '');
-      return d != null && d.isBefore(DateTime(today.year, today.month, today.day));
+      return d != null &&
+          d.isBefore(DateTime(today.year, today.month, today.day));
     }).toList();
 
     return Scaffold(
@@ -357,8 +356,7 @@ class _HolidaysPageState extends State<HolidaysPage> {
                                       color: AppColors.textMuted)),
                               const SizedBox(height: 8),
                               OutlinedButton(
-                                  onPressed: _load,
-                                  child: const Text('Retry')),
+                                  onPressed: _load, child: const Text('Retry')),
                             ],
                           ),
                         ),
@@ -400,8 +398,8 @@ class _NextHolidayCard extends StatelessWidget {
     final days = d == null
         ? 0
         : d
-            .difference(DateTime(DateTime.now().year, DateTime.now().month,
-                DateTime.now().day))
+            .difference(DateTime(
+                DateTime.now().year, DateTime.now().month, DateTime.now().day))
             .inDays;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -409,8 +407,7 @@ class _NextHolidayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: const Color(0xFFF9A825).withValues(alpha: 0.4)),
+        border: Border.all(color: const Color(0xFFF9A825).withOpacity(0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,12 +422,11 @@ class _NextHolidayCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(holiday['localName'] as String? ?? '',
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           Text(
             d == null ? '' : svcDayLabel(svcDay(d)),
-            style:
-                const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],
       ),
@@ -446,15 +442,14 @@ class _HolidayTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = DateTime.tryParse(holiday['date'] as String? ?? '');
-    final isLongWeekend =
-        d != null && (d.weekday == DateTime.friday || d.weekday == DateTime.monday);
+    final isLongWeekend = d != null &&
+        (d.weekday == DateTime.friday || d.weekday == DateTime.monday);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Opacity(
         opacity: dimmed ? 0.55 : 1,
         child: WhiteCard(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: <Widget>[
               SizedBox(
@@ -471,8 +466,8 @@ class _HolidayTile extends StatelessWidget {
               ),
               if (isLongWeekend && !dimmed)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(6),
@@ -531,8 +526,7 @@ class _FoodDbPageState extends State<FoodDbPage> {
         'page_size': '20',
         'fields': 'product_name,brands,nutriments',
       });
-      final response =
-          await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         throw Exception('API error ${response.statusCode}');
       }
@@ -605,8 +599,7 @@ class _FoodDbPageState extends State<FoodDbPage> {
                         hintText: 'Search foods…',
                         hintStyle: TextStyle(
                             fontSize: 11.5,
-                            color: AppColors.textMuted
-                                .withValues(alpha: 0.8)),
+                            color: AppColors.textMuted.withOpacity(0.8)),
                         prefixIcon: const Icon(Icons.search_rounded,
                             size: 18, color: AppColors.textMuted),
                         filled: true,
@@ -615,8 +608,7 @@ class _FoodDbPageState extends State<FoodDbPage> {
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                              color: AppColors.outline
-                                  .withValues(alpha: 0.9)),
+                              color: AppColors.outline.withOpacity(0.9)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -637,8 +629,8 @@ class _FoodDbPageState extends State<FoodDbPage> {
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text('Go',
-                      style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w700)),
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
@@ -653,11 +645,10 @@ class _FoodDbPageState extends State<FoodDbPage> {
                         itemCount: _results.length,
                         itemBuilder: (context, i) {
                           final p = _results[i];
-                          final n = (p['nutriments'] as Map?) ??
-                              <String, dynamic>{};
+                          final n =
+                              (p['nutriments'] as Map?) ?? <String, dynamic>{};
                           final kcal =
-                              ((n['energy-kcal_100g'] as num?) ?? 0)
-                                  .round();
+                              ((n['energy-kcal_100g'] as num?) ?? 0).round();
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: WhiteCard(
@@ -671,21 +662,18 @@ class _FoodDbPageState extends State<FoodDbPage> {
                                           CrossAxisAlignment.start,
                                       children: <Widget>[
                                         Text(
-                                          p['product_name'] as String? ??
-                                              '',
+                                          p['product_name'] as String? ?? '',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                               fontSize: 12.5,
-                                              fontWeight:
-                                                  FontWeight.w600),
+                                              fontWeight: FontWeight.w600),
                                         ),
                                         Text(
                                           'per 100 g · P ${_g(n, 'proteins_100g')} · C ${_g(n, 'carbohydrates_100g')} · F ${_g(n, 'fat_100g')}',
                                           style: const TextStyle(
                                               fontSize: 9.5,
-                                              color:
-                                                  AppColors.textMuted),
+                                              color: AppColors.textMuted),
                                         ),
                                       ],
                                     ),
@@ -698,18 +686,15 @@ class _FoodDbPageState extends State<FoodDbPage> {
                                   const SizedBox(width: 6),
                                   InkWell(
                                     onTap: () => _addToCounter(p),
-                                    borderRadius:
-                                        BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(8),
                                     child: Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
                                         color: AppColors.surfaceTint,
-                                        borderRadius:
-                                            BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: const Icon(
-                                          Icons
-                                              .add_circle_outline_rounded,
+                                          Icons.add_circle_outline_rounded,
                                           size: 16,
                                           color: AppColors.primary),
                                     ),

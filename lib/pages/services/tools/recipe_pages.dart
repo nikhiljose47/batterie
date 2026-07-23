@@ -37,12 +37,12 @@ class _RecipePageState extends State<RecipePage> {
   }
 
   Future<void> _edit([Map<String, dynamic>? existing]) async {
-    final name = TextEditingController(
-        text: existing?['name'] as String? ?? '');
-    final ingredients = TextEditingController(
-        text: existing?['ingredients'] as String? ?? '');
-    final steps = TextEditingController(
-        text: existing?['steps'] as String? ?? '');
+    final name =
+        TextEditingController(text: existing?['name'] as String? ?? '');
+    final ingredients =
+        TextEditingController(text: existing?['ingredients'] as String? ?? '');
+    final steps =
+        TextEditingController(text: existing?['steps'] as String? ?? '');
 
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -51,7 +51,9 @@ class _RecipePageState extends State<RecipePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(AppSpacing.large, AppSpacing.large,
+        padding: EdgeInsets.fromLTRB(
+            AppSpacing.large,
+            AppSpacing.large,
             AppSpacing.large,
             MediaQuery.of(context).viewInsets.bottom + AppSpacing.large),
         child: Column(
@@ -59,8 +61,8 @@ class _RecipePageState extends State<RecipePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(existing == null ? 'New recipe' : 'Edit recipe',
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w800)),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
             TextField(
               controller: name,
@@ -151,19 +153,19 @@ class _RecipePageState extends State<RecipePage> {
                         child: WhiteCard(
                           padding: EdgeInsets.zero,
                           child: Theme(
-                            data: Theme.of(context).copyWith(
-                                dividerColor: Colors.transparent),
+                            data: Theme.of(context)
+                                .copyWith(dividerColor: Colors.transparent),
                             child: ExpansionTile(
-                              tilePadding: const EdgeInsets.symmetric(
-                                  horizontal: 14),
+                              tilePadding:
+                                  const EdgeInsets.symmetric(horizontal: 14),
                               title: Text(r['name'] as String,
                                   style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700)),
                               children: <Widget>[
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      14, 0, 14, 12),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(14, 0, 14, 12),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -174,56 +176,45 @@ class _RecipePageState extends State<RecipePage> {
                                         const Text('INGREDIENTS',
                                             style: TextStyle(
                                                 fontSize: 9,
-                                                fontWeight:
-                                                    FontWeight.w800,
+                                                fontWeight: FontWeight.w800,
                                                 letterSpacing: 0.8,
-                                                color: AppColors
-                                                    .textMuted)),
+                                                color: AppColors.textMuted)),
                                         const SizedBox(height: 3),
                                         Text(r['ingredients'] as String,
                                             style: const TextStyle(
-                                                fontSize: 11.5,
-                                                height: 1.5)),
+                                                fontSize: 11.5, height: 1.5)),
                                         const SizedBox(height: 8),
                                       ],
-                                      if ((r['steps'] as String?)
-                                              ?.isNotEmpty ==
+                                      if ((r['steps'] as String?)?.isNotEmpty ==
                                           true) ...<Widget>[
                                         const Text('STEPS',
                                             style: TextStyle(
                                                 fontSize: 9,
-                                                fontWeight:
-                                                    FontWeight.w800,
+                                                fontWeight: FontWeight.w800,
                                                 letterSpacing: 0.8,
-                                                color: AppColors
-                                                    .textMuted)),
+                                                color: AppColors.textMuted)),
                                         const SizedBox(height: 3),
                                         Text(r['steps'] as String,
                                             style: const TextStyle(
-                                                fontSize: 11.5,
-                                                height: 1.5)),
+                                                fontSize: 11.5, height: 1.5)),
                                         const SizedBox(height: 8),
                                       ],
                                       Row(
                                         children: <Widget>[
                                           TextButton.icon(
                                             onPressed: () => _edit(r),
-                                            icon: const Icon(
-                                                Icons.edit_rounded,
+                                            icon: const Icon(Icons.edit_rounded,
                                                 size: 14),
                                             label: const Text('Edit',
-                                                style: TextStyle(
-                                                    fontSize: 11)),
+                                                style: TextStyle(fontSize: 11)),
                                           ),
                                           TextButton.icon(
                                             onPressed: () => _delete(r),
                                             icon: const Icon(
-                                                Icons
-                                                    .delete_outline_rounded,
+                                                Icons.delete_outline_rounded,
                                                 size: 14),
                                             label: const Text('Delete',
-                                                style: TextStyle(
-                                                    fontSize: 11)),
+                                                style: TextStyle(fontSize: 11)),
                                           ),
                                         ],
                                       ),
@@ -255,10 +246,18 @@ class MealPlanPage extends StatefulWidget {
 class _MealPlanPageState extends State<MealPlanPage> {
   static const String key = 'svc.mealplan.grid';
   static const List<String> _days = <String>[
-    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
   ];
   static const List<String> _meals = <String>[
-    '🌅 Breakfast', '☀️ Lunch', '🌙 Dinner'
+    '🌅 Breakfast',
+    '☀️ Lunch',
+    '🌙 Dinner'
   ];
 
   Map<String, dynamic> _grid = <String, dynamic>{};
@@ -298,14 +297,12 @@ class _MealPlanPageState extends State<MealPlanPage> {
               controller: controller,
               autofocus: true,
               style: const TextStyle(fontSize: 13),
-              decoration:
-                  const InputDecoration(hintText: 'What\'s cooking?'),
+              decoration: const InputDecoration(hintText: 'What\'s cooking?'),
             ),
             if (_recipes.isNotEmpty) ...<Widget>[
               const SizedBox(height: 10),
               const Text('From your recipe box:',
-                  style: TextStyle(
-                      fontSize: 10, color: AppColors.textMuted)),
+                  style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 6,
@@ -313,8 +310,7 @@ class _MealPlanPageState extends State<MealPlanPage> {
                 children: <Widget>[
                   for (final r in _recipes.take(6))
                     InkWell(
-                      onTap: () =>
-                          controller.text = r['name'] as String? ?? '',
+                      onTap: () => controller.text = r['name'] as String? ?? '',
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -390,23 +386,21 @@ class _MealPlanPageState extends State<MealPlanPage> {
                                   ),
                                   Expanded(
                                     child: Text(
-                                      _grid['${_days[d]}.$meal']
-                                              as String? ??
+                                      _grid['${_days[d]}.$meal'] as String? ??
                                           'Tap to plan…',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        fontStyle: _grid[
-                                                    '${_days[d]}.$meal'] ==
-                                                null
-                                            ? FontStyle.italic
-                                            : FontStyle.normal,
-                                        color: _grid['${_days[d]}.$meal'] ==
-                                                null
-                                            ? AppColors.textMuted
-                                                .withValues(alpha: 0.6)
-                                            : const Color(0xFF2A2E3B),
+                                        fontStyle:
+                                            _grid['${_days[d]}.$meal'] == null
+                                                ? FontStyle.italic
+                                                : FontStyle.normal,
+                                        color:
+                                            _grid['${_days[d]}.$meal'] == null
+                                                ? AppColors.textMuted
+                                                    .withOpacity(0.6)
+                                                : const Color(0xFF2A2E3B),
                                       ),
                                     ),
                                   ),

@@ -73,18 +73,16 @@ class _TdeePageState extends State<TdeePage> {
                         color: AppColors.primary,
                         height: 1.0)),
                 const Text('kcal/day to maintain',
-                    style: TextStyle(
-                        fontSize: 10.5, color: AppColors.textMuted)),
+                    style:
+                        TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: <Widget>[
-                    _TargetChip(
-                        label: 'Lose', kcal: cut, onSet: _setAsTarget),
+                    _TargetChip(label: 'Lose', kcal: cut, onSet: _setAsTarget),
                     _TargetChip(
                         label: 'Maintain', kcal: tdee, onSet: _setAsTarget),
-                    _TargetChip(
-                        label: 'Gain', kcal: bulk, onSet: _setAsTarget),
+                    _TargetChip(label: 'Gain', kcal: bulk, onSet: _setAsTarget),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -139,17 +137,16 @@ class _TdeePageState extends State<TdeePage> {
                 onTap: () => setState(() => _activity = i),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: _activity == i
-                        ? AppColors.surfaceTint
-                        : Colors.white,
+                    color:
+                        _activity == i ? AppColors.surfaceTint : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: _activity == i
-                          ? AppColors.primary.withValues(alpha: 0.5)
-                          : AppColors.outline.withValues(alpha: 0.8),
+                          ? AppColors.primary.withOpacity(0.5)
+                          : AppColors.outline.withOpacity(0.8),
                     ),
                   ),
                   child: Row(
@@ -227,10 +224,9 @@ class _TargetChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.surfaceTint.withValues(alpha: 0.6),
+          color: AppColors.surfaceTint.withOpacity(0.6),
           borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
         ),
         child: Column(
           children: <Widget>[
@@ -240,8 +236,8 @@ class _TargetChip extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     color: AppColors.primary)),
             Text('$label · tap to set',
-                style: const TextStyle(
-                    fontSize: 8.5, color: AppColors.textMuted)),
+                style:
+                    const TextStyle(fontSize: 8.5, color: AppColors.textMuted)),
           ],
         ),
       ),

@@ -115,15 +115,12 @@ class _BreathingPageState extends State<BreathingPage>
                                     shape: BoxShape.circle,
                                     gradient: RadialGradient(
                                       colors: <Color>[
-                                        AppColors.primary
-                                            .withValues(alpha: 0.55),
-                                        AppColors.primary
-                                            .withValues(alpha: 0.15),
+                                        AppColors.primary.withOpacity(0.55),
+                                        AppColors.primary.withOpacity(0.15),
                                       ],
                                     ),
                                     border: Border.all(
-                                      color: AppColors.primary
-                                          .withValues(alpha: 0.6),
+                                      color: AppColors.primary.withOpacity(0.6),
                                       width: 2,
                                     ),
                                   ),
@@ -188,8 +185,8 @@ class _BreathingPageState extends State<BreathingPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text('When to use which',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w700)),
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 SizedBox(height: 6),
                 Text(
                   '• Box 4-4-4-4 — steady focus before work or sport.\n'
@@ -197,9 +194,7 @@ class _BreathingPageState extends State<BreathingPage>
                   '• Calm 4-6 — anytime reset; longer exhale slows the '
                   'heart rate.',
                   style: TextStyle(
-                      fontSize: 11,
-                      height: 1.6,
-                      color: AppColors.textMuted),
+                      fontSize: 11, height: 1.6, color: AppColors.textMuted),
                 ),
               ],
             ),

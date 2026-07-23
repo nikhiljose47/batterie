@@ -92,8 +92,8 @@ class _FoodLogPageState extends State<FoodLogPage> {
     final result = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Daily calorie target',
-            style: TextStyle(fontSize: 15)),
+        title:
+            const Text('Daily calorie target', style: TextStyle(fontSize: 15)),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
@@ -146,8 +146,9 @@ class _FoodLogPageState extends State<FoodLogPage> {
     }
 
     return Scaffold(
-      appBar: svcAppBar(
-          widget.showMacros ? '🥦 Nutrition Tracker' : '🍽️ Calorie Counter'),
+      appBar: svcAppBar(widget.showMacros
+          ? '🥦 Nutrition Tracker'
+          : '🍽️ Calorie Counter'),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -173,8 +174,7 @@ class _FoodLogPageState extends State<FoodLogPage> {
                           Text(
                             ' / $_targetKcal kcal today',
                             style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textMuted),
+                                fontSize: 11, color: AppColors.textMuted),
                           ),
                           const Spacer(),
                           InkWell(
@@ -197,14 +197,13 @@ class _FoodLogPageState extends State<FoodLogPage> {
                               ? const Color(0xFFC62828)
                               : AppColors.primary,
                           backgroundColor:
-                              AppColors.surfaceTint.withValues(alpha: 0.8),
+                              AppColors.surfaceTint.withOpacity(0.8),
                         ),
                       ),
                       if (widget.showMacros) ...<Widget>[
                         const SizedBox(height: 10),
                         Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceAround,
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: <Widget>[
                             _MacroStat(
                                 label: 'Protein',
@@ -229,9 +228,12 @@ class _FoodLogPageState extends State<FoodLogPage> {
                 // Add form
                 Row(
                   children: <Widget>[
-                    Expanded(flex: 3, child: _field(_name, 'Food — "2 rotis + dal"')),
+                    Expanded(
+                        flex: 3,
+                        child: _field(_name, 'Food — "2 rotis + dal"')),
                     const SizedBox(width: 8),
-                    Expanded(flex: 2, child: _field(_kcal, 'kcal', number: true)),
+                    Expanded(
+                        flex: 2, child: _field(_kcal, 'kcal', number: true)),
                   ],
                 ),
                 if (widget.showMacros)
@@ -240,8 +242,7 @@ class _FoodLogPageState extends State<FoodLogPage> {
                     child: Row(
                       children: <Widget>[
                         Expanded(
-                            child:
-                                _field(_protein, 'Protein g', number: true)),
+                            child: _field(_protein, 'Protein g', number: true)),
                         const SizedBox(width: 8),
                         Expanded(
                             child: _field(_carbs, 'Carbs g', number: true)),
@@ -285,8 +286,7 @@ class _FoodLogPageState extends State<FoodLogPage> {
                           children: <Widget>[
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: <Widget>[
                                   Text(e['name'] as String,
                                       style: const TextStyle(
@@ -317,8 +317,7 @@ class _FoodLogPageState extends State<FoodLogPage> {
                               onTap: () => _delete(e),
                               child: Icon(Icons.close_rounded,
                                   size: 15,
-                                  color: AppColors.textMuted
-                                      .withValues(alpha: 0.6)),
+                                  color: AppColors.textMuted.withOpacity(0.6)),
                             ),
                           ],
                         ),
@@ -342,21 +341,18 @@ class _FoodLogPageState extends State<FoodLogPage> {
           isDense: true,
           hintText: hint,
           hintStyle: TextStyle(
-              fontSize: 11,
-              color: AppColors.textMuted.withValues(alpha: 0.8)),
+              fontSize: 11, color: AppColors.textMuted.withOpacity(0.8)),
           filled: true,
           fillColor: Colors.white,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                BorderSide(color: AppColors.outline.withValues(alpha: 0.9)),
+            borderSide: BorderSide(color: AppColors.outline.withOpacity(0.9)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.2),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
           ),
         ),
       ),
@@ -380,8 +376,7 @@ class _MacroStat extends StatelessWidget {
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w800, color: color)),
         Text(label,
-            style:
-                const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
+            style: const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
       ],
     );
   }

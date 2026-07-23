@@ -16,7 +16,14 @@ class EmergencyPage extends StatefulWidget {
 class _EmergencyPageState extends State<EmergencyPage> {
   static const String key = 'svc.emergency.info';
   static const List<String> _bloodGroups = <String>[
-    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-'
   ];
 
   String? _blood;
@@ -89,8 +96,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                     color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                        color:
-                            const Color(0xFFC62828).withValues(alpha: 0.3)),
+                        color: const Color(0xFFC62828).withOpacity(0.3)),
                   ),
                   child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,8 +124,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      const Text('Blood group',
-                          style: TextStyle(fontSize: 12)),
+                      const Text('Blood group', style: TextStyle(fontSize: 12)),
                       const SizedBox(height: 6),
                       Wrap(
                         spacing: 6,
@@ -160,9 +165,8 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   child: FilledButton(
                     onPressed: _save,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _dirty
-                          ? const Color(0xFFC62828)
-                          : AppColors.primary,
+                      backgroundColor:
+                          _dirty ? const Color(0xFFC62828) : AppColors.primary,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -201,21 +205,18 @@ class _EmergencyPageState extends State<EmergencyPage> {
           isDense: true,
           hintText: hint,
           hintStyle: TextStyle(
-              fontSize: 11.5,
-              color: AppColors.textMuted.withValues(alpha: 0.8)),
+              fontSize: 11.5, color: AppColors.textMuted.withOpacity(0.8)),
           filled: true,
           fillColor: AppColors.scaffoldBackground,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide:
-                BorderSide(color: AppColors.outline.withValues(alpha: 0.8)),
+            borderSide: BorderSide(color: AppColors.outline.withOpacity(0.8)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.2),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
           ),
         ),
       ),

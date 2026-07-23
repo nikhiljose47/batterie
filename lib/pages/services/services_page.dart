@@ -348,10 +348,10 @@ class _ServiceTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+          border: Border.all(color: AppColors.outline.withOpacity(0.8)),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -380,7 +380,7 @@ class _ServiceTile extends StatelessWidget {
                     fontSize: 7.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.6,
-                    color: accent.withValues(alpha: 0.8),
+                    color: accent.withOpacity(0.8),
                   ),
                 ),
               ],

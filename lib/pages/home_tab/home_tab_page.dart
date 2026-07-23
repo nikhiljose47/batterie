@@ -98,104 +98,105 @@ class _HomeTabPageState extends State<HomeTabPage> {
   }
 
   Widget _buildDayCard(BuildContext context) {
-    return Padding(
+    return Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFFF7FBF8),
+              Color(0xFFFEFAEC),
+              Color(0xFFFDF4E4),
+              Color(0xFFF2EAE2),
+            ],
+            stops: <double>[0.0, 0.4, 0.7, 1.0],
+          ),
+          // Glass shell: bright hairline like light catching a frosted edge.
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.9),
+            width: 1.2,
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: const Color(0xFF8B7355).withValues(alpha: 0.10),
+              blurRadius: 18,
+              spreadRadius: -6,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xSmall,
+            AppSpacing.xLarge,
+            AppSpacing.medium,
+            AppSpacing.xLarge,
             AppSpacing.small,
-            AppSpacing.xSmall,
-            0,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // ── Header: avatar + name + time ──────────────────────────
+              // ── Header: name + current time + mode dropdown ──────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
-                  ValueListenableBuilder<String?>(
-                    valueListenable: ProfileStore.instance.photoPath,
-                    builder: (_, path, __) {
-                      final hasPhoto = path != null && File(path).existsSync();
-                      return CircleAvatar(
-                        radius: 16,
-                        backgroundColor: const Color(0xFFE8F5E9),
-                        backgroundImage:
-                            hasPhoto ? FileImage(File(path)) : null,
-                        child: hasPhoto
-                            ? null
-                            : const Text('🧑',
-                                style: TextStyle(fontSize: 15)),
-                      );
-                    },
+                  const CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Color(0xFFE8F5E9),
+                    child: Text('🧑', style: TextStyle(fontSize: 15)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: ProfileStore.instance.name,
-                      builder: (_, displayName, __) => Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: <Widget>[
-                          Text(
-                            displayName,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: <Widget>[
+                            const Text(
+                              'Bob',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            formatMinutes(_nowMinutes.floor()),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black.withValues(alpha: 0.55),
-                              letterSpacing: 0.2,
+                            const SizedBox(width: 8),
+                            Text(
+                              formatMinutes(_nowMinutes.floor()),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black.withValues(alpha: 0.55),
+                                letterSpacing: 0.2,
+                              ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          _modeLabelOf(_modeId).toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                            letterSpacing: 1.2,
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '· $_todayLabel',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black.withValues(alpha: 0.38),
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Sleep schedule quick-access — compact icon button
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => const SleepPage()),
-                    ),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1B1E4A).withValues(alpha: 0.07),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color:
-                              const Color(0xFF3D3E85).withValues(alpha: 0.22),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.bedtime_rounded,
-                        size: 18,
-                        color: Color(0xFF3D3E85),
-                      ),
-                    ),
+                  _ModeDropdown(
+                    modeId: _modeId,
+                    onChanged: (id) => setState(() => _modeId = id),
                   ),
                 ],
               ),
+
+              // Tight spacing — pull tube close to header
+              const SizedBox(height: 8),
+
               // Tube — tight hairpin, compact height
               SizedBox(
                 height: 132,
@@ -203,9 +204,82 @@ class _HomeTabPageState extends State<HomeTabPage> {
               ),
             ],
           ),
-        );
+        ),
+    );
   }
 
+  String _modeLabelOf(String id) =>
+      _dayModes.firstWhere((m) => m.id == id).label;
+}
+
+// ── Mode dropdown ─────────────────────────────────────────────────────────
+
+class _ModeDropdown extends StatelessWidget {
+  const _ModeDropdown({required this.modeId, required this.onChanged});
+
+  final String modeId;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _dayModes.firstWhere((m) => m.id == modeId);
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: AppColors.outline.withValues(alpha: 0.7),
+          width: 0.8,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: modeId,
+          isDense: true,
+          alignment: Alignment.center,
+          borderRadius: BorderRadius.circular(14),
+          icon: const Padding(
+            padding: EdgeInsets.only(left: 2),
+            child: Icon(Icons.keyboard_arrow_down_rounded,
+                size: 16, color: AppColors.primary),
+          ),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+          ),
+          selectedItemBuilder: (context) => _dayModes
+              .map(
+                (m) => Center(
+                  child: Text(
+                    '${m.emoji} ${m.label}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          items: _dayModes
+              .map(
+                (m) => DropdownMenuItem<String>(
+                  value: m.id,
+                  child: Text('${m.emoji} ${m.label}'),
+                ),
+              )
+              .toList(),
+          onChanged: (id) {
+            if (id != null) onChanged(id);
+          },
+          hint: Text('${selected.emoji} ${selected.label}'),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Day tube ──────────────────────────────────────────────────────────────
@@ -270,9 +344,8 @@ class _DayTubeState extends State<_DayTube>
   int get _sleepMinutes => SleepScheduleStore.instance.sleepMinutes;
 
   double get _progress {
-    final span = _sleepMinutes - _wakeMinutes;
-    if (span <= 0) return 0.0;
-    final t = (widget.nowMinutes - _wakeMinutes) / span;
+    final t = (widget.nowMinutes - _wakeMinutes) /
+        (_sleepMinutes - _wakeMinutes);
     return t.clamp(0.0, 1.0);
   }
 
@@ -364,35 +437,23 @@ class _DayTubeState extends State<_DayTube>
             Positioned(
               left: nowPos.dx - 17,
               top: nowPos.dy - 17,
-              child: ValueListenableBuilder<String?>(
-                valueListenable: ProfileStore.instance.photoPath,
-                builder: (_, path, __) {
-                  final hasPhoto = path != null && File(path).existsSync();
-                  return Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary, width: 2),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 6,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primary, width: 2),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
                     ),
-                    child: ClipOval(
-                      child: hasPhoto
-                          ? Image.file(File(path),
-                              fit: BoxFit.cover, width: 34, height: 34)
-                          : const Center(
-                              child:
-                                  Text('🧑', style: TextStyle(fontSize: 15))),
-                    ),
-                  );
-                },
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: const Text('🧑', style: TextStyle(fontSize: 15)),
               ),
             ),
           ],
@@ -438,7 +499,7 @@ class _DayTubePainter extends CustomPainter {
     final shadow = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
-      ..strokeCap = StrokeCap.butt
+      ..strokeCap = StrokeCap.round
       ..color = Colors.black.withValues(alpha: 0.07)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
     canvas.save();
@@ -456,8 +517,8 @@ class _DayTubePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: <Color>[
-          Colors.white.withValues(alpha: 0.8),
-          Colors.white.withValues(alpha: 0.45),
+          Colors.white.withOpacity(0.8),
+          Colors.white.withOpacity(0.45),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawPath(path, glassBody);
@@ -466,7 +527,7 @@ class _DayTubePainter extends CustomPainter {
     final rimLight = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
-      ..strokeCap = StrokeCap.butt
+      ..strokeCap = StrokeCap.round
       ..color = Colors.white.withValues(alpha: 0.35);
     canvas.drawPath(path, rimLight);
 
@@ -485,7 +546,7 @@ class _DayTubePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = (_tubeWidth - 12) / 3
         ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: 0.22);
+        ..color = Colors.white.withOpacity(0.22);
       canvas.save();
       canvas.translate(0, -(_tubeWidth - 12) / 4);
       canvas.drawPath(done, sheen);
@@ -502,8 +563,7 @@ class _DayTubePainter extends CustomPainter {
         final start = head - glintLen;
         if (start < 0) continue;
         // Fade the glint as it approaches the "now" edge.
-        final edgeFade =
-            ((doneLen - head) / 60.0).clamp(0.0, 1.0);
+        final edgeFade = ((doneLen - head) / 60.0).clamp(0.0, 1.0);
         if (edgeFade == 0) continue;
         final glint = metric.extractPath(start, head);
         canvas.drawPath(
@@ -512,10 +572,8 @@ class _DayTubePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = (_tubeWidth - 12) / 2.6
             ..strokeCap = StrokeCap.round
-            ..color =
-                Colors.white.withValues(alpha: 0.16 * edgeFade)
-            ..maskFilter =
-                const MaskFilter.blur(BlurStyle.normal, 3),
+            ..color = Colors.white.withOpacity(0.16 * edgeFade)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
     }
@@ -545,16 +603,16 @@ class _DayTubePainter extends CustomPainter {
           2.2,
           Paint()
             ..color = isElapsed
-                ? Colors.white.withValues(alpha: 0.35)
-                : Colors.black.withValues(alpha: 0.08),
+                ? Colors.white.withOpacity(0.35)
+                : Colors.black.withOpacity(0.08),
         );
         canvas.drawCircle(
           pos,
           1.1,
           Paint()
             ..color = isElapsed
-                ? Colors.white.withValues(alpha: 0.85)
-                : Colors.black.withValues(alpha: 0.25),
+                ? Colors.white.withOpacity(0.85)
+                : Colors.black.withOpacity(0.25),
         );
       }
     }
@@ -583,8 +641,7 @@ class _DayTubePainter extends CustomPainter {
         metric.getTangentForOffset(metric.length * progress.clamp(0.0, 1.0));
     if (nowTangent != null) {
       final pos = nowTangent.position;
-      final normal =
-          Offset(-nowTangent.vector.dy, nowTangent.vector.dx);
+      final normal = Offset(-nowTangent.vector.dy, nowTangent.vector.dx);
       final n = normal / normal.distance;
       final needle = Paint()
         ..color = Colors.white
@@ -630,9 +687,7 @@ class _DayTubePainter extends CustomPainter {
           fontSize: 7.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.3,
-          color: isElapsed
-              ? Colors.white
-              : Colors.black.withValues(alpha: 0.55),
+          color: isElapsed ? Colors.white : Colors.black.withOpacity(0.55),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -651,8 +706,8 @@ class _DayTubePainter extends CustomPainter {
       rect,
       Paint()
         ..color = isElapsed
-            ? Colors.black.withValues(alpha: 0.28)
-            : Colors.white.withValues(alpha: 0.75),
+            ? Colors.black.withOpacity(0.28)
+            : Colors.white.withOpacity(0.75),
     );
     canvas.drawRRect(
       rect,
@@ -660,8 +715,8 @@ class _DayTubePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.8
         ..color = isElapsed
-            ? Colors.white.withValues(alpha: 0.45)
-            : Colors.black.withValues(alpha: 0.12),
+            ? Colors.white.withOpacity(0.45)
+            : Colors.black.withOpacity(0.12),
     );
     tp.paint(canvas, pos - Offset(tp.width / 2, tp.height / 2));
   }
@@ -676,80 +731,6 @@ class _DayTubePainter extends CustomPainter {
   @override
   bool shouldRepaint(_DayTubePainter oldDelegate) =>
       oldDelegate.progress != progress ||
-      oldDelegate.flowPhase != flowPhase ||
-      oldDelegate.wakeMinutes != wakeMinutes ||
-      oldDelegate.sleepMinutes != sleepMinutes;
+      oldDelegate.flowPhase != flowPhase;
 }
 
-/// Small rounded chip anchored at one of the tube's left endpoints. Its
-/// right edge sits flush against `startX` (the tube's flat cap) so tube +
-/// box read as one continuous shape — a filled pill capped at either end.
-///
-/// When [animate] is true, the box breathes with a gentle scale + glow
-/// pulse driven by [pulse] (the day tube's flow controller).
-class _EndpointBox extends StatelessWidget {
-  const _EndpointBox({
-    required this.left,
-    required this.top,
-    required this.size,
-    required this.baseColor,
-    required this.accentColor,
-    required this.animate,
-    required this.pulse,
-    required this.child,
-  });
-
-  final double left;
-  final double top;
-  final Size size;
-  final Color baseColor;
-  final Color accentColor;
-  final bool animate;
-  final Animation<double> pulse;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: AnimatedBuilder(
-        animation: pulse,
-        builder: (context, cachedChild) {
-          // Sine sweep 0→1→0 across the 6-second flow — imperceptible when
-          // idle, subtle breath when active.
-          final t = animate
-              ? (0.5 - 0.5 * math.cos(pulse.value * 2 * math.pi))
-              : 0.0;
-          final scale = 1.0 + 0.06 * t;
-          final glowAlpha = 0.15 + 0.35 * t;
-          return Transform.scale(
-            scale: scale,
-            child: Container(
-              width: size.width,
-              height: size.height,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[baseColor, accentColor],
-                ),
-                boxShadow: animate
-                    ? <BoxShadow>[
-                        BoxShadow(
-                          color: baseColor.withValues(alpha: glowAlpha),
-                          blurRadius: 10,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: ClipRect(child: cachedChild),
-            ),
-          );
-        },
-        child: child,
-      ),
-    );
-  }
-}

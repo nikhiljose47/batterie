@@ -148,8 +148,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
                                   value: progress,
                                   strokeWidth: 8,
                                   color: c.accent,
-                                  backgroundColor:
-                                      c.accent.withValues(alpha: 0.12),
+                                  backgroundColor: c.accent.withOpacity(0.12),
                                 ),
                               ),
                               Column(
@@ -238,13 +237,11 @@ class _CounterToolPageState extends State<CounterToolPage> {
                           children: <Widget>[
                             Text('🔥 $_streak',
                                 style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800)),
+                                    fontSize: 20, fontWeight: FontWeight.w800)),
                             const SizedBox(height: 2),
                             const Text('day streak',
                                 style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textMuted)),
+                                    fontSize: 10, color: AppColors.textMuted)),
                           ],
                         ),
                       ),
@@ -260,8 +257,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
                                 InkWell(
                                   onTap: () => _setGoal(_goal - 1),
                                   child: const Icon(Icons.remove_rounded,
-                                      size: 18,
-                                      color: AppColors.textMuted),
+                                      size: 18, color: AppColors.textMuted),
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -274,19 +270,14 @@ class _CounterToolPageState extends State<CounterToolPage> {
                                 InkWell(
                                   onTap: () => _setGoal(_goal + 1),
                                   child: const Icon(Icons.add_rounded,
-                                      size: 18,
-                                      color: AppColors.textMuted),
+                                      size: 18, color: AppColors.textMuted),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                                c.lowerIsBetter
-                                    ? 'daily limit'
-                                    : 'daily goal',
+                            Text(c.lowerIsBetter ? 'daily limit' : 'daily goal',
                                 style: const TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textMuted)),
+                                    fontSize: 10, color: AppColors.textMuted)),
                           ],
                         ),
                       ),
@@ -302,10 +293,9 @@ class _CounterToolPageState extends State<CounterToolPage> {
                     children: <Widget>[
                       for (var back = 6; back >= 0; back--)
                         _DayBar(
-                          day: DateTime.now()
-                              .subtract(Duration(days: back)),
-                          value: (_days[svcDay(DateTime.now().subtract(
-                                      Duration(days: back)))] as num?)
+                          day: DateTime.now().subtract(Duration(days: back)),
+                          value: (_days[svcDay(DateTime.now()
+                                      .subtract(Duration(days: back)))] as num?)
                                   ?.toInt() ??
                               0,
                           max: c.lowerIsBetter ? 10 : (_goal == 0 ? 8 : _goal),
@@ -345,13 +335,10 @@ class _RoundBtn extends StatelessWidget {
           color: filled ? accent : Colors.white,
           shape: BoxShape.circle,
           border: Border.all(
-              color: filled
-                  ? accent
-                  : AppColors.outline.withValues(alpha: 0.9)),
+              color: filled ? accent : AppColors.outline.withOpacity(0.9)),
         ),
         child: Icon(icon,
-            size: 26,
-            color: filled ? Colors.white : AppColors.textMuted),
+            size: 26, color: filled ? Colors.white : AppColors.textMuted),
       ),
     );
   }
@@ -378,22 +365,21 @@ class _DayBar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Text('$value',
-            style: const TextStyle(
-                fontSize: 9, color: AppColors.textMuted)),
+            style: const TextStyle(fontSize: 9, color: AppColors.textMuted)),
         const SizedBox(height: 3),
         Container(
           width: 18,
           height: 56,
           alignment: Alignment.bottomCenter,
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.08),
+            color: accent.withOpacity(0.08),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Container(
             width: 18,
             height: h,
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.75),
+              color: accent.withOpacity(0.75),
               borderRadius: BorderRadius.circular(6),
             ),
           ),
