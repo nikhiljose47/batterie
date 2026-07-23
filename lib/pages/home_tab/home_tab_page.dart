@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -11,8 +10,8 @@ import '../../constants/app_spacing.dart';
 import '../../models/logged_activity.dart';
 import '../../services/sleep_schedule_store.dart';
 import '../profile/profile_store.dart';
-import '../services/tools/sleep_page.dart';
 import '../weather/weather_controller.dart';
+import 'data/mode_advice.dart';
 import 'widgets/planner_section.dart';
 
 /// Fresh home tab: unified, color-coded day tube showing energy flow from
@@ -59,11 +58,6 @@ class _HomeTabPageState extends State<HomeTabPage> {
   double get _nowMinutes {
     final now = DateTime.now();
     return now.hour * 60 + now.minute + now.second / 60.0;
-  }
-
-  String get _todayLabel {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[DateTime.now().weekday - 1];
   }
 
   @override
@@ -209,7 +203,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
   }
 
   String _modeLabelOf(String id) =>
-      _dayModes.firstWhere((m) => m.id == id).label;
+      allDayModes.firstWhere((m) => m.id == id).label;
 }
 
 // ── Mode dropdown ─────────────────────────────────────────────────────────
@@ -222,7 +216,7 @@ class _ModeDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = _dayModes.firstWhere((m) => m.id == modeId);
+    final selected = allDayModes.firstWhere((m) => m.id == modeId);
     return Container(
       height: 30,
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -250,7 +244,7 @@ class _ModeDropdown extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: AppColors.primary,
           ),
-          selectedItemBuilder: (context) => _dayModes
+          selectedItemBuilder: (context) => allDayModes
               .map(
                 (m) => Center(
                   child: Text(
@@ -264,7 +258,7 @@ class _ModeDropdown extends StatelessWidget {
                 ),
               )
               .toList(),
-          items: _dayModes
+          items: allDayModes
               .map(
                 (m) => DropdownMenuItem<String>(
                   value: m.id,
@@ -517,8 +511,8 @@ class _DayTubePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: <Color>[
-          Colors.white.withOpacity(0.8),
-          Colors.white.withOpacity(0.45),
+          Colors.white.withValues(alpha: 0.8),
+          Colors.white.withValues(alpha: 0.45),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawPath(path, glassBody);
@@ -546,7 +540,7 @@ class _DayTubePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = (_tubeWidth - 12) / 3
         ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withOpacity(0.22);
+        ..color = Colors.white.withValues(alpha: 0.22);
       canvas.save();
       canvas.translate(0, -(_tubeWidth - 12) / 4);
       canvas.drawPath(done, sheen);
@@ -572,7 +566,7 @@ class _DayTubePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = (_tubeWidth - 12) / 2.6
             ..strokeCap = StrokeCap.round
-            ..color = Colors.white.withOpacity(0.16 * edgeFade)
+            ..color = Colors.white.withValues(alpha: 0.16 * edgeFade)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
@@ -603,16 +597,16 @@ class _DayTubePainter extends CustomPainter {
           2.2,
           Paint()
             ..color = isElapsed
-                ? Colors.white.withOpacity(0.35)
-                : Colors.black.withOpacity(0.08),
+                ? Colors.white.withValues(alpha: 0.35)
+                : Colors.black.withValues(alpha: 0.08),
         );
         canvas.drawCircle(
           pos,
           1.1,
           Paint()
             ..color = isElapsed
-                ? Colors.white.withOpacity(0.85)
-                : Colors.black.withOpacity(0.25),
+                ? Colors.white.withValues(alpha: 0.85)
+                : Colors.black.withValues(alpha: 0.25),
         );
       }
     }
@@ -687,7 +681,7 @@ class _DayTubePainter extends CustomPainter {
           fontSize: 7.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.3,
-          color: isElapsed ? Colors.white : Colors.black.withOpacity(0.55),
+          color: isElapsed ? Colors.white : Colors.black.withValues(alpha: 0.55),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -706,8 +700,8 @@ class _DayTubePainter extends CustomPainter {
       rect,
       Paint()
         ..color = isElapsed
-            ? Colors.black.withOpacity(0.28)
-            : Colors.white.withOpacity(0.75),
+            ? Colors.black.withValues(alpha: 0.28)
+            : Colors.white.withValues(alpha: 0.75),
     );
     canvas.drawRRect(
       rect,
@@ -715,8 +709,8 @@ class _DayTubePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.8
         ..color = isElapsed
-            ? Colors.white.withOpacity(0.45)
-            : Colors.black.withOpacity(0.12),
+            ? Colors.white.withValues(alpha: 0.45)
+            : Colors.black.withValues(alpha: 0.12),
     );
     tp.paint(canvas, pos - Offset(tp.width / 2, tp.height / 2));
   }
@@ -732,5 +726,66 @@ class _DayTubePainter extends CustomPainter {
   bool shouldRepaint(_DayTubePainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.flowPhase != flowPhase;
+}
+
+/// A small square box anchored at [left],[top] that sits at the tube's
+/// endpoint. When [animate] is true it pulses in sync with [pulse].
+class _EndpointBox extends StatelessWidget {
+  const _EndpointBox({
+    required this.left,
+    required this.top,
+    required this.size,
+    required this.baseColor,
+    required this.accentColor,
+    required this.animate,
+    required this.pulse,
+    required this.child,
+  });
+
+  final double left;
+  final double top;
+  final Size size;
+  final Color baseColor;
+  final Color accentColor;
+  final bool animate;
+  final Animation<double> pulse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: left,
+      top: top,
+      width: size.width,
+      height: size.height,
+      child: AnimatedBuilder(
+        animation: pulse,
+        builder: (_, __) {
+          final glow = animate
+              ? (0.18 + 0.12 * math.sin(pulse.value * 2 * math.pi))
+              : 0.0;
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[baseColor, accentColor],
+              ),
+              boxShadow: animate
+                  ? <BoxShadow>[
+                      BoxShadow(
+                        color: baseColor.withValues(alpha: glow),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRect(child: child),
+          );
+        },
+      ),
+    );
+  }
 }
 
