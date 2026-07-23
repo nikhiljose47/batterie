@@ -24,11 +24,13 @@ class PlannerSection extends StatefulWidget {
     super.key,
     required this.nowMinutes,
     required this.modeId,
+    required this.onModeChanged,
     this.weatherController,
   });
 
   final double nowMinutes;
   final String modeId;
+  final ValueChanged<String> onModeChanged;
   final WeatherController? weatherController;
 
   @override
@@ -48,20 +50,50 @@ class _PlannerSectionState extends State<PlannerSection> {
 
   int get _currentIndex {
     final now = widget.nowMinutes.floor();
-    final i = plannerSlots.indexWhere((s) => s.contains(now));
-    return i == -1 ? 0 : i;
+    return plannerSlots.indexWhere((s) => s.contains(now));
+  }
+
+  bool get _isWakeCurrent {
+    final now = widget.nowMinutes;
+    return now >= homeDayWakeMinutes &&
+        now < plannerSlots.first.startHour * 60.0;
+  }
+
+  bool get _isSleepCurrent {
+    final now = widget.nowMinutes;
+    return now < homeDayWakeMinutes || now >= homeDaySleepMinutes;
+  }
+
+  double get _currentCardOffset {
+    const step = _regularCardHeight + _cardGap;
+    if (_isSleepCurrent) {
+      return (plannerSlots.length + 1) * step - 18.0;
+    } else if (_isWakeCurrent || _currentIndex == -1) {
+      return 0.0;
+    }
+    final visualIndex = _currentIndex + 1;
+    return (visualIndex * step - 18)
+        .clamp(0.0, (plannerSlots.length + 2) * step);
   }
 
   @override
   void initState() {
     super.initState();
-    const step = _regularCardHeight + _cardGap;
-    // +1 because the wake card sits above index 0 in the list.
-    final visualIndex = _currentIndex + 1;
-    final offset = (visualIndex * step - 18)
-        .clamp(0.0, (plannerSlots.length + 2) * step);
-    _scrollController = ScrollController(initialScrollOffset: offset);
+    _scrollController = ScrollController();
     _loadTravelBack();
+    // Start one card above the current slot, then glide into place — a short,
+    // purposeful reveal rather than a full-list fly-down from the top.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final target = _currentCardOffset;
+      const step = _regularCardHeight + _cardGap;
+      _scrollController.jumpTo((target - step).clamp(0.0, double.infinity));
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   /// Scans the last 7 days of the energy log and, per slot, keeps the
@@ -121,32 +153,51 @@ class _PlannerSectionState extends State<PlannerSection> {
   @override
   Widget build(BuildContext context) {
     final adviceList = adviceForMode(widget.modeId);
+    if (widget.weatherController != null) {
+      return AnimatedBuilder(
+        animation: widget.weatherController!,
+        builder: (context, _) => _buildBody(
+          adviceList,
+          widget.weatherController!.state.snapshot,
+        ),
+      );
+    }
+    return _buildBody(adviceList, null);
+  }
 
+  Widget _buildBody(List<ModeAdvice> adviceList, WeatherSnapshot? weather) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: AppSpacing.small),
-          child: Text(
-            'PLANNER',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textMuted,
-              letterSpacing: 1.2,
-            ),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: AppSpacing.small),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              const Text(
+                'PLANNER',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMuted,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const Spacer(),
+              _ModeDropdown(
+                modeId: widget.modeId,
+                onChanged: widget.onModeChanged,
+              ),
+            ],
           ),
         ),
-        Expanded(
-          child: widget.weatherController == null
-              ? _buildList(adviceList, null)
-              : AnimatedBuilder(
-                  animation: widget.weatherController!,
-                  builder: (context, _) => _buildList(
-                    adviceList,
-                    widget.weatherController!.state.snapshot,
-                  ),
-                ),
+        Expanded(child: _buildList(adviceList, weather)),
+        _PastBestFooter(
+          label: _currentIndex != -1 ? _bestFromPast[_currentIndex] : null,
+          slotLabel: _currentIndex != -1
+              ? plannerSlots[_currentIndex].rangeLabel
+              : null,
+          weather: weather,
         ),
       ],
     );
@@ -177,32 +228,31 @@ class _PlannerSectionState extends State<PlannerSection> {
         separatorBuilder: (_, __) => const SizedBox(height: _cardGap),
         itemBuilder: (context, index) {
           if (index == 0) {
-            return const _WakeSleepCard(
+            return _WakeSleepCard(
               content: wakeCardContent,
               variant: _WakeSleepVariant.wake,
               assetPath: 'assets/icons/wakeup_alarm.svg',
+              isCurrent: _isWakeCurrent,
             );
           }
           if (index == plannerSlots.length + 1) {
-            return const _WakeSleepCard(
+            return _WakeSleepCard(
               content: sleepCardContent,
               variant: _WakeSleepVariant.sleep,
               assetPath: 'assets/icons/going_to_sleep.svg',
+              isCurrent: _isSleepCurrent,
             );
           }
           final slotIndex = index - 1;
           final slot = plannerSlots[slotIndex];
           final advice = adviceList[slotIndex];
-          final isCurrent = slotIndex == currentIndex;
+          final isCurrent = currentIndex != -1 && slotIndex == currentIndex;
           return _PlannerCard(
             slot: slot,
             advice: advice,
             isCurrent: isCurrent,
             weatherTag: _weatherTagFor(weather),
-            travelBackTag: _bestFromPast[slotIndex],
             weather: isCurrent ? weather : null,
-            // Upcoming slots get their own hour-accurate prediction at the
-            // user's location, from the cached hourly forecast.
             slotForecast: slotIndex > currentIndex
                 ? _forecastForSlot(slot, weather)
                 : null,
@@ -265,7 +315,6 @@ class _PlannerCard extends StatelessWidget {
     required this.advice,
     required this.isCurrent,
     required this.weatherTag,
-    required this.travelBackTag,
     required this.weather,
     required this.slotForecast,
     required this.height,
@@ -275,9 +324,6 @@ class _PlannerCard extends StatelessWidget {
   final ModeAdvice advice;
   final bool isCurrent;
   final String? weatherTag;
-
-  /// "⏪ 🏃 Running (Tue)" — best past activity in this window, if any.
-  final String? travelBackTag;
 
   /// Full weather snapshot — passed only to the current card.
   final WeatherSnapshot? weather;
@@ -291,9 +337,9 @@ class _PlannerCard extends StatelessWidget {
     return Container(
       height: height,
       padding: EdgeInsets.fromLTRB(
-        isCurrent ? 18 : 14,
+        isCurrent ? 18 : 13,
         isCurrent ? 14 : 10,
-        isCurrent ? 14 : 12,
+        isCurrent ? 14 : 10,
         isCurrent ? 14 : 10,
       ),
       decoration: BoxDecoration(
@@ -307,141 +353,141 @@ class _PlannerCard extends StatelessWidget {
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: isCurrent ? 0.10 : 0.04),
-            blurRadius: isCurrent ? 20 : 8,
-            offset: Offset(0, isCurrent ? 6 : 3),
+            color: isCurrent
+                ? AppColors.primary.withValues(alpha: 0.14)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: isCurrent ? 22 : 8,
+            spreadRadius: isCurrent ? 1 : 0,
+            offset: Offset(0, isCurrent ? 8 : 3),
           ),
         ],
       ),
-      child: Column(
+      child: Stack(
+        children: <Widget>[
+          // ── Main content — the star of the card ────────────────────
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: isCurrent ? 72 : 60, // clearance for the right column
+                bottom: isCurrent ? 20 : 16, // clearance for footnote
+              ),
+              child: _buildContent(),
+            ),
+          ),
+          // ── Time chip (non-current only) / Right column ───────────
+          Positioned(top: 0, right: 0, child: _buildTimeChip()),
+          Positioned(
+            top: isCurrent ? 8 : 30,
+            right: 0,
+            bottom: isCurrent ? 22 : 18,
+            width: isCurrent ? 66 : 54,
+            child: _buildRight(),
+          ),
+          // ── Footnote pinned at the bottom edge ─────────────────────
+          Positioned(left: 0, right: 0, bottom: 0, child: _buildFootnote()),
+        ],
+      ),
+    );
+  }
+
+  /// Time pill in the top-right corner. On the current card it doubles as
+  /// the NOW badge — filled primary, pulse-dot, both the label and range.
+  Widget _buildTimeChip() {
+    if (isCurrent) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.scaffoldBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.outline.withValues(alpha: 0.7),
+          width: 0.7,
+        ),
+      ),
+      child: Text(
+        slot.rangeLabel,
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+          color: AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (isCurrent) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _buildHeader(),
-          const SizedBox(height: 8),
-          // 70% left (spotlit main content) / 10% gap / 20% right
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(
-                  flex: 70,
-                  child: isCurrent
-                      // Spotlight: a soft tinted wash behind the main
-                      // content so the eye lands there first.
-                      ? Container(
-                          padding:
-                              const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: <Color>[
-                                AppColors.surfaceTint
-                                    .withValues(alpha: 0.55),
-                                AppColors.surfaceTint
-                                    .withValues(alpha: 0.15),
-                              ],
-                            ),
-                          ),
-                          child: _buildLeft(),
-                        )
-                      : _buildLeft(),
-                ),
-                const Spacer(flex: 10),
-                Expanded(flex: 20, child: _buildRight()),
-              ],
+          Text(
+            advice.tip,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 16.5,
+              height: 1.28,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+              letterSpacing: -0.1,
             ),
           ),
           const SizedBox(height: 6),
-          _buildFootnote(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      children: <Widget>[
-        Text(
-          slot.rangeLabel,
-          style: TextStyle(
-            fontSize: isCurrent ? 10 : 9,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.9,
-            color: isCurrent ? AppColors.primary : AppColors.textMuted,
-          ),
-        ),
-        if (isCurrent) ...<Widget>[
-          const SizedBox(width: 6),
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'NOW',
+          Text(
+            advice.recommendation,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-              color: AppColors.primary,
+              fontSize: 12.5,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF141824).withValues(alpha: 0.58),
+              letterSpacing: 0,
             ),
           ),
         ],
-      ],
-    );
-  }
-
-  /// The star row. Recommendation is set in a MacBook-keynote-style serif
-  /// with the attribution as a subtle author line below.
-  Widget _buildLeft() {
-    final recSize = isCurrent ? 17.0 : 13.0;
+      );
+    }
+    // Non-current card: recommendation as headline, tip as pill at bottom.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '“${advice.recommendation}”',
-          maxLines: isCurrent ? 4 : 2,
+          advice.recommendation,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: recSize,
-            height: 1.28,
-            fontStyle: FontStyle.italic,
-            fontFamily: 'Georgia',
-            fontFamilyFallback: const <String>['serif'],
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF2A2E3B),
-            letterSpacing: -0.1,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          advice.attribution,
-          style: TextStyle(
-            fontSize: isCurrent ? 11 : 9.5,
-            color: AppColors.textMuted,
-            fontWeight: FontWeight.w500,
+          style: const TextStyle(
+            fontSize: 13.5,
+            height: 1.26,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF141824),
+            letterSpacing: -0.2,
           ),
         ),
         const Spacer(),
-        if (travelBackTag != null)
-          _PreviousBestLine(label: travelBackTag!, emphasized: isCurrent)
-        else if (isCurrent)
-          _PreviousBestPlaceholder(),
-        SizedBox(height: isCurrent ? 6 : 4),
-        Text(
-          advice.tip,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: isCurrent ? 11.5 : 10,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.32),
+              width: 0.8,
+            ),
+          ),
+          child: Text(
+            advice.tip,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+              letterSpacing: 0.2,
+            ),
           ),
         ),
       ],
@@ -644,73 +690,182 @@ class _SlotForecastBlock extends StatelessWidget {
   }
 }
 
-/// "Your previous best in this slot" — a highlighted one-liner with a
-/// trophy affordance. Sits inside the left column so the eye lands on it
-/// after the recommendation.
-class _PreviousBestLine extends StatelessWidget {
-  const _PreviousBestLine({required this.label, required this.emphasized});
+/// Solid info bar docked at the very bottom of the planner column.
+/// Two panels side by side: past best for the current slot (left) and
+/// today's next rain window (right). Square corners — no border radius —
+/// so it reads as a flat shelf, not a floating card.
+class _PastBestFooter extends StatelessWidget {
+  const _PastBestFooter({
+    required this.label,
+    required this.slotLabel,
+    required this.weather,
+  });
 
-  final String label;
-  final bool emphasized;
+  final String? label;
+  final String? slotLabel;
+  final WeatherSnapshot? weather;
+
+  bool _isRainy(WeatherCondition c) =>
+      c == WeatherCondition.rain ||
+      c == WeatherCondition.drizzle ||
+      c == WeatherCondition.showers ||
+      c == WeatherCondition.thunderstorm ||
+      c == WeatherCondition.freezingRain;
+
+  /// First rainy hourly slot later today, or today's daily rain probability.
+  /// Returns a compact display string like "3 PM · 72%" or "No rain today".
+  String _rainSummary() {
+    if (weather == null) return '—';
+    final now = DateTime.now();
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59);
+
+    for (final h in weather!.hourly) {
+      if (h.time.isBefore(now) || h.time.isAfter(todayEnd)) continue;
+      final prob = h.precipitationProbability ?? 0;
+      if (!_isRainy(h.condition) && prob < 50) continue;
+      final hr = h.time.hour;
+      final label = hr == 0
+          ? '12 AM'
+          : hr < 12
+              ? '$hr AM'
+              : hr == 12
+                  ? '12 PM'
+                  : '${hr - 12} PM';
+      return prob > 0 ? '$label · $prob%' : label;
+    }
+
+    if (weather!.daily.isNotEmpty) {
+      final today = weather!.daily.first;
+      final prob = today.precipitationProbability;
+      if (_isRainy(today.condition)) {
+        return prob != null && prob > 0 ? 'Today · $prob%' : 'Today';
+      }
+      if (prob != null && prob >= 30) return 'Today · $prob%';
+    }
+
+    return 'No rain today';
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (slotLabel == null) return const SizedBox.shrink();
+    final hasHistory = label != null;
+    final rainText = _rainSummary();
+
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: emphasized ? 9 : 7,
-        vertical: emphasized ? 4 : 3,
-      ),
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.fromLTRB(0, 24, 0, 36),
       decoration: BoxDecoration(
-        color: AppColors.surfaceTint.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.28),
-          width: 0.8,
+        color: const Color(0xFFF5F7FF),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.30),
+            width: 2,
+          ),
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text('🏆', style: TextStyle(fontSize: emphasized ? 11 : 9)),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: emphasized ? 11 : 9.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, -5),
           ),
         ],
       ),
-    );
-  }
-}
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            // ── Left: past best ──────────────────────────────────────────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'YOUR BEST · $slotLabel',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: <Widget>[
+                      const Text('🏆', style: TextStyle(fontSize: 18)),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          hasHistory
+                              ? label!
+                              : 'Log an activity to start tracking',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: hasHistory
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            fontStyle: hasHistory
+                                ? FontStyle.normal
+                                : FontStyle.italic,
+                            color: hasHistory
+                                ? const Color(0xFF2A2E3B)
+                                : AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
-/// Placeholder when no past activity was logged for this slot yet.
-class _PreviousBestPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Text('🏆',
-            style: TextStyle(
-                fontSize: 10,
-                color: AppColors.textMuted.withValues(alpha: 0.5))),
-        const SizedBox(width: 5),
-        Text(
-          'No past best yet',
-          style: TextStyle(
-            fontSize: 10,
-            fontStyle: FontStyle.italic,
-            color: AppColors.textMuted.withValues(alpha: 0.6),
-          ),
+            // ── Divider ──────────────────────────────────────────────────
+            Container(
+              height: 48,
+              width: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              color: AppColors.outline.withValues(alpha: 0.5),
+            ),
+
+            // ── Right: next rain ─────────────────────────────────────────
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Text(
+                  'EXPECTED RAIN',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Text('🌧', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 6),
+                    Text(
+                      rainText,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2A2E3B),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -725,11 +880,13 @@ class _WakeSleepCard extends StatelessWidget {
     required this.content,
     required this.variant,
     required this.assetPath,
+    this.isCurrent = false,
   });
 
   final WakeSleepCopy content;
   final _WakeSleepVariant variant;
   final String assetPath;
+  final bool isCurrent;
 
   bool get _isWake => variant == _WakeSleepVariant.wake;
 
@@ -764,17 +921,22 @@ class _WakeSleepCard extends StatelessWidget {
           colors: gradientColors,
         ),
         border: Border.all(
-          color: (_isWake ? Colors.white : Colors.white)
-              .withValues(alpha: _isWake ? 0.7 : 0.15),
-          width: 1,
+          color: isCurrent
+              ? (_isWake
+                  ? const Color(0xFFB86A00).withValues(alpha: 0.75)
+                  : const Color(0xFFB5B8FF).withValues(alpha: 0.65))
+              : (_isWake ? Colors.white : Colors.white)
+                  .withValues(alpha: _isWake ? 0.7 : 0.15),
+          width: isCurrent ? 2.0 : 1,
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: (_isWake
                     ? const Color(0xFFB88A3A)
                     : const Color(0xFF0A0C2A))
-                .withValues(alpha: 0.18),
-            blurRadius: 14,
+                .withValues(alpha: isCurrent ? 0.35 : 0.18),
+            blurRadius: isCurrent ? 22 : 14,
+            spreadRadius: isCurrent ? 2 : 0,
             offset: const Offset(0, 5),
           ),
         ],
@@ -786,14 +948,43 @@ class _WakeSleepCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  content.title.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                    color: titleFg,
-                  ),
+                Row(
+                  children: <Widget>[
+                    Text(
+                      content.title.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: titleFg,
+                      ),
+                    ),
+                    if (isCurrent) ...<Widget>[
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: _isWake
+                              ? const Color(0xFFB86A00)
+                              : const Color(0xFFB5B8FF),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'NOW',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                          color: _isWake
+                              ? const Color(0xFFB86A00)
+                              : const Color(0xFFB5B8FF),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -919,6 +1110,209 @@ class _Tag extends StatelessWidget {
           fontSize: 9,
           fontWeight: FontWeight.w600,
           color: emphasized ? AppColors.primary : AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+}
+
+/// Trigger button + custom overlay dropdown for the PLANNER header.
+/// Always opens below the button, 2-column grid, no PRO badge.
+class _ModeDropdown extends StatefulWidget {
+  const _ModeDropdown({required this.modeId, required this.onChanged});
+
+  final String modeId;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_ModeDropdown> createState() => _ModeDropdownState();
+}
+
+class _ModeDropdownState extends State<_ModeDropdown> {
+  OverlayEntry? _entry;
+
+  bool get _isOpen => _entry != null;
+
+  void _toggle() => _isOpen ? _close() : _open();
+
+  void _open() {
+    final box = context.findRenderObject() as RenderBox;
+    final pos = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    _entry = OverlayEntry(builder: (ctx) {
+      final screenWidth = MediaQuery.of(ctx).size.width;
+      // Right-align panel with button's right edge, clamp to screen.
+      const panelWidth = 230.0;
+      final right = screenWidth - pos.dx - size.width;
+
+      return Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _close,
+          ),
+          Positioned(
+            top: pos.dy + size.height + 6,
+            right: right,
+            width: panelWidth,
+            child: _ModePanel(
+              modeId: widget.modeId,
+              onSelect: (id) {
+                _close();
+                widget.onChanged(id);
+              },
+            ),
+          ),
+        ],
+      );
+    });
+
+    Overlay.of(context).insert(_entry!);
+    setState(() {});
+  }
+
+  void _close() {
+    _entry?.remove();
+    _entry = null;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _entry?.remove();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = allDayModes.firstWhere(
+      (m) => m.id == widget.modeId,
+      orElse: () => allDayModes.first,
+    );
+
+    return GestureDetector(
+      onTap: _toggle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              '${selected.emoji} ${selected.label}',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                letterSpacing: 0.1,
+              ),
+            ),
+            const SizedBox(width: 2),
+            AnimatedRotation(
+              turns: _isOpen ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 13,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The floating 2-column panel shown by [_ModeDropdown].
+class _ModePanel extends StatelessWidget {
+  const _ModePanel({required this.modeId, required this.onSelect});
+
+  final String modeId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    const cols = 2;
+    final rows = (allDayModes.length / cols).ceil();
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.outline.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.11),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(rows, (row) {
+            return Row(
+              children: List.generate(cols, (col) {
+                final i = row * cols + col;
+                if (i >= allDayModes.length) {
+                  return const Expanded(child: SizedBox());
+                }
+                final m = allDayModes[i];
+                final selected = m.id == modeId;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => onSelect(m.id),
+                    child: Container(
+                      margin: const EdgeInsets.all(3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? AppColors.primary.withValues(alpha: 0.10)
+                            : AppColors.scaffoldBackground
+                                .withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.primary.withValues(alpha: 0.45)
+                              : AppColors.outline.withValues(alpha: 0.25),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        '${m.emoji} ${m.label}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            );
+          }),
         ),
       ),
     );

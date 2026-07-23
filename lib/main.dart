@@ -6,6 +6,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'app.dart';
+import 'pages/profile/profile_store.dart';
+import 'services/sleep_schedule_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,5 +20,7 @@ Future<void> main() async {
   }
 
   await dotenv.load();
+  await ProfileStore.instance.init();
+  await SleepScheduleStore.instance.init();
   runApp(const EnergyHealthApp());
 }

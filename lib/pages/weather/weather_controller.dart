@@ -52,7 +52,9 @@ class WeatherController extends ChangeNotifier {
   WeatherState _state = const WeatherState();
   WeatherState get state => _state;
 
-  /// Show whatever we've got cached, then kick off a fresh fetch.
+  /// Show whatever we've got cached, then kick off a fresh fetch — but only
+  /// if location permission is already granted. If not, stay at initial (or
+  /// show cached data) and let the user tap to allow.
   Future<void> load() async {
     final cached = await _repository.cachedSnapshot();
     if (cached != null) {
@@ -61,11 +63,20 @@ class WeatherController extends ChangeNotifier {
         snapshot: cached,
         clearError: true,
       ));
-    } else {
+    }
+
+    // Check permission without showing the OS dialog.
+    final hasPermission = await _repository.hasLocationPermission();
+    if (!hasPermission) {
       _emit(_state.copyWith(
-        status: WeatherStatus.loading,
+        status: WeatherStatus.permissionDenied,
         clearError: true,
       ));
+      return;
+    }
+
+    if (cached == null) {
+      _emit(_state.copyWith(status: WeatherStatus.loading, clearError: true));
     }
     await _fetch();
   }

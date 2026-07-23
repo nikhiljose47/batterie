@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/weather.dart';
 
@@ -74,5 +77,39 @@ class LocationService {
     } catch (e) {
       throw LocationException(LocationExceptionKind.unknown, e.toString());
     }
+  }
+
+  /// Returns a friendly label like "Bangalore, IN" for a lat/lon pair.
+  /// Uses the Nominatim free reverse geocoding API. Throws on any failure —
+  /// callers should swallow the error and treat place name as optional.
+  Future<String?> reverseGeocode(UserLocation location) async {
+    final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', <String, String>{
+      'lat': location.latitude.toString(),
+      'lon': location.longitude.toString(),
+      'format': 'json',
+      'zoom': '10', // city-level resolution
+      'addressdetails': '1',
+    });
+
+    final response = await http.get(
+      uri,
+      headers: <String, String>{'User-Agent': 'batterie-app/1.0'},
+    ).timeout(const Duration(seconds: 6));
+
+    if (response.statusCode != 200) return null;
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final address = data['address'] as Map<String, dynamic>?;
+    if (address == null) return null;
+
+    final city = (address['city'] ??
+            address['town'] ??
+            address['village'] ??
+            address['county']) as String?;
+    final country = address['country_code'] as String?;
+
+    if (city == null) return null;
+    if (country == null) return city;
+    return '$city, ${country.toUpperCase()}';
   }
 }

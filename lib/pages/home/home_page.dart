@@ -164,7 +164,7 @@ class _HomePageState extends State<HomePage>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(34),
+          preferredSize: const Size.fromHeight(44),
           child: DecoratedBox(
             decoration: const BoxDecoration(
               color: AppColors.surface,
@@ -179,9 +179,9 @@ class _HomePageState extends State<HomePage>
               labelPadding: EdgeInsets.zero,
               tabs: const <Widget>[
                 _ThinTab(icon: Icons.home_outlined, label: AppStrings.homeTab),
-                _ThinTab(icon: Icons.bolt_outlined, label: AppStrings.youTab),
                 _ThinTab(
-                    icon: Icons.groups_2_outlined, label: AppStrings.othersTab),
+                    icon: Icons.update_rounded, label: AppStrings.updatesTab),
+                _ThinTab(icon: Icons.bolt_outlined, label: AppStrings.youTab),
                 _ThinTab(
                     icon: Icons.article_outlined, label: AppStrings.newsTab),
               ],
@@ -197,8 +197,8 @@ class _HomePageState extends State<HomePage>
         controller: _tabController,
         children: <Widget>[
           HomeTabPage(weatherController: _weatherController),
-          DashboardPage(controller: _dashboardController),
           const OthersPage(),
+          DashboardPage(controller: _dashboardController),
           const NewsPage(),
         ],
       ),
@@ -283,8 +283,9 @@ class _LocationChip extends StatelessWidget {
         final Color fg;
         final Color bg;
         if (location != null) {
-          label = '${location.latitude.toStringAsFixed(2)},'
-              '${location.longitude.toStringAsFixed(2)}';
+          label = location.placeLabel ??
+              '${location.latitude.toStringAsFixed(1)}°,'
+                  '${location.longitude.toStringAsFixed(1)}°';
           fg = const Color(0xFF2E7D32);
           bg = const Color(0xFFE8F5E9);
         } else if (isOff) {
@@ -350,16 +351,16 @@ class _ThinTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tab(
-      height: 34,
+      height: 40,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 15),
-          const SizedBox(width: 5),
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
           Text(label,
               style:
-                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
     );

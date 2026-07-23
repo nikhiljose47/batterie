@@ -7,6 +7,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/energy_log_record.dart';
 import '../../models/logged_activity.dart';
+import '../../pages/profile/profile_store.dart';
 import '../../services/energy_log_store.dart';
 import '../home_tab/data/mode_advice.dart';
 
@@ -14,6 +15,7 @@ import '../home_tab/data/mode_advice.dart';
 enum InspectorSource {
   energyLog('Energy log (SQLite)', Icons.storage_rounded),
   weatherCache('Weather cache (prefs)', Icons.cloud_outlined),
+  databaseFull('Full Database & User', Icons.info_outline),
   modeAdvice('Mode advice (const)', Icons.menu_book_outlined);
 
   const InspectorSource(this.label, this.icon);
@@ -48,6 +50,8 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
         return _loadEnergyLog();
       case InspectorSource.weatherCache:
         return _loadWeatherCache();
+      case InspectorSource.databaseFull:
+        return _loadDatabaseFull();
       case InspectorSource.modeAdvice:
         return _loadModeAdvice();
     }
@@ -118,6 +122,101 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
             isError: true),
       ];
     }
+  }
+
+  Future<List<_InspectorEntry>> _loadDatabaseFull() async {
+    final entries = <_InspectorEntry>[];
+    final store = SqliteEnergyLogStore.instance;
+    final today = DateTime.now();
+
+    entries.add(_InspectorEntry(
+      title: '📱 USER INFO',
+      body: 'Profile Photo: ${ProfileStore.instance.photoPath.value ?? "(none)"}',
+    ));
+
+    entries.add(const _InspectorEntry(
+      title: '📋 ENERGY LOGS (last 8 days)',
+      body: '—',
+    ));
+
+    for (var back = 0; back <= 7; back++) {
+      final day = today.subtract(Duration(days: back));
+      final key = dateKey(day);
+      List<EnergyLogRecord> records;
+      try {
+        records = await store.recordsForDate(key);
+      } catch (e) {
+        entries.add(_InspectorEntry(
+          title: '$key [ERROR]',
+          body: 'Failed to read: $e',
+          isError: true,
+        ));
+        continue;
+      }
+
+      if (records.isNotEmpty) {
+        for (final r in records) {
+          final emoji = activityEmojis[r.activityId] ?? '⚡';
+          entries.add(_InspectorEntry(
+            title: '$key · ${formatMinutes(r.startMinutes)} · $emoji ${r.activityId}',
+            body: 'Duration: ${r.durationMinutes} min\n'
+                'Physical: ${r.physicalAfter}/100 · Brain: ${r.brainAfter}/100\n'
+                'ID: ${r.id}',
+          ));
+        }
+      }
+
+      try {
+        final remark = await store.remarkForDate(key);
+        if (remark != null) {
+          entries.add(_InspectorEntry(
+            title: '$key · 📝 REMARK',
+            body: remark,
+          ));
+        }
+      } catch (_) {}
+    }
+
+    entries.add(const _InspectorEntry(
+      title: '🗂️ DAY TEMPLATES',
+      body: '—',
+    ));
+
+    try {
+      final templates = await store.customTemplates();
+      if (templates.isEmpty) {
+        entries.add(const _InspectorEntry(
+          title: 'Custom Templates',
+          body: '(no custom templates saved)',
+        ));
+      } else {
+        for (final t in templates) {
+          final items = t.items
+              .map((item) =>
+                  '  ${formatMinutes(item.startMinutes)} · ${item.activityId} (${item.durationMinutes} min)')
+              .join('\n');
+          entries.add(_InspectorEntry(
+            title: '${t.emoji} ${t.name}',
+            body: 'ID: ${t.id}\nItems:\n$items',
+          ));
+        }
+      }
+    } catch (e) {
+      entries.add(_InspectorEntry(
+        title: 'Custom Templates [ERROR]',
+        body: 'Failed to read: $e',
+        isError: true,
+      ));
+    }
+
+    if (entries.isEmpty) {
+      entries.add(const _InspectorEntry(
+        title: 'Database Empty',
+        body: 'No data logged yet.',
+      ));
+    }
+
+    return entries;
   }
 
   Future<List<_InspectorEntry>> _loadModeAdvice() async {

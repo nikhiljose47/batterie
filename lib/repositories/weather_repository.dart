@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/weather.dart';
@@ -25,6 +26,13 @@ class WeatherRepository {
   final WeatherService _weatherService;
   final Future<SharedPreferences> Function() _preferencesLoader;
 
+  /// Returns true if location permission is already granted — without prompting.
+  Future<bool> hasLocationPermission() async {
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+  }
+
   /// Reads the last snapshot we successfully stored, if any.
   Future<WeatherSnapshot?> cachedSnapshot() async {
     try {
@@ -46,8 +54,18 @@ class WeatherRepository {
     final location = await _locationService.currentLocation();
     final result = await _weatherService.fetchForLocation(location);
 
+    // Best-effort reverse geocode — failure doesn't block the weather data.
+    String? placeLabel;
+    try {
+      placeLabel = await _locationService.reverseGeocode(location);
+    } catch (_) {}
+
     final snapshot = WeatherSnapshot(
-      location: location,
+      location: UserLocation(
+        latitude: location.latitude,
+        longitude: location.longitude,
+        placeLabel: placeLabel,
+      ),
       current: result.current,
       daily: result.daily,
       hourly: result.hourly,

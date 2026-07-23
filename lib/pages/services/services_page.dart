@@ -21,12 +21,55 @@ import 'tools/task_page.dart';
 import 'tools/tdee_page.dart';
 import 'tools/timer_page.dart';
 
-/// Services hub — every mini-app in one place.
-///
-/// Selection paths, per the spec:
-///  1. Thin search bar at the top (matches name + keywords).
-///  2. Horizontally scrollable category tags under it.
-///  3. The tile grid itself — every tile is a button.
+// ── The 4 major UI groups ────────────────────────────────────────────────────
+
+class _ServiceGroup {
+  const _ServiceGroup({
+    required this.emoji,
+    required this.title,
+    required this.cats,
+    required this.color,
+  });
+
+  final String emoji;
+  final String title;
+  final List<ServiceCategory> cats;
+  final Color color;
+}
+
+const List<_ServiceGroup> _groups = <_ServiceGroup>[
+  _ServiceGroup(
+    emoji: '🏃',
+    title: 'Body & Health',
+    cats: <ServiceCategory>[ServiceCategory.health],
+    color: Color(0xFF2E7D32),
+  ),
+  _ServiceGroup(
+    emoji: '🧠',
+    title: 'Mind & Nutrition',
+    cats: <ServiceCategory>[ServiceCategory.mind, ServiceCategory.food],
+    color: Color(0xFF5E35B1),
+  ),
+  _ServiceGroup(
+    emoji: '🌸',
+    title: "Women's Health",
+    cats: <ServiceCategory>[ServiceCategory.women],
+    color: Color(0xFFC2185B),
+  ),
+  _ServiceGroup(
+    emoji: '🗓️',
+    title: 'Life & Plans',
+    cats: <ServiceCategory>[
+      ServiceCategory.finance,
+      ServiceCategory.productivity,
+      ServiceCategory.lifestyle,
+    ],
+    color: Color(0xFF1565C0),
+  ),
+];
+
+// ── Page ────────────────────────────────────────────────────────────────────
+
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key});
 
@@ -36,23 +79,18 @@ class ServicesPage extends StatefulWidget {
 
 class _ServicesPageState extends State<ServicesPage> {
   String _query = '';
-  ServiceCategory? _category;
 
-  List<AppService> get _filtered {
+  bool get _isSearching => _query.trim().isNotEmpty;
+
+  List<AppService> get _searchResults {
     final q = _query.trim().toLowerCase();
     return serviceCatalog.where((s) {
-      final inCategory = _category == null || s.category == _category;
-      final inQuery = q.isEmpty ||
-          s.name.toLowerCase().contains(q) ||
+      return s.name.toLowerCase().contains(q) ||
           s.tagline.toLowerCase().contains(q) ||
           s.keywords.any((k) => k.contains(q));
-      return inCategory && inQuery;
     }).toList();
   }
 
-  /// Route table — every service id maps to its working page.
-  /// New services fall through to the scaffolded detail page until
-  /// their page is built and registered here.
   void _openService(AppService service) {
     final Widget page = switch (service.id) {
       // Health
@@ -107,8 +145,6 @@ class _ServicesPageState extends State<ServicesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final services = _filtered;
-
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 44,
@@ -118,151 +154,182 @@ class _ServicesPageState extends State<ServicesPage> {
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          // ── Thin search bar ─────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.large, AppSpacing.medium, AppSpacing.large, 0),
-            child: SizedBox(
-              height: 38,
-              child: TextField(
-                onChanged: (value) => setState(() => _query = value),
-                style: const TextStyle(fontSize: 12.5),
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Search a service — "water", "budget", "sleep"…',
-                  hintStyle: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted.withValues(alpha: 0.8),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _buildSearchBar(),
+            if (_isSearching)
+              _buildSearchResults()
+            else
+              for (int i = 0; i < _groups.length; i++) ...<Widget>[
+                if (i > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.large),
+                    child: Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: AppColors.outline.withValues(alpha: 0.5),
+                    ),
                   ),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      size: 18, color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: EdgeInsets.zero,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: AppColors.outline.withValues(alpha: 0.9)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primary, width: 1.2),
+                _buildGroup(_groups[i]),
+              ],
+            const SizedBox(height: AppSpacing.large),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.large, AppSpacing.medium, AppSpacing.large, 0),
+      child: SizedBox(
+        height: 38,
+        child: TextField(
+          onChanged: (v) => setState(() => _query = v),
+          style: const TextStyle(fontSize: 12.5),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Search — "water", "budget", "sleep"…',
+            hintStyle: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMuted.withValues(alpha: 0.8),
+            ),
+            prefixIcon: const Icon(Icons.search_rounded,
+                size: 18, color: AppColors.textMuted),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: EdgeInsets.zero,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  BorderSide(color: AppColors.outline.withValues(alpha: 0.9)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroup(_ServiceGroup g) {
+    final items = serviceCatalog
+        .where((s) => g.cats.contains(s.category))
+        .toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.large, 30, AppSpacing.large, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: g.color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(g.emoji, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 7),
+              Text(
+                g.title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1C2030),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: g.color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${items.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: g.color,
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // ── Scrollable category tags ────────────────────────────────
-          SizedBox(
-            height: 30,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.large),
-              children: <Widget>[
-                _CategoryChip(
-                  label: 'All',
-                  emoji: '✨',
-                  selected: _category == null,
-                  onTap: () => setState(() => _category = null),
-                ),
-                for (final c in ServiceCategory.values) ...<Widget>[
-                  const SizedBox(width: 6),
-                  _CategoryChip(
-                    label: c.label,
-                    emoji: c.emoji,
-                    selected: _category == c,
-                    onTap: () => setState(
-                        () => _category = _category == c ? null : c),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // ── Tile grid ───────────────────────────────────────────────
-          Expanded(
-            child: services.isEmpty
-                ? Center(
-                    child: Text(
-                      'Nothing matches "$_query"',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textMuted),
-                    ),
-                  )
-                : GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.large, 2,
-                        AppSpacing.large, AppSpacing.large),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisExtent: 96,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
-                    itemCount: services.length,
-                    itemBuilder: (context, index) => _ServiceTile(
-                      service: services[index],
-                      onTap: () => _openService(services[index]),
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
-    required this.label,
-    required this.emoji,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String emoji;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 11),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: selected
-                ? AppColors.primary
-                : AppColors.outline.withValues(alpha: 0.9),
+            ],
           ),
         ),
-        child: Text(
-          '$emoji $label',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.textMuted,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisExtent: 96,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: items.length,
+            itemBuilder: (_, i) => _ServiceTile(
+              service: items[i],
+              onTap: () => _openService(items[i]),
+            ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchResults() {
+    final results = _searchResults;
+    if (results.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: Text(
+            'Nothing matches "${_query.trim()}"',
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.large, AppSpacing.medium, AppSpacing.large, 0),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisExtent: 96,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: results.length,
+        itemBuilder: (_, i) => _ServiceTile(
+          service: results[i],
+          onTap: () => _openService(results[i]),
         ),
       ),
     );
   }
 }
+
+// ── Tile ────────────────────────────────────────────────────────────────────
 
 class _ServiceTile extends StatelessWidget {
   const _ServiceTile({required this.service, required this.onTap});
@@ -303,8 +370,8 @@ class _ServiceTile extends StatelessWidget {
                     color: categoryTint(service.category),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child:
-                      Text(service.emoji, style: const TextStyle(fontSize: 15)),
+                  child: Text(service.emoji,
+                      style: const TextStyle(fontSize: 15)),
                 ),
                 const Spacer(),
                 Text(
@@ -334,8 +401,8 @@ class _ServiceTile extends StatelessWidget {
               service.tagline,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 9.5, color: AppColors.textMuted),
+              style:
+                  const TextStyle(fontSize: 9.5, color: AppColors.textMuted),
             ),
           ],
         ),

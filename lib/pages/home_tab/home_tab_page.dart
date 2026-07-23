@@ -1,24 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/logged_activity.dart';
+import '../../services/sleep_schedule_store.dart';
+import '../profile/profile_store.dart';
+import '../services/tools/sleep_page.dart';
 import '../weather/weather_controller.dart';
 import 'widgets/planner_section.dart';
-
-/// Day modes that shape how the day is scored/planned.
-const List<({String id, String emoji, String label})> _dayModes =
-    <({String id, String emoji, String label})>[
-  (id: 'normal', emoji: '🙂', label: 'Normal'),
-  (id: 'athletic', emoji: '🏃', label: 'Athletic'),
-  (id: 'gym', emoji: '🏋️', label: 'Gym'),
-  (id: 'office', emoji: '💼', label: 'Office'),
-  (id: 'nicotine_free', emoji: '🚭', label: 'Nicotine free'),
-];
 
 /// Fresh home tab: unified, color-coded day tube showing energy flow from
 /// wake (morning green) through warm noon through evening dusk to sleep (night).
@@ -34,7 +29,7 @@ class HomeTabPage extends StatefulWidget {
 }
 
 class _HomeTabPageState extends State<HomeTabPage> {
-  String _modeId = 'normal';
+  late String _modeId;
   Timer? _ticker;
   late final WeatherController _weatherController;
   late final bool _ownsWeatherController;
@@ -42,6 +37,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
   @override
   void initState() {
     super.initState();
+    _modeId = ProfileStore.instance.plannerMode.value;
     // Live clock — header time and tube fill track the real time.
     _ticker = Timer.periodic(
       const Duration(seconds: 20),
@@ -65,25 +61,34 @@ class _HomeTabPageState extends State<HomeTabPage> {
     return now.hour * 60 + now.minute + now.second / 60.0;
   }
 
+  String get _todayLabel {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[DateTime.now().weekday - 1];
+  }
+
   @override
   Widget build(BuildContext context) {
     // Fixed day card at the top; only the planner list below scrolls.
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.large,
-        AppSpacing.large,
-        AppSpacing.large,
+        AppSpacing.small,
+        AppSpacing.xSmall,
+        AppSpacing.small,
         0,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           _buildDayCard(context),
-          const SizedBox(height: AppSpacing.large),
+          const SizedBox(height: AppSpacing.medium),
           Expanded(
             child: PlannerSection(
               nowMinutes: _nowMinutes,
               modeId: _modeId,
+              onModeChanged: (id) {
+                setState(() => _modeId = id);
+                ProfileStore.instance.setPlannerMode(id);
+              },
               weatherController: _weatherController,
             ),
           ),
@@ -93,105 +98,104 @@ class _HomeTabPageState extends State<HomeTabPage> {
   }
 
   Widget _buildDayCard(BuildContext context) {
-    return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFFF7FBF8),
-              Color(0xFFFEFAEC),
-              Color(0xFFFDF4E4),
-              Color(0xFFF2EAE2),
-            ],
-            stops: <double>[0.0, 0.4, 0.7, 1.0],
-          ),
-          // Glass shell: bright hairline like light catching a frosted edge.
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.9),
-            width: 1.2,
-          ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: const Color(0xFF8B7355).withValues(alpha: 0.10),
-              blurRadius: 18,
-              spreadRadius: -6,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Padding(
+    return Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xLarge,
-            AppSpacing.medium,
-            AppSpacing.xLarge,
+            AppSpacing.xSmall,
             AppSpacing.small,
+            AppSpacing.xSmall,
+            0,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // ── Header: name + current time + mode dropdown ──────────────
+              // ── Header: avatar + name + time ──────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
-                  const CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Color(0xFFE8F5E9),
-                    child: Text('🧑', style: TextStyle(fontSize: 15)),
+                  ValueListenableBuilder<String?>(
+                    valueListenable: ProfileStore.instance.photoPath,
+                    builder: (_, path, __) {
+                      final hasPhoto = path != null && File(path).existsSync();
+                      return CircleAvatar(
+                        radius: 16,
+                        backgroundColor: const Color(0xFFE8F5E9),
+                        backgroundImage:
+                            hasPhoto ? FileImage(File(path)) : null,
+                        child: hasPhoto
+                            ? null
+                            : const Text('🧑',
+                                style: TextStyle(fontSize: 15)),
+                      );
+                    },
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: <Widget>[
-                            const Text(
-                              'Bob',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.3,
-                              ),
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: ProfileStore.instance.name,
+                      builder: (_, displayName, __) => Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: <Widget>[
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              formatMinutes(_nowMinutes.floor()),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black.withValues(alpha: 0.55),
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          _modeLabelOf(_modeId).toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                            letterSpacing: 1.2,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Text(
+                            formatMinutes(_nowMinutes.floor()),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black.withValues(alpha: 0.55),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '· $_todayLabel',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black.withValues(alpha: 0.38),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  _ModeDropdown(
-                    modeId: _modeId,
-                    onChanged: (id) => setState(() => _modeId = id),
+                  const SizedBox(width: 8),
+                  // Sleep schedule quick-access — compact icon button
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                          builder: (_) => const SleepPage()),
+                    ),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B1E4A).withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color:
+                              const Color(0xFF3D3E85).withValues(alpha: 0.22),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.bedtime_rounded,
+                        size: 18,
+                        color: Color(0xFF3D3E85),
+                      ),
+                    ),
                   ),
                 ],
               ),
-
-              // Tight spacing — pull tube close to header
-              const SizedBox(height: 8),
-
               // Tube — tight hairpin, compact height
               SizedBox(
                 height: 132,
@@ -199,98 +203,20 @@ class _HomeTabPageState extends State<HomeTabPage> {
               ),
             ],
           ),
-        ),
-    );
+        );
   }
 
-  String _modeLabelOf(String id) =>
-      _dayModes.firstWhere((m) => m.id == id).label;
-}
-
-// ── Mode dropdown ─────────────────────────────────────────────────────────
-
-class _ModeDropdown extends StatelessWidget {
-  const _ModeDropdown({required this.modeId, required this.onChanged});
-
-  final String modeId;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = _dayModes.firstWhere((m) => m.id == modeId);
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: AppColors.outline.withValues(alpha: 0.7),
-          width: 0.8,
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: modeId,
-          isDense: true,
-          alignment: Alignment.center,
-          borderRadius: BorderRadius.circular(14),
-          icon: const Padding(
-            padding: EdgeInsets.only(left: 2),
-            child: Icon(Icons.keyboard_arrow_down_rounded,
-                size: 16, color: AppColors.primary),
-          ),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
-          ),
-          selectedItemBuilder: (context) => _dayModes
-              .map(
-                (m) => Center(
-                  child: Text(
-                    '${m.emoji} ${m.label}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          items: _dayModes
-              .map(
-                (m) => DropdownMenuItem<String>(
-                  value: m.id,
-                  child: Text('${m.emoji} ${m.label}'),
-                ),
-              )
-              .toList(),
-          onChanged: (id) {
-            if (id != null) onChanged(id);
-          },
-          hint: Text('${selected.emoji} ${selected.label}'),
-        ),
-      ),
-    );
-  }
 }
 
 // ── Day tube ──────────────────────────────────────────────────────────────
 
-/// Day runs 6 AM → 10 PM (16 waking hours, 8 h of sleep). Outside that the
-/// panda sleeps.
-const int _wakeMinutes = 6 * 60;
-const int _sleepMinutes = 22 * 60;
-
 /// Left gutter reserved for the sleeping panda.
-const double _sleepGutter = 52.0;
+const double _sleepGutter = 44.0;
 
 /// Builds the hairpin centerline — runs pulled close together for a tight,
 /// hard bend, with breathing room on both sides.
 Path _buildTubePath(Size size) {
-  const padRight = 16.0;
+  const padRight = 28.0;
   final topY = size.height * 0.28;
   final bottomY = size.height * 0.72;
   final bendRadius = (bottomY - topY) / 2;
@@ -340,11 +266,23 @@ class _DayTubeState extends State<_DayTube>
     super.dispose();
   }
 
+  int get _wakeMinutes => SleepScheduleStore.instance.wakeMinutes;
+  int get _sleepMinutes => SleepScheduleStore.instance.sleepMinutes;
+
   double get _progress {
-    final t = (widget.nowMinutes - _wakeMinutes) /
-        (_sleepMinutes - _wakeMinutes);
+    final span = _sleepMinutes - _wakeMinutes;
+    if (span <= 0) return 0.0;
+    final t = (widget.nowMinutes - _wakeMinutes) / span;
     return t.clamp(0.0, 1.0);
   }
+
+  bool get _isWakeCurrent =>
+      widget.nowMinutes >= _wakeMinutes &&
+      widget.nowMinutes < _wakeMinutes + 3 * 60;
+
+  bool get _isSleepCurrent =>
+      widget.nowMinutes < _wakeMinutes ||
+      widget.nowMinutes >= _sleepMinutes;
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +298,6 @@ class _DayTubeState extends State<_DayTube>
 
         final topY = size.height * 0.28;
         final bottomY = size.height * 0.72;
-        final centerY = (topY + bottomY) / 2;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -373,29 +310,52 @@ class _DayTubeState extends State<_DayTube>
                   painter: _DayTubePainter(
                     progress: _progress,
                     flowPhase: _flow.value,
+                    wakeMinutes: _wakeMinutes,
+                    sleepMinutes: _sleepMinutes,
                   ),
                 ),
               ),
             ),
 
-            // Sleeping panda Lottie on the left, rotated 90° and clipped
-            // to the same 52×52 footprint as the old PNG.
-            Positioned(
-              left: -2,
-              top: centerY - 26,
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: RotatedBox(
-                    quarterTurns: 1,
-                    child: Lottie.asset(
-                      'assets/lottie/panda_sleeping.json',
-                      fit: BoxFit.cover,
-                      repeat: true,
-                    ),
-                  ),
+            // Wake-up box: sits just before the tube's top-left endpoint,
+            // its right edge flush against startX so the tube extends
+            // rightward out of it. The green matches the tube fill's morning
+            // start color — continuous fill across box → tube.
+            _EndpointBox(
+              left: _sleepGutter - 40,
+              top: topY - 20,
+              size: const Size(40, 40),
+              baseColor: const Color(0xFF66BB6A),
+              accentColor: const Color(0xFF43A047),
+              animate: _isWakeCurrent,
+              pulse: _flow,
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: SvgPicture.asset(
+                  'assets/icons/wakeup_alarm.svg',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+
+            // Sleep box: sits just before the tube's bottom-left endpoint.
+            // Deep indigo matches the tube fill's night end — the panda
+            // Lottie always plays; the box itself pulses when it's the
+            // current window.
+            _EndpointBox(
+              left: _sleepGutter - 40,
+              top: bottomY - 20,
+              size: const Size(40, 40),
+              baseColor: const Color(0xFF303F9F),
+              accentColor: const Color(0xFF1B1E4A),
+              animate: _isSleepCurrent,
+              pulse: _flow,
+              child: RotatedBox(
+                quarterTurns: 1,
+                child: Lottie.asset(
+                  'assets/lottie/panda_sleeping.json',
+                  fit: BoxFit.cover,
+                  repeat: true,
                 ),
               ),
             ),
@@ -404,23 +364,35 @@ class _DayTubeState extends State<_DayTube>
             Positioned(
               left: nowPos.dx - 17,
               top: nowPos.dy - 17,
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary, width: 2),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
+              child: ValueListenableBuilder<String?>(
+                valueListenable: ProfileStore.instance.photoPath,
+                builder: (_, path, __) {
+                  final hasPhoto = path != null && File(path).existsSync();
+                  return Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 2),
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: const Text('🧑', style: TextStyle(fontSize: 15)),
+                    child: ClipOval(
+                      child: hasPhoto
+                          ? Image.file(File(path),
+                              fit: BoxFit.cover, width: 34, height: 34)
+                          : const Center(
+                              child:
+                                  Text('🧑', style: TextStyle(fontSize: 15))),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -431,13 +403,17 @@ class _DayTubeState extends State<_DayTube>
 }
 
 class _DayTubePainter extends CustomPainter {
-  _DayTubePainter({required this.progress, required this.flowPhase});
+  _DayTubePainter({
+    required this.progress,
+    required this.flowPhase,
+    required this.wakeMinutes,
+    required this.sleepMinutes,
+  });
 
   final double progress;
-
-  /// 0→1 looping animation phase — drives the drifting shimmer inside the
-  /// liquid so the fill feels alive.
   final double flowPhase;
+  final int wakeMinutes;
+  final int sleepMinutes;
 
   static const double _tubeWidth = 48;
 
@@ -462,7 +438,7 @@ class _DayTubePainter extends CustomPainter {
     final shadow = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt
       ..color = Colors.black.withValues(alpha: 0.07)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
     canvas.save();
@@ -470,11 +446,12 @@ class _DayTubePainter extends CustomPainter {
     canvas.drawPath(path, shadow);
     canvas.restore();
 
-    // Frosted translucent body
+    // Frosted translucent body — butt caps so ends butt against endpoint
+    // boxes cleanly instead of a rounded bulge overlapping them.
     final glassBody = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -489,7 +466,7 @@ class _DayTubePainter extends CustomPainter {
     final rimLight = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tubeWidth
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt
       ..color = Colors.white.withValues(alpha: 0.35);
     canvas.drawPath(path, rimLight);
 
@@ -499,7 +476,7 @@ class _DayTubePainter extends CustomPainter {
       final fill = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = _tubeWidth - 12
-        ..strokeCap = StrokeCap.round
+        ..strokeCap = StrokeCap.butt
         ..shader = _dayGradient().createShader(Offset.zero & size);
       canvas.drawPath(done, fill);
 
@@ -544,17 +521,19 @@ class _DayTubePainter extends CustomPainter {
     }
 
     // ── Timeline markers inside the tube — cute capsule labels ─────────
-    const total = _sleepMinutes - _wakeMinutes;
+    final total = sleepMinutes - wakeMinutes;
+    if (total <= 0) return;
+    final wakeHour = wakeMinutes ~/ 60;
+    final sleepHour = sleepMinutes ~/ 60;
 
-    for (var m = _wakeMinutes; m <= _sleepMinutes; m += 60) {
-      final t = (m - _wakeMinutes) / total;
+    for (var m = wakeMinutes; m <= sleepMinutes; m += 60) {
+      final t = (m - wakeMinutes) / total;
       final tangent = metric.getTangentForOffset(metric.length * t);
       if (tangent == null) continue;
 
       final pos = tangent.position;
       final hour = m ~/ 60;
-      // Labelled marks: every 3h from the 6 AM wake, plus the 10 PM end.
-      final isMajor = hour == 22 || (hour - 6) % 3 == 0;
+      final isMajor = hour == sleepHour || (hour - wakeHour) % 3 == 0;
       final isElapsed = t <= progress;
 
       if (isMajor) {
@@ -582,7 +561,7 @@ class _DayTubePainter extends CustomPainter {
 
     // ── Time-of-day mood icons riding inside the tube ──────────────────
     for (final phase in _phaseIcons) {
-      final t = (phase.minute - _wakeMinutes) / total;
+      final t = (phase.minute - wakeMinutes) / total;
       if (t < 0 || t > 1) continue;
       final tangent = metric.getTangentForOffset(metric.length * t);
       if (tangent == null) continue;
@@ -619,18 +598,23 @@ class _DayTubePainter extends CustomPainter {
     }
   }
 
-  /// Gradient reflecting the time of day: morning green → noon warm →
-  /// evening dusk → night deep.
+  /// Gradient: top rail = morning green, bend = golden sun → warm orange,
+  /// bottom rail = twilight. Dark blues stay below the tube (night).
+  /// Top-to-bottom orientation so the hairpin bend never shows night colors.
   LinearGradient _dayGradient() {
     return const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
       colors: <Color>[
-        Color(0xFF66BB6A), // Morning green
-        Color(0xFFFFCA28), // Late morning gold
-        Color(0xFFFFA726), // Noon warm orange
-        Color(0xFFFF7043), // Evening dusk
-        Color(0xFF7E57C2), // Twilight purple
-        Color(0xFF303F9F), // Night blue
+        Color(0xFF4CAF50), // above tube — vivid morning green
+        Color(0xFF66BB6A), // 6 AM — top rail start
+        Color(0xFFF9A825), // ~noon — upper bend, golden sun
+        Color(0xFFFF7043), // ~3 PM — lower bend, warm orange-dusk
+        Color(0xFF5C6BC0), // ~10 PM — bottom rail, soft twilight
+        Color(0xFF1A237E), // below tube — deep night
       ],
+      // stops keyed to tube geometry: topY ≈ 28%, bottomY ≈ 72%
+      stops: <double>[0.0, 0.28, 0.46, 0.58, 0.72, 1.0],
     );
   }
 
@@ -684,14 +668,88 @@ class _DayTubePainter extends CustomPainter {
 
   String _hourLabel(int hour) {
     final h = hour % 24;
-    if (h == 0) return '12A';
-    if (h == 12) return '12P';
-    return h < 12 ? '${h}A' : '${h - 12}P';
+    if (h == 0) return '12AM';
+    if (h == 12) return '12PM';
+    return h < 12 ? '${h}AM' : '${h - 12}PM';
   }
 
   @override
   bool shouldRepaint(_DayTubePainter oldDelegate) =>
       oldDelegate.progress != progress ||
-      oldDelegate.flowPhase != flowPhase;
+      oldDelegate.flowPhase != flowPhase ||
+      oldDelegate.wakeMinutes != wakeMinutes ||
+      oldDelegate.sleepMinutes != sleepMinutes;
 }
 
+/// Small rounded chip anchored at one of the tube's left endpoints. Its
+/// right edge sits flush against `startX` (the tube's flat cap) so tube +
+/// box read as one continuous shape — a filled pill capped at either end.
+///
+/// When [animate] is true, the box breathes with a gentle scale + glow
+/// pulse driven by [pulse] (the day tube's flow controller).
+class _EndpointBox extends StatelessWidget {
+  const _EndpointBox({
+    required this.left,
+    required this.top,
+    required this.size,
+    required this.baseColor,
+    required this.accentColor,
+    required this.animate,
+    required this.pulse,
+    required this.child,
+  });
+
+  final double left;
+  final double top;
+  final Size size;
+  final Color baseColor;
+  final Color accentColor;
+  final bool animate;
+  final Animation<double> pulse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: AnimatedBuilder(
+        animation: pulse,
+        builder: (context, cachedChild) {
+          // Sine sweep 0→1→0 across the 6-second flow — imperceptible when
+          // idle, subtle breath when active.
+          final t = animate
+              ? (0.5 - 0.5 * math.cos(pulse.value * 2 * math.pi))
+              : 0.0;
+          final scale = 1.0 + 0.06 * t;
+          final glowAlpha = 0.15 + 0.35 * t;
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              width: size.width,
+              height: size.height,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[baseColor, accentColor],
+                ),
+                boxShadow: animate
+                    ? <BoxShadow>[
+                        BoxShadow(
+                          color: baseColor.withValues(alpha: glowAlpha),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ClipRect(child: cachedChild),
+            ),
+          );
+        },
+        child: child,
+      ),
+    );
+  }
+}

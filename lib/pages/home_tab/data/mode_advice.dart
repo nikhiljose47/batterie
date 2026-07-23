@@ -1,3 +1,8 @@
+import '../../../services/sleep_schedule_store.dart';
+
+// Short alias so the getters below read cleanly.
+SleepScheduleStore get _scheduleStore => SleepScheduleStore.instance;
+
 // ═════════════════════════════════════════════════════════════════════════
 //                  Home tab planner — content data source
 // ═════════════════════════════════════════════════════════════════════════
@@ -37,11 +42,47 @@
 //
 // Nothing else in this file is worth touching by hand.
 
-/// 6 AM — day starts.
-const int homeDayWakeMinutes = 6 * 60;
+// ═════════════════════════════════════════════════════════════════════════
+//                          Day-mode registry
+// ═════════════════════════════════════════════════════════════════════════
 
-/// 10 PM — day ends. 22 → 6 next morning = 8 h sleep.
-const int homeDaySleepMinutes = 22 * 60;
+class DayMode {
+  const DayMode({
+    required this.id,
+    required this.emoji,
+    required this.label,
+    this.isPro = false,
+  });
+
+  final String id;
+  final String emoji;
+  final String label;
+
+  /// Pro modes show a small PRO badge in the chip.
+  final bool isPro;
+}
+
+/// Full ordered list of modes — base modes first, Student, then Pro variants.
+/// Keys must match the `modeAdviceMap` entries at the bottom of this file.
+const List<DayMode> allDayModes = <DayMode>[
+  DayMode(id: 'normal',           emoji: '🙂', label: 'Normal'),
+  DayMode(id: 'athletic',         emoji: '🏃', label: 'Athletic'),
+  DayMode(id: 'gym',              emoji: '🏋️', label: 'Gym'),
+  DayMode(id: 'office',           emoji: '💼', label: 'Office'),
+  DayMode(id: 'nicotine_free',    emoji: '🚭', label: 'Nicotine Free'),
+  DayMode(id: 'student',          emoji: '📚', label: 'Student'),
+  DayMode(id: 'normal_pro',       emoji: '🙂', label: 'Normal Pro',       isPro: true),
+  DayMode(id: 'athletic_pro',     emoji: '🏃', label: 'Athletic Pro',     isPro: true),
+  DayMode(id: 'gym_pro',          emoji: '🏋️', label: 'Gym Pro',          isPro: true),
+  DayMode(id: 'office_pro',       emoji: '💼', label: 'Office Pro',       isPro: true),
+  DayMode(id: 'nicotine_free_pro',emoji: '🚭', label: 'Quit Pro',         isPro: true),
+];
+
+/// User's target wake time in minutes — driven by [SleepScheduleStore].
+int get homeDayWakeMinutes => _scheduleStore.wakeMinutes;
+
+/// User's target sleep time in minutes — driven by [SleepScheduleStore].
+int get homeDaySleepMinutes => _scheduleStore.sleepMinutes;
 
 /// A 1–2 hour window in the waking day.
 class TimeSlot {
@@ -456,19 +497,402 @@ const List<ModeAdvice> _nicotineFree = <ModeAdvice>[
 ];
 
 // ═════════════════════════════════════════════════════════════════════════
+//                             Mode: STUDENT
+// ═════════════════════════════════════════════════════════════════════════
+
+const List<ModeAdvice> _student = <ModeAdvice>[
+  // 09–11
+  ModeAdvice(
+    recommendation: 'Hardest subject first. Your brain is sharpest right now.',
+    attribution: '— your study peak',
+    crowd: '📖 Deep focus',
+    tip: '🧠 Peak retention — shut all notifications',
+    history: '1687 · Newton wrote Principia in total isolation',
+  ),
+  // 11–13
+  ModeAdvice(
+    recommendation: 'Teach it back. If you can\'t explain it, you don\'t know it.',
+    attribution: '— your recall block',
+    crowd: '✏️ Active recall',
+    tip: '✏️ Active recall beats re-reading 3× over',
+    history: '1905 · Einstein wrote 4 landmark papers in one year',
+  ),
+  // 13–15
+  ModeAdvice(
+    recommendation: 'Eat, walk, skim. Don\'t study hard during the post-lunch dip.',
+    attribution: '— your recharge',
+    crowd: '🍱 Lunch break',
+    tip: '😴 20-min nap now — memory consolidates in sleep',
+    history: '1453 · Gutenberg\'s press cut the cost of study',
+  ),
+  // 15–17
+  ModeAdvice(
+    recommendation: 'New material or group work. Fresh eyes handle complex ideas.',
+    attribution: '— your afternoon block',
+    crowd: '👥 Group study',
+    tip: '📊 Interleave subjects — fights the forgetting curve',
+    history: '1636 · Harvard founded to push new learning forward',
+  ),
+  // 17–19
+  ModeAdvice(
+    recommendation: 'Move your body. A 20-minute walk doubles afternoon retention.',
+    attribution: '— your brain break',
+    crowd: '🚶 Decompressing',
+    tip: '🏃 Exercise before revision = +20% next-day recall',
+    history: '1768 · First Encyclopaedia Britannica published',
+  ),
+  // 19–21
+  ModeAdvice(
+    recommendation: 'Spaced repetition. Tonight\'s review is tomorrow\'s memory.',
+    attribution: '— your revision hour',
+    crowd: '🃏 Flashcards',
+    tip: '🗂 Review: 1h later, 1 day, 1 week — that\'s the curve',
+    history: '1885 · Ebbinghaus first mapped the forgetting curve',
+  ),
+  // 21–22
+  ModeAdvice(
+    recommendation: 'Write tomorrow\'s first task. Then close the books for good.',
+    attribution: '— your study close',
+    crowd: '🌙 Wrap up',
+    tip: '📒 Sleep cements today\'s learning — protect it',
+    history: '1956 · Miller published "The Magical Number 7"',
+  ),
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+//                           Mode: NORMAL PRO
+// ═════════════════════════════════════════════════════════════════════════
+
+const List<ModeAdvice> _normalPro = <ModeAdvice>[
+  // 09–11
+  ModeAdvice(
+    recommendation: 'Cortisol peaks at 9 AM. Use the stress hormone — don\'t fight it.',
+    attribution: '— your neuroscience morning',
+    crowd: '🔬 Peak cortisol',
+    tip: '⏰ Delay caffeine 90 min post-wake for best effect',
+    history: '1958 · NASA designed peak-performance daily schedules',
+  ),
+  // 11–13
+  ModeAdvice(
+    recommendation: 'Decision fatigue starts now. Clear shallow work, not your mind.',
+    attribution: '— your mid-morning',
+    crowd: '🗣 Collaboration',
+    tip: '🧠 Spend high willpower only on key decisions',
+    history: '1995 · Baumeister first coined "decision fatigue"',
+  ),
+  // 13–15
+  ModeAdvice(
+    recommendation: 'Post-lunch dip is biology. A nap here beats two coffees.',
+    attribution: '— your dip window',
+    crowd: '😴 Recovery dip',
+    tip: '🛌 10-min nap — set alarm to avoid sleep inertia',
+    history: '500 BC · Aristotle napped holding a key over a bowl',
+  ),
+  // 15–17
+  ModeAdvice(
+    recommendation: 'Cognitive rebound. Use it for creative or deep analytical work.',
+    attribution: '— your second peak',
+    crowd: '💡 Creative work',
+    tip: '🎨 Afternoon = right-brain mode is unlocked',
+    history: '1935 · Graham Wallas mapped the four stages of creativity',
+  ),
+  // 17–19
+  ModeAdvice(
+    recommendation: 'Body temperature peaks. Reaction time is at its fastest now.',
+    attribution: '— your physical peak',
+    crowd: '🏃 Exercise',
+    tip: '⚡ Personal-best attempts belong in this window',
+    history: '1984 · USOC studied time-of-day performance gains',
+  ),
+  // 19–21
+  ModeAdvice(
+    recommendation: 'Parasympathetic mode on. Digest, connect, restore.',
+    attribution: '— your recovery phase',
+    crowd: '🏡 Family & rest',
+    tip: '💬 Deep conversations measurably lower cortisol',
+    history: '1970s · Cardiologists defined HRV as recovery marker',
+  ),
+  // 21–22
+  ModeAdvice(
+    recommendation: 'Melatonin rising. Blue light now costs 45 min of deep sleep.',
+    attribution: '— your circadian prep',
+    crowd: '🌙 Sleep onset',
+    tip: '🕯 Dim lights + 18 °C room = faster sleep onset',
+    history: '1980 · Lewy discovered the light–melatonin link',
+  ),
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+//                          Mode: ATHLETIC PRO
+// ═════════════════════════════════════════════════════════════════════════
+
+const List<ModeAdvice> _athleticPro = <ModeAdvice>[
+  // 09–11
+  ModeAdvice(
+    recommendation: 'Periodize, don\'t improvise. Know your training block for today.',
+    attribution: '— your periodization',
+    crowd: '📋 Block planning',
+    tip: '🗓 Base → build → peak → taper — know your phase',
+    history: '1952 · Matveyev formalised periodization theory',
+  ),
+  // 11–13
+  ModeAdvice(
+    recommendation: 'Zone 4–5 work. Push the VO₂ ceiling, not the floor.',
+    attribution: '— your intensity block',
+    crowd: '🔥 High intensity',
+    tip: '❤️ 170–185 bpm is your Zone 4 territory',
+    history: '1976 · Åstrand standardised VO₂ max measurement',
+  ),
+  // 13–15
+  ModeAdvice(
+    recommendation: 'Carb + protein within 30 minutes. The anabolic window is real.',
+    attribution: '— your fueling window',
+    crowd: '🍚 Precision refuel',
+    tip: '📐 4:1 carb-to-protein ratio after high intensity',
+    history: '1967 · Karlsson first mapped glycogen depletion rates',
+  ),
+  // 15–17
+  ModeAdvice(
+    recommendation: 'Technical skills need a fresher CNS than you might think.',
+    attribution: '— your skill block',
+    crowd: '🎯 Technical drills',
+    tip: '🧠 Motor learning peaks ~6h after your warm-up',
+    history: '1967 · Fitts\'s Law of motor skill acquisition',
+  ),
+  // 17–19
+  ModeAdvice(
+    recommendation: 'Zone 2 recovery run. Aerobic base compounds every single day.',
+    attribution: '— your base build',
+    crowd: '🏃 Zone 2',
+    tip: '💓 Keep HR 120–145 bpm — you should be able to talk',
+    history: '2007 · Iñigo San Millán popularised Zone 2 training',
+  ),
+  // 19–21
+  ModeAdvice(
+    recommendation: 'Cold, contrast, or compression. Choose one recovery tool.',
+    attribution: '— your recovery stack',
+    crowd: '🧊 Recovery',
+    tip: '🌡 Cold 10 min → warm 10 min — repeat 3 rounds',
+    history: '1978 · Jones published the first DOMS mechanisms paper',
+  ),
+  // 21–22
+  ModeAdvice(
+    recommendation: 'Log HRV. Low tomorrow = pull back. High = push hard.',
+    attribution: '— your readiness check',
+    crowd: '📊 HRV & sleep',
+    tip: '📱 HRV drop > 10% = scheduled deload or full rest',
+    history: '1973 · Ewing mapped HRV relationship with training load',
+  ),
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+//                            Mode: GYM PRO
+// ═════════════════════════════════════════════════════════════════════════
+
+const List<ModeAdvice> _gymPro = <ModeAdvice>[
+  // 09–11
+  ModeAdvice(
+    recommendation: 'RPE 3 warm-up. Prime the CNS properly before you load the bar.',
+    attribution: '— your CNS activation',
+    crowd: '⚡ CNS priming',
+    tip: '🔁 Potentiation set: 30% × 8 before your working sets',
+    history: '1980 · Zatsiorsky defined maximum strength methods',
+  ),
+  // 11–13
+  ModeAdvice(
+    recommendation: 'Progressive overload is the only rule. One more rep or 2.5 kg.',
+    attribution: '— your strength block',
+    crowd: '🏋️ Working sets',
+    tip: '📈 Linear: add 2.5 kg weekly on main compound lifts',
+    history: '1945 · DeLorme published Progressive Resistance Exercise',
+  ),
+  // 13–15
+  ModeAdvice(
+    recommendation: 'Leucine triggers MPS. Get at least 3g in your post-workout meal.',
+    attribution: '— your MPS window',
+    crowd: '🍳 Muscle synthesis',
+    tip: '🥩 Leucine threshold: 40g chicken or three whole eggs',
+    history: '1998 · Norton established the leucine threshold model',
+  ),
+  // 15–17
+  ModeAdvice(
+    recommendation: '2 RIR on every set. Growth happens at the edge, not past it.',
+    attribution: '— your volume block',
+    crowd: '💪 Hypertrophy',
+    tip: '📏 2 reps in reserve = optimal hypertrophy stimulus',
+    history: '2001 · Krieger published the volume dose-response study',
+  ),
+  // 17–19
+  ModeAdvice(
+    recommendation: 'Zone 2 cardio protects the heart without stealing muscle.',
+    attribution: '— your cardio boundary',
+    crowd: '❤️ Conditioning',
+    tip: '🚴 Low-intensity cardio: zero muscle interference at this dose',
+    history: '1990 · Hickson studied interference effect limits',
+  ),
+  // 19–21
+  ModeAdvice(
+    recommendation: 'Myofascial release + protein. Two simultaneous repair signals.',
+    attribution: '— your repair block',
+    crowd: '🧘 Recovery',
+    tip: '🫙 Casein shake + foam roll = the optimal repair combo',
+    history: '1977 · Rolf Institute formalised myofascial release work',
+  ),
+  // 21–22
+  ModeAdvice(
+    recommendation: 'Growth hormone surges in slow-wave sleep. Earn the sleep.',
+    attribution: '— your anabolic night',
+    crowd: '💤 Anabolic sleep',
+    tip: '😴 GH peaks ~1h after sleep onset — protect that window',
+    history: '1963 · Takahashi documented the GH–sleep link',
+  ),
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+//                           Mode: OFFICE PRO
+// ═════════════════════════════════════════════════════════════════════════
+
+const List<ModeAdvice> _officePro = <ModeAdvice>[
+  // 09–11
+  ModeAdvice(
+    recommendation: 'Maker time. No meetings before noon — protect it fiercely.',
+    attribution: '— your maker schedule',
+    crowd: '🔕 Zero interrupts',
+    tip: '🎧 Deep work: no Slack, one tab, one task',
+    history: '2009 · Paul Graham wrote "Maker\'s Schedule, Manager\'s Schedule"',
+  ),
+  // 11–13
+  ModeAdvice(
+    recommendation: 'Batch your decisions here. Willpower is highest before lunch.',
+    attribution: '— your decision peak',
+    crowd: '⚖️ Key decisions',
+    tip: '🧠 Save peak willpower for your two highest-stakes calls',
+    history: '2011 · Danziger\'s judge study proved decision fatigue',
+  ),
+  // 13–15
+  ModeAdvice(
+    recommendation: 'Strategic lunch. A 10-minute walk gives you a 20% sharper 3 PM.',
+    attribution: '— your tactical break',
+    crowd: '🚶 Recovery walk',
+    tip: '☀️ Outdoor lunch = melatonin reset + measurable mood lift',
+    history: '1920 · Henry Ford introduced the 8-hour workday',
+  ),
+  // 15–17
+  ModeAdvice(
+    recommendation: 'Manager tasks now. Meetings, reviews, replies — none need peak brain.',
+    attribution: '— your manager schedule',
+    crowd: '📧 Admin mode',
+    tip: '📬 Batch all emails twice a day — once right now',
+    history: '1956 · Parkinson\'s Law published in The Economist',
+  ),
+  // 17–19
+  ModeAdvice(
+    recommendation: 'Shutdown ritual. Define "done", log the wins, set tomorrow\'s one thing.',
+    attribution: '— your shutdown ritual',
+    crowd: '🔒 Close-out',
+    tip: '📋 3 wins + top task for tomorrow = zero morning drag',
+    history: '1990 · Newport coined the "shutdown complete" ritual',
+  ),
+  // 19–21
+  ModeAdvice(
+    recommendation: 'Detach fully. The brain sorts unsolved problems during genuine downtime.',
+    attribution: '— your incubation phase',
+    crowd: '🏡 True rest',
+    tip: '🧩 Hard problems often solve themselves in rest mode',
+    history: '1926 · Wallas named incubation the third stage of creativity',
+  ),
+  // 21–22
+  ModeAdvice(
+    recommendation: 'Pre-mortem tomorrow. Name the one thing that must not fail.',
+    attribution: '— your strategic wind-down',
+    crowd: '📝 Pre-mortem',
+    tip: '🎯 Clear top task → zero decision cost at tomorrow\'s start',
+    history: '1989 · Klein developed the pre-mortem technique',
+  ),
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+//                        Mode: NICOTINE FREE PRO
+// ═════════════════════════════════════════════════════════════════════════
+
+const List<ModeAdvice> _nicotineFreePro = <ModeAdvice>[
+  // 09–11
+  ModeAdvice(
+    recommendation: 'HALT check — Hungry, Angry, Lonely, Tired? Fix the real need first.',
+    attribution: '— your craving root',
+    crowd: '🛡 HALT check',
+    tip: '🔎 A craving = an unmet need. Name it precisely.',
+    history: '1970 · HALT model emerged from addiction counselling',
+  ),
+  // 11–13
+  ModeAdvice(
+    recommendation: 'Urge surfing: ride the wave, don\'t wrestle it. Peak lasts 3 minutes.',
+    attribution: '— your urge window',
+    crowd: '🌊 Urge surf',
+    tip: '⏱ Peak craving = 3 min max — breathe through the whole thing',
+    history: '1994 · Marlatt and colleagues developed urge surfing',
+  ),
+  // 13–15
+  ModeAdvice(
+    recommendation: 'Stable blood sugar is your secret weapon. Spikes mimic nicotine cues.',
+    attribution: '— your metabolic anchor',
+    crowd: '🍎 Stable glucose',
+    tip: '🥗 Low-GI lunch → fewer false craving signals this afternoon',
+    history: '1977 · Hughes first linked nicotine and blood glucose',
+  ),
+  // 15–17
+  ModeAdvice(
+    recommendation: 'Reward the milestone. Your quit bank grows every waking hour.',
+    attribution: '— your reward anchor',
+    crowd: '🏆 Reward',
+    tip: '💰 Calculate money saved and keep it visible today',
+    history: '2003 · NRT studies doubled 12-month quit rates',
+  ),
+  // 17–19
+  ModeAdvice(
+    recommendation: 'Dopamine reset: exercise fires the same pathways nicotine hijacked.',
+    attribution: '— your dopamine repair',
+    crowd: '🏃 Dopamine run',
+    tip: '🧬 20-min run = nicotine-equivalent dopamine release',
+    history: '2002 · Volkow mapped dopamine pathways in addiction',
+  ),
+  // 19–21
+  ModeAdvice(
+    recommendation: 'Social triggers are set-ups. Sit differently. Hold your drink. Leave briefly.',
+    attribution: '— your trigger shield',
+    crowd: '🛡 Social shield',
+    tip: '🔄 Cue → routine → reward. Break the routine first.',
+    history: '2012 · Duhigg\'s The Power of Habit published',
+  ),
+  // 21–22
+  ModeAdvice(
+    recommendation: 'Another day banked. Sleep cements the quit-behaviour pathways.',
+    attribution: '— your daily win',
+    crowd: '💤 Win banked',
+    tip: '😴 Sleep quality = top predictor of next-day quit success',
+    history: '2014 · Sleep quality was linked to quit success rates',
+  ),
+];
+
+// ═════════════════════════════════════════════════════════════════════════
 //                       Register all modes here
 // ═════════════════════════════════════════════════════════════════════════
 //
-// One line per mode. Keys must match the mode ids in `home_tab_page.dart`'s
-// `_dayModes` list. Add a mode → add one line. Remove a mode → remove one.
+// One line per mode. Keys must match DayMode.id values in `allDayModes`.
 
 const Map<String, List<ModeAdvice>> modeAdviceMap =
     <String, List<ModeAdvice>>{
-  'normal': _normal,
-  'athletic': _athletic,
-  'gym': _gym,
-  'office': _office,
-  'nicotine_free': _nicotineFree,
+  'normal':            _normal,
+  'athletic':          _athletic,
+  'gym':               _gym,
+  'office':            _office,
+  'nicotine_free':     _nicotineFree,
+  'student':           _student,
+  'normal_pro':        _normalPro,
+  'athletic_pro':      _athleticPro,
+  'gym_pro':           _gymPro,
+  'office_pro':        _officePro,
+  'nicotine_free_pro': _nicotineFreePro,
 };
 
 /// Safe lookup: falls back to 'normal' if a mode id has no curated data
