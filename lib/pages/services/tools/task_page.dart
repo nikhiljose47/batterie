@@ -45,14 +45,6 @@ const remindersConfig = TaskConfig(
       'due. OS notifications can be added as a next step.',
 );
 
-const plannerConfig = TaskConfig(
-  id: 'daily_planner',
-  title: '🗓️ Daily Planner',
-  addHint: 'Block — "Deep work", "Gym"…',
-  withTime: true,
-  todayOnly: true,
-);
-
 class TaskToolPage extends StatefulWidget {
   const TaskToolPage({super.key, required this.config});
   final TaskConfig config;

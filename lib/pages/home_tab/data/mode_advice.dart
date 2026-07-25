@@ -1,3 +1,4 @@
+import '../../../services/custom_mode_store.dart';
 import '../../../services/sleep_schedule_store.dart';
 
 // Short alias so the getters below read cleanly.
@@ -76,7 +77,12 @@ const List<DayMode> allDayModes = <DayMode>[
   DayMode(id: 'gym_pro',          emoji: '🏋️', label: 'Gym Pro',          isPro: true),
   DayMode(id: 'office_pro',       emoji: '💼', label: 'Office Pro',       isPro: true),
   DayMode(id: 'nicotine_free_pro',emoji: '🚭', label: 'Quit Pro',         isPro: true),
+  DayMode(id: 'custom',           emoji: '✨', label: 'Custom'),
 ];
+
+/// Marker id — picking this mode should send the user to the Daily Planner
+/// service to fill in their own per-slot advice.
+const String customModeId = 'custom';
 
 /// User's target wake time in minutes — driven by [SleepScheduleStore].
 int get homeDayWakeMinutes => _scheduleStore.wakeMinutes;
@@ -84,25 +90,37 @@ int get homeDayWakeMinutes => _scheduleStore.wakeMinutes;
 /// User's target sleep time in minutes — driven by [SleepScheduleStore].
 int get homeDaySleepMinutes => _scheduleStore.sleepMinutes;
 
-/// A 1–2 hour window in the waking day.
+/// A window in the waking day. Stored in minutes since midnight so the
+/// slots can shift with the user's wake / sleep target without losing
+/// precision at non-hour boundaries.
 class TimeSlot {
-  const TimeSlot({required this.startHour, required this.endHour});
+  const TimeSlot({required this.startMinutes, required this.endMinutes});
 
-  final int startHour;
-  final int endHour;
+  /// Convenience for legacy call sites that reason in whole hours.
+  const TimeSlot.hours({required int startHour, required int endHour})
+      : startMinutes = startHour * 60,
+        endMinutes = endHour * 60;
+
+  final int startMinutes;
+  final int endMinutes;
+
+  int get startHour => startMinutes ~/ 60;
+  int get endHour => endMinutes ~/ 60;
 
   bool contains(int minutes) =>
-      minutes >= startHour * 60 && minutes < endHour * 60;
+      minutes >= startMinutes && minutes < endMinutes;
 
   String get rangeLabel {
-    String h(int v) {
-      final hr = v % 24;
-      if (hr == 0) return '12 AM';
-      if (hr == 12) return '12 PM';
-      return hr < 12 ? '$hr AM' : '${hr - 12} PM';
+    String fmt(int m) {
+      final hr24 = (m ~/ 60) % 24;
+      final min = m % 60;
+      final hr12 = hr24 == 0 ? 12 : (hr24 > 12 ? hr24 - 12 : hr24);
+      final period = hr24 < 12 ? 'AM' : 'PM';
+      if (min == 0) return '$hr12 $period';
+      return '$hr12:${min.toString().padLeft(2, '0')} $period';
     }
 
-    return '${h(startHour)} – ${h(endHour)}';
+    return '${fmt(startMinutes)} – ${fmt(endMinutes)}';
   }
 }
 
@@ -169,17 +187,74 @@ const WakeSleepCopy sleepCardContent = WakeSleepCopy(
 //                              Time slots
 // ═════════════════════════════════════════════════════════════════════════
 //
-// Order matters — every mode's advice list uses these indices.
+// Order matters — every mode's advice list uses these indices. The list is
+// computed on demand from the user's wake / sleep window so shifting either
+// end re-labels every planner card, the daily-planner editor, and the home
+// scrollbar together.
 
-const List<TimeSlot> plannerSlots = <TimeSlot>[
-  TimeSlot(startHour: 9, endHour: 11), // 0 · 09–11
-  TimeSlot(startHour: 11, endHour: 13), // 1 · 11–13
-  TimeSlot(startHour: 13, endHour: 15), // 2 · 13–15
-  TimeSlot(startHour: 15, endHour: 17), // 3 · 15–17
-  TimeSlot(startHour: 17, endHour: 19), // 4 · 17–19
-  TimeSlot(startHour: 19, endHour: 21), // 5 · 19–21
-  TimeSlot(startHour: 21, endHour: 22), // 6 · 21–22
-];
+/// Number of slots in the day. Kept as a compile-time constant so the
+/// per-mode advice lists (which are `const`) stay in sync with the layout.
+const int kSlotCount = 7;
+
+/// Minutes reserved after wake for the "wake" card (breakfast, sunlight,
+/// morning routine). The first planner slot begins at [wake + this].
+const int kWakeBufferMinutes = 120;
+
+/// True when [nowMinutes] falls inside the wake-card window
+/// (right after wake, before the first planner slot).
+bool isWakeWindow(num nowMinutes) {
+  final wake = homeDayWakeMinutes;
+  return nowMinutes >= wake && nowMinutes < wake + kWakeBufferMinutes;
+}
+
+/// True when [nowMinutes] is either before wake (previous night still
+/// carrying over) or at/after sleep — i.e. the sleep card is current.
+bool isSleepWindow(num nowMinutes) {
+  return nowMinutes < homeDayWakeMinutes || nowMinutes >= homeDaySleepMinutes;
+}
+
+/// Live-computed planner slots — divides the current
+/// [wake + kWakeBufferMinutes → sleep] window evenly into [kSlotCount]
+/// pieces, rounded to 15-minute boundaries so labels stay tidy. The last
+/// slot absorbs any rounding remainder so it always ends exactly at sleep.
+List<TimeSlot> get plannerSlots {
+  final wake = homeDayWakeMinutes;
+  final sleep = homeDaySleepMinutes;
+  final start = wake + kWakeBufferMinutes;
+  final total = sleep > start ? sleep - start : 60 * 12; // sane fallback
+  const step = 15;
+  final rawSlot = total ~/ kSlotCount;
+  final slotMinutes = (rawSlot ~/ step) * step;
+  final base = slotMinutes < step ? step : slotMinutes;
+
+  final slots = <TimeSlot>[];
+  var cursor = start;
+  for (var i = 0; i < kSlotCount - 1; i++) {
+    slots.add(TimeSlot(
+      startMinutes: cursor,
+      endMinutes: cursor + base,
+    ));
+    cursor += base;
+  }
+  slots.add(TimeSlot(startMinutes: cursor, endMinutes: sleep));
+  return slots;
+}
+
+/// Formatted "6:00 AM" for the current wake target.
+String get wakeTimeLabel {
+  final t = _scheduleStore.wakeTime.value;
+  final h12 = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
+  final m = t.minute.toString().padLeft(2, '0');
+  return '$h12:$m ${t.hour < 12 ? 'AM' : 'PM'}';
+}
+
+/// Formatted "10:00 PM" for the current sleep target.
+String get sleepTimeLabel {
+  final t = _scheduleStore.sleepTime.value;
+  final h12 = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
+  final m = t.minute.toString().padLeft(2, '0');
+  return '$h12:$m ${t.hour < 12 ? 'AM' : 'PM'}';
+}
 
 // ═════════════════════════════════════════════════════════════════════════
 //                              Mode: NORMAL
@@ -897,7 +972,25 @@ const Map<String, List<ModeAdvice>> modeAdviceMap =
 
 /// Safe lookup: falls back to 'normal' if a mode id has no curated data
 /// yet, so a new dropdown entry can never crash the planner.
+/// For the special [customModeId], reads live from [CustomModeStore] and
+/// falls back per-slot to the normal advice for any blank entries.
 List<ModeAdvice> adviceForMode(String modeId) {
+  if (modeId == customModeId) {
+    final slots = CustomModeStore.instance.slots.value;
+    final fallback = modeAdviceMap['normal']!;
+    return List<ModeAdvice>.generate(fallback.length, (i) {
+      final s = i < slots.length ? slots[i] : const CustomSlot();
+      final base = fallback[i];
+      return ModeAdvice(
+        recommendation:
+            s.recommendation.isNotEmpty ? s.recommendation : base.recommendation,
+        attribution: '— your plan',
+        crowd: s.crowd.isNotEmpty ? s.crowd : base.crowd,
+        tip: s.tip.isNotEmpty ? s.tip : base.tip,
+        history: base.history,
+      );
+    });
+  }
   return modeAdviceMap[modeId] ?? modeAdviceMap['normal']!;
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../models/weather.dart';
 import '../../repositories/weather_repository.dart';
@@ -90,6 +91,32 @@ class WeatherController extends ChangeNotifier {
       clearError: true,
     ));
     await _fetch();
+  }
+
+  /// Called when the user taps the location chip while permission is denied.
+  /// Shows the OS dialog first; only fetches if permission is granted.
+  Future<void> requestPermissionAndLoad() async {
+    _emit(_state.copyWith(status: WeatherStatus.loading, clearError: true));
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _emit(_state.copyWith(status: WeatherStatus.permissionDeniedForever));
+        return;
+      }
+      if (permission == LocationPermission.denied) {
+        _emit(_state.copyWith(status: WeatherStatus.permissionDenied));
+        return;
+      }
+      await _fetch();
+    } catch (e) {
+      _emit(_state.copyWith(
+        status: WeatherStatus.error,
+        errorMessage: e.toString(),
+      ));
+    }
   }
 
   Future<void> _fetch() async {

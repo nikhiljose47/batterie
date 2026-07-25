@@ -7,9 +7,9 @@ import 'package:lottie/lottie.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
-import '../../models/logged_activity.dart';
 import '../../services/sleep_schedule_store.dart';
 import '../profile/profile_store.dart';
+import '../services/tools/sleep_page.dart';
 import '../weather/weather_controller.dart';
 import 'data/mode_advice.dart';
 import 'widgets/planner_section.dart';
@@ -42,6 +42,10 @@ class _HomeTabPageState extends State<HomeTabPage> {
       const Duration(seconds: 20),
       (_) => setState(() {}),
     );
+    // Rebuild whenever the user edits wake/sleep on the sleep tracker page,
+    // so the tube endpoints, fill, and planner cards reflect it immediately.
+    SleepScheduleStore.instance.wakeTime.addListener(_onScheduleChanged);
+    SleepScheduleStore.instance.sleepTime.addListener(_onScheduleChanged);
     _ownsWeatherController = widget.weatherController == null;
     _weatherController = widget.weatherController ?? WeatherController();
     if (_ownsWeatherController) _weatherController.load();
@@ -50,14 +54,59 @@ class _HomeTabPageState extends State<HomeTabPage> {
   @override
   void dispose() {
     _ticker?.cancel();
+    SleepScheduleStore.instance.wakeTime.removeListener(_onScheduleChanged);
+    SleepScheduleStore.instance.sleepTime.removeListener(_onScheduleChanged);
     if (_ownsWeatherController) _weatherController.dispose();
     super.dispose();
+  }
+
+  void _onScheduleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openSleepEditor() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const SleepPage()),
+    );
+    // Schedule listener already fires on save; force one more setState in
+    // case the user made no changes but the widget was rebuilt.
+    if (mounted) setState(() {});
   }
 
   /// Fractional minutes since midnight, so the fill creeps smoothly.
   double get _nowMinutes {
     final now = DateTime.now();
     return now.hour * 60 + now.minute + now.second / 60.0;
+  }
+
+  static const List<String> _weekdayAbbr = <String>[
+    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+  ];
+  static const List<String> _monthAbbr = <String>[
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// e.g. "Fri, 24 Jul 2026" — the weekday, date, and year for the header.
+  String get _todayLabel {
+    final n = DateTime.now();
+    return '${_weekdayAbbr[n.weekday - 1]}, '
+        '${n.day} ${_monthAbbr[n.month - 1]} ${n.year}';
+  }
+
+  /// A friendly phrase for the current time. Schedule-aware: says "Sleep
+  /// time" during the user's off-hours and "Just woke up" during the wake
+  /// buffer; falls back to clock-based phrases the rest of the day.
+  String _timeOfDayPhrase(int minutes) {
+    if (isSleepWindow(minutes)) return 'Sleep time';
+    if (isWakeWindow(minutes)) return 'Just woke up';
+    final h = (minutes ~/ 60) % 24;
+    if (h < 11) return 'Morning';
+    if (h < 13) return 'Midday';
+    if (h < 16) return 'Afternoon';
+    if (h < 18) return 'Late afternoon';
+    if (h < 21) return 'Evening';
+    return 'Night';
   }
 
   @override
@@ -92,39 +141,11 @@ class _HomeTabPageState extends State<HomeTabPage> {
   }
 
   Widget _buildDayCard(BuildContext context) {
-    return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFFF7FBF8),
-              Color(0xFFFEFAEC),
-              Color(0xFFFDF4E4),
-              Color(0xFFF2EAE2),
-            ],
-            stops: <double>[0.0, 0.4, 0.7, 1.0],
-          ),
-          // Glass shell: bright hairline like light catching a frosted edge.
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.9),
-            width: 1.2,
-          ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: const Color(0xFF8B7355).withValues(alpha: 0.10),
-              blurRadius: 18,
-              spreadRadius: -6,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Padding(
+    return Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xLarge,
-            AppSpacing.medium,
-            AppSpacing.xLarge,
+            AppSpacing.small,
+            AppSpacing.xSmall,
+            AppSpacing.small,
             AppSpacing.small,
           ),
           child: Column(
@@ -157,20 +178,24 @@ class _HomeTabPageState extends State<HomeTabPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              formatMinutes(_nowMinutes.floor()),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black.withValues(alpha: 0.55),
-                                letterSpacing: 0.2,
+                            Flexible(
+                              child: Text(
+                                _todayLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  letterSpacing: 0.2,
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          _modeLabelOf(_modeId).toUpperCase(),
+                          _timeOfDayPhrase(_nowMinutes.floor()).toUpperCase(),
                           style: const TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
@@ -181,9 +206,10 @@ class _HomeTabPageState extends State<HomeTabPage> {
                       ],
                     ),
                   ),
-                  _ModeDropdown(
-                    modeId: _modeId,
-                    onChanged: (id) => setState(() => _modeId = id),
+                  _SleepEditButton(
+                    wake: SleepScheduleStore.instance.wakeTime.value,
+                    sleep: SleepScheduleStore.instance.sleepTime.value,
+                    onTap: _openSleepEditor,
                   ),
                 ],
               ),
@@ -198,78 +224,69 @@ class _HomeTabPageState extends State<HomeTabPage> {
               ),
             ],
           ),
-        ),
-    );
+        );
   }
-
-  String _modeLabelOf(String id) =>
-      allDayModes.firstWhere((m) => m.id == id).label;
 }
 
-// ── Mode dropdown ─────────────────────────────────────────────────────────
+// ── Sleep-edit shortcut ───────────────────────────────────────────────────
 
-class _ModeDropdown extends StatelessWidget {
-  const _ModeDropdown({required this.modeId, required this.onChanged});
+/// Compact "wake → sleep" pill with an edit icon. Tapping it opens the sleep
+/// tracker, where the user can adjust their schedule; when they return, the
+/// home-tab listener rebuilds the tube against the new times.
+class _SleepEditButton extends StatelessWidget {
+  const _SleepEditButton({
+    required this.wake,
+    required this.sleep,
+    required this.onTap,
+  });
 
-  final String modeId;
-  final ValueChanged<String> onChanged;
+  final TimeOfDay wake;
+  final TimeOfDay sleep;
+  final VoidCallback onTap;
+
+  String _fmt(TimeOfDay t) {
+    final h = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
+    return t.hour < 12 ? '${h}A' : '${h}P';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final selected = allDayModes.firstWhere((m) => m.id == modeId);
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.75),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: AppColors.outline.withValues(alpha: 0.7),
-          width: 0.8,
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: modeId,
-          isDense: true,
-          alignment: Alignment.center,
-          borderRadius: BorderRadius.circular(14),
-          icon: const Padding(
-            padding: EdgeInsets.only(left: 2),
-            child: Icon(Icons.keyboard_arrow_down_rounded,
-                size: 16, color: AppColors.primary),
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: AppColors.outline.withValues(alpha: 0.7),
+              width: 0.8,
+            ),
           ),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                '${_fmt(wake)} → ${_fmt(sleep)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.edit_outlined,
+                size: 14,
+                color: AppColors.primary,
+              ),
+            ],
           ),
-          selectedItemBuilder: (context) => allDayModes
-              .map(
-                (m) => Center(
-                  child: Text(
-                    '${m.emoji} ${m.label}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          items: allDayModes
-              .map(
-                (m) => DropdownMenuItem<String>(
-                  value: m.id,
-                  child: Text('${m.emoji} ${m.label}'),
-                ),
-              )
-              .toList(),
-          onChanged: (id) {
-            if (id != null) onChanged(id);
-          },
-          hint: Text('${selected.emoji} ${selected.label}'),
         ),
       ),
     );
@@ -337,19 +354,27 @@ class _DayTubeState extends State<_DayTube>
   int get _wakeMinutes => SleepScheduleStore.instance.wakeMinutes;
   int get _sleepMinutes => SleepScheduleStore.instance.sleepMinutes;
 
+  /// Fill/avatar position along the tube.
+  /// Daytime  (wake ≤ now < sleep)      → linear (now − wake) / (sleep − wake)
+  /// Nighttime, first half              → 1.0 (parked at the sleep box)
+  /// Nighttime, second half             → 0.0 (parked at the wake box)
   double get _progress {
-    final t = (widget.nowMinutes - _wakeMinutes) /
-        (_sleepMinutes - _wakeMinutes);
-    return t.clamp(0.0, 1.0);
+    final now = widget.nowMinutes;
+    final wake = _wakeMinutes.toDouble();
+    final sleep = _sleepMinutes.toDouble();
+
+    if (now >= wake && now < sleep) {
+      return ((now - wake) / (sleep - wake)).clamp(0.0, 1.0);
+    }
+
+    // Night — from sleep → wake next day, crossing midnight.
+    final nightDuration = 1440 - sleep + wake;
+    final into = now >= sleep ? (now - sleep) : (1440 - sleep + now);
+    return into < nightDuration / 2 ? 1.0 : 0.0;
   }
 
-  bool get _isWakeCurrent =>
-      widget.nowMinutes >= _wakeMinutes &&
-      widget.nowMinutes < _wakeMinutes + 3 * 60;
-
-  bool get _isSleepCurrent =>
-      widget.nowMinutes < _wakeMinutes ||
-      widget.nowMinutes >= _sleepMinutes;
+  bool get _isWakeCurrent => isWakeWindow(widget.nowMinutes);
+  bool get _isSleepCurrent => isSleepWindow(widget.nowMinutes);
 
   @override
   Widget build(BuildContext context) {
@@ -725,7 +750,9 @@ class _DayTubePainter extends CustomPainter {
   @override
   bool shouldRepaint(_DayTubePainter oldDelegate) =>
       oldDelegate.progress != progress ||
-      oldDelegate.flowPhase != flowPhase;
+      oldDelegate.flowPhase != flowPhase ||
+      oldDelegate.wakeMinutes != wakeMinutes ||
+      oldDelegate.sleepMinutes != sleepMinutes;
 }
 
 /// A small square box anchored at [left],[top] that sits at the tube's

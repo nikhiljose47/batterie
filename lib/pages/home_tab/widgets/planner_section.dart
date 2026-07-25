@@ -1,6 +1,8 @@
+import 'dart:math' show cos, pi, sin;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:lottie/lottie.dart';
+
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
@@ -8,7 +10,10 @@ import '../../../engine/energy_score_engine.dart';
 import '../../../models/energy_log_record.dart';
 import '../../../models/logged_activity.dart';
 import '../../../models/weather.dart';
+import '../../../services/custom_mode_store.dart';
 import '../../../services/energy_log_store.dart';
+import '../../profile/profile_store.dart';
+import '../../services/services_page.dart';
 import '../../weather/weather_controller.dart';
 import '../data/mode_advice.dart';
 
@@ -38,8 +43,8 @@ class PlannerSection extends StatefulWidget {
 }
 
 class _PlannerSectionState extends State<PlannerSection> {
-  static const double _regularCardHeight = 132.0;
-  static const double _currentCardHeight = 210.0;
+  static const double _regularCardHeight = 150.0;
+  static const double _currentCardHeight = 372.0;
   static const double _cardGap = 12.0;
 
   late final ScrollController _scrollController;
@@ -53,16 +58,8 @@ class _PlannerSectionState extends State<PlannerSection> {
     return plannerSlots.indexWhere((s) => s.contains(now));
   }
 
-  bool get _isWakeCurrent {
-    final now = widget.nowMinutes;
-    return now >= homeDayWakeMinutes &&
-        now < plannerSlots.first.startHour * 60.0;
-  }
-
-  bool get _isSleepCurrent {
-    final now = widget.nowMinutes;
-    return now < homeDayWakeMinutes || now >= homeDaySleepMinutes;
-  }
+  bool get _isWakeCurrent => isWakeWindow(widget.nowMinutes);
+  bool get _isSleepCurrent => isSleepWindow(widget.nowMinutes);
 
   double get _currentCardOffset {
     const step = _regularCardHeight + _cardGap;
@@ -81,6 +78,9 @@ class _PlannerSectionState extends State<PlannerSection> {
     super.initState();
     _scrollController = ScrollController();
     _loadTravelBack();
+    // Refresh the cards whenever the user edits their custom plan — makes
+    // the round-trip through the Daily Planner service feel instantaneous.
+    CustomModeStore.instance.slots.addListener(_onCustomChanged);
     // Start one card above the current slot, then glide into place — a short,
     // purposeful reveal rather than a full-list fly-down from the top.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,6 +94,10 @@ class _PlannerSectionState extends State<PlannerSection> {
         curve: Curves.easeOutCubic,
       );
     });
+  }
+
+  void _onCustomChanged() {
+    if (mounted && widget.modeId == customModeId) setState(() {});
   }
 
   /// Scans the last 7 days of the energy log and, per slot, keeps the
@@ -146,6 +150,7 @@ class _PlannerSectionState extends State<PlannerSection> {
 
   @override
   void dispose() {
+    CustomModeStore.instance.slots.removeListener(_onCustomChanged);
     _scrollController.dispose();
     super.dispose();
   }
@@ -196,7 +201,9 @@ class _PlannerSectionState extends State<PlannerSection> {
           label: _currentIndex != -1 ? _bestFromPast[_currentIndex] : null,
           slotLabel: _currentIndex != -1
               ? plannerSlots[_currentIndex].rangeLabel
-              : null,
+              : _isWakeCurrent
+                  ? 'Wake'
+                  : 'Sleep',
           weather: weather,
         ),
       ],
@@ -205,22 +212,12 @@ class _PlannerSectionState extends State<PlannerSection> {
 
   Widget _buildList(List<ModeAdvice> adviceList, WeatherSnapshot? weather) {
     final currentIndex = _currentIndex;
-    return ShaderMask(
-      // Soft fade at top and bottom edges — carousel feel.
-      shaderCallback: (rect) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: <Color>[
-          Colors.transparent,
-          Colors.black,
-          Colors.black,
-          Colors.transparent,
-        ],
-        stops: <double>[0.0, 0.05, 0.93, 1.0],
-      ).createShader(rect),
-      blendMode: BlendMode.dstIn,
-      // Layout: [wake card] + [7 planner cards] + [sleep card].
-      // Index math: 0 = wake, 1..7 = slots, 8 = sleep.
+    // Layout: [wake card] + [7 planner cards] + [sleep card].
+    // Index math: 0 = wake, 1..7 = slots, 8 = sleep.
+    return _TimeScrollbar(
+      controller: _scrollController,
+      wakeMinutes: homeDayWakeMinutes,
+      sleepMinutes: homeDaySleepMinutes,
       child: ListView.separated(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -229,18 +226,30 @@ class _PlannerSectionState extends State<PlannerSection> {
         itemBuilder: (context, index) {
           if (index == 0) {
             return _WakeSleepCard(
-              content: wakeCardContent,
+              content: WakeSleepCopy(
+                title: '$wakeTimeLabel · Wake up',
+                headline: wakeCardContent.headline,
+                sub: wakeCardContent.sub,
+                tip: wakeCardContent.tip,
+              ),
               variant: _WakeSleepVariant.wake,
               assetPath: 'assets/icons/wakeup_alarm.svg',
               isCurrent: _isWakeCurrent,
+              height: _isWakeCurrent ? _currentCardHeight : 148.0,
             );
           }
           if (index == plannerSlots.length + 1) {
             return _WakeSleepCard(
-              content: sleepCardContent,
+              content: WakeSleepCopy(
+                title: '$sleepTimeLabel · Sleep',
+                headline: sleepCardContent.headline,
+                sub: sleepCardContent.sub,
+                tip: sleepCardContent.tip,
+              ),
               variant: _WakeSleepVariant.sleep,
               assetPath: 'assets/icons/going_to_sleep.svg',
               isCurrent: _isSleepCurrent,
+              height: _isSleepCurrent ? _currentCardHeight : 148.0,
             );
           }
           final slotIndex = index - 1;
@@ -303,6 +312,288 @@ class _PlannerSectionState extends State<PlannerSection> {
   }
 }
 
+/// Revamped sidebar scrollbar: thick illuminated track with animated elapsed-
+/// fill, a grippy pill thumb with glow, and mini analog-clock badges pinned
+/// at four schedule anchors. The track is inset from the top/bottom edges so
+/// it reads as a deliberate widget, not a raw system scrollbar.
+class _TimeScrollbar extends StatelessWidget {
+  const _TimeScrollbar({
+    required this.controller,
+    required this.wakeMinutes,
+    required this.sleepMinutes,
+    required this.child,
+  });
+
+  final ScrollController controller;
+  final int wakeMinutes;
+  final int sleepMinutes;
+  final Widget child;
+
+  static const double _sidebarW    = 56.0;
+  static const double _trackW      = 5.0;
+  static const double _thumbW      = 14.0;
+  static const double _thumbH      = 52.0;
+  static const double _trackVPad   = 28.0; // top/bottom inset — track is shorter than sidebar
+  static const double _trackXInset = (_thumbW - _trackW) / 2; // centers track under thumb
+
+  List<({String label, double frac, int hour24, int minute})> get _markers {
+    String fmt(int m) {
+      final hr24 = (m ~/ 60) % 24;
+      final min  = m % 60;
+      final hr12 = hr24 == 0 ? 12 : (hr24 > 12 ? hr24 - 12 : hr24);
+      final period = hr24 < 12 ? 'A' : 'P';
+      return min == 0
+          ? '$hr12$period'
+          : '$hr12:${min.toString().padLeft(2, '0')}$period';
+    }
+
+    int toH(int m) => (m ~/ 60) % 24;
+    int toM(int m) => m % 60;
+    final total = sleepMinutes - wakeMinutes;
+    final m1 = wakeMinutes + (total ~/ 3);
+    final m2 = wakeMinutes + (2 * total ~/ 3);
+    return [
+      (label: fmt(wakeMinutes), frac: 0.00, hour24: toH(wakeMinutes), minute: toM(wakeMinutes)),
+      (label: fmt(m1),          frac: 0.33, hour24: toH(m1),          minute: toM(m1)),
+      (label: fmt(m2),          frac: 0.67, hour24: toH(m2),          minute: toM(m2)),
+      (label: fmt(sleepMinutes),frac: 1.00, hour24: toH(sleepMinutes),minute: toM(sleepMinutes)),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: _sidebarW),
+          child: child,
+        ),
+        Positioned(
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: _sidebarW,
+          child: AnimatedBuilder(
+            animation: controller,
+            builder: (_, __) => LayoutBuilder(
+              builder: (ctx, constraints) {
+                final h = constraints.maxHeight;
+                final trackH = h - 2 * _trackVPad;
+
+                double frac = 0;
+                if (controller.hasClients &&
+                    controller.position.maxScrollExtent > 0) {
+                  frac = (controller.offset /
+                          controller.position.maxScrollExtent)
+                      .clamp(0.0, 1.0);
+                }
+
+                final thumbTop =
+                    _trackVPad + ((trackH - _thumbH) * frac).clamp(0.0, trackH - _thumbH);
+                // Elapsed fill ends at the thumb's vertical midpoint.
+                final elapsedH =
+                    (thumbTop + _thumbH / 2 - _trackVPad).clamp(0.0, trackH);
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // ── Background track (remaining portion) ──────────────
+                    Positioned(
+                      right: _trackXInset,
+                      top: _trackVPad,
+                      height: trackH,
+                      width: _trackW,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.outline.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(_trackW / 2),
+                        ),
+                      ),
+                    ),
+                    // ── Elapsed fill — animated primary gradient ───────────
+                    if (elapsedH > 0)
+                      Positioned(
+                        right: _trackXInset,
+                        top: _trackVPad,
+                        height: elapsedH,
+                        width: _trackW,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                AppColors.primary.withValues(alpha: 0.38),
+                                AppColors.primary.withValues(alpha: 0.85),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(_trackW / 2),
+                          ),
+                        ),
+                      ),
+                    // ── Pill thumb ────────────────────────────────────────
+                    Positioned(
+                      right: 0,
+                      top: thumbTop,
+                      width: _thumbW,
+                      height: _thumbH,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.primary.withValues(alpha: 0.80),
+                              AppColors.primary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(_thumbW / 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.46),
+                              blurRadius: 12,
+                              spreadRadius: 1,
+                              offset: const Offset(-2, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // ── Grip lines centred on thumb ───────────────────────
+                    for (var li = -1; li <= 1; li++)
+                      Positioned(
+                        right: (_thumbW - 8) / 2,
+                        top: thumbTop + _thumbH / 2 + li * 7 - 0.75,
+                        width: 8,
+                        height: 1.5,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.48),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ),
+                    // ── Mini analog-clock badges ──────────────────────────
+                    for (final m in _markers)
+                      Positioned(
+                        right: _trackXInset + _trackW + 4,
+                        top: (_trackVPad + trackH * m.frac - 22)
+                            .clamp(0.0, h - 44),
+                        child: _ClockBadge(
+                          label: m.label,
+                          hour: m.hour24,
+                          minute: m.minute,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Mini analog-clock face + time label pinned at each scrollbar anchor.
+class _ClockBadge extends StatelessWidget {
+  const _ClockBadge({
+    required this.label,
+    required this.hour,
+    required this.minute,
+  });
+
+  final String label; // e.g. "6A", "3:20P"
+  final int hour;     // 24 h
+  final int minute;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: CustomPaint(
+            painter: _ClockFacePainter(hour: hour, minute: minute),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textMuted,
+            height: 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Draws a tiny analog clock: translucent face, border, hour hand, minute
+/// hand, and a centre dot — all in [AppColors.primary].
+class _ClockFacePainter extends CustomPainter {
+  const _ClockFacePainter({required this.hour, required this.minute});
+  final int hour;
+  final int minute;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const primary = AppColors.primary;
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 - 0.5;
+
+    // Face fill
+    canvas.drawCircle(c, r, Paint()..color = const Color(0xFFEEF1FF));
+    // Face border
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..color = primary.withValues(alpha: 0.50)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+
+    // Hour hand (shorter)
+    final hAngle =
+        ((hour % 12) + minute / 60.0) / 12.0 * 2.0 * pi - pi / 2;
+    canvas.drawLine(
+      c,
+      Offset(c.dx + cos(hAngle) * r * 0.48, c.dy + sin(hAngle) * r * 0.48),
+      Paint()
+        ..color = primary
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Minute hand (longer, lighter)
+    final mAngle = minute / 60.0 * 2.0 * pi - pi / 2;
+    canvas.drawLine(
+      c,
+      Offset(c.dx + cos(mAngle) * r * 0.70, c.dy + sin(mAngle) * r * 0.70),
+      Paint()
+        ..color = primary.withValues(alpha: 0.60)
+        ..strokeWidth = 1.0
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Centre dot
+    canvas.drawCircle(c, 1.5, Paint()..color = primary);
+  }
+
+  @override
+  bool shouldRepaint(_ClockFacePainter old) =>
+      old.hour != hour || old.minute != minute;
+}
+
 /// White mac-style card.
 ///
 /// Layout: 70% left column (recommendation quote, attribution, previous
@@ -347,8 +638,8 @@ class _PlannerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(isCurrent ? 22 : 16),
         border: Border.all(
           color: isCurrent
-              ? AppColors.primary.withOpacity(0.55)
-              : AppColors.outline.withOpacity(0.8),
+              ? AppColors.primary.withValues(alpha: 0.55)
+              : AppColors.outline.withValues(alpha: 0.8),
           width: isCurrent ? 1.6 : 1,
         ),
         boxShadow: <BoxShadow>[
@@ -368,7 +659,7 @@ class _PlannerCard extends StatelessWidget {
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(
-                right: isCurrent ? 72 : 60, // clearance for the right column
+                right: isCurrent ? 84 : 60, // clearance for the right column
                 bottom: isCurrent ? 20 : 16, // clearance for footnote
               ),
               child: _buildContent(),
@@ -380,7 +671,7 @@ class _PlannerCard extends StatelessWidget {
             top: isCurrent ? 8 : 30,
             right: 0,
             bottom: isCurrent ? 22 : 18,
-            width: isCurrent ? 66 : 54,
+            width: isCurrent ? 78 : 54,
             child: _buildRight(),
           ),
           // ── Footnote pinned at the bottom edge ─────────────────────
@@ -540,8 +831,7 @@ class _PlannerCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: isCurrent ? 9 : 8,
-              fontStyle: FontStyle.italic,
-              color: AppColors.textMuted.withOpacity(0.9),
+              color: AppColors.textMuted.withValues(alpha: 0.9),
             ),
           ),
         ),
@@ -566,14 +856,13 @@ class _CurrentWeatherBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
           Icon(Icons.cloud_queue_rounded,
-              size: 22, color: AppColors.primary.withOpacity(0.45)),
+              size: 22, color: AppColors.primary.withValues(alpha: 0.45)),
           const SizedBox(height: 4),
           Text(
             'Loading',
             style: TextStyle(
               fontSize: 9,
-              color: AppColors.textMuted.withOpacity(0.7),
-              fontStyle: FontStyle.italic,
+              color: AppColors.textMuted.withValues(alpha: 0.7),
             ),
           ),
           const Spacer(),
@@ -608,7 +897,7 @@ class _CurrentWeatherBlock extends StatelessWidget {
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.w600,
-            color: Colors.black.withOpacity(0.55),
+            color: Colors.black.withValues(alpha: 0.55),
             letterSpacing: 0.2,
           ),
         ),
@@ -617,25 +906,33 @@ class _CurrentWeatherBlock extends StatelessWidget {
           'Feels ${current.apparentTemperatureC.round()}°',
           style: TextStyle(
             fontSize: 9,
-            color: AppColors.textMuted.withOpacity(0.85),
+            color: AppColors.textMuted.withValues(alpha: 0.85),
           ),
         ),
         const Spacer(),
         if (today != null)
-          Text(
-            '↑${today.tempMaxC.round()}° ↓${today.tempMinC.round()}°',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: Colors.black.withOpacity(0.6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              '↑${today.tempMaxC.round()}° ↓${today.tempMinC.round()}°',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.black.withValues(alpha: 0.6),
+              ),
             ),
           ),
         const SizedBox(height: 2),
-        Text(
-          '💧${current.humidityPercent}%  💨${current.windSpeedKph.round()}',
-          style: TextStyle(
-            fontSize: 9,
-            color: AppColors.textMuted.withOpacity(0.85),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            '💧${current.humidityPercent}%  💨${current.windSpeedKph.round()}',
+            style: TextStyle(
+              fontSize: 9,
+              color: AppColors.textMuted.withValues(alpha: 0.85),
+            ),
           ),
         ),
       ],
@@ -659,7 +956,7 @@ class _SlotForecastBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
         Icon(forecast.condition.icon,
-            size: 18, color: AppColors.primary.withOpacity(0.85)),
+            size: 18, color: AppColors.primary.withValues(alpha: 0.85)),
         const SizedBox(height: 2),
         Text(
           '${forecast.temperatureC.round()}°',
@@ -677,7 +974,7 @@ class _SlotForecastBlock extends StatelessWidget {
             style: TextStyle(
               fontSize: 8.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textMuted.withOpacity(0.9),
+              color: AppColors.textMuted.withValues(alpha: 0.9),
             ),
           ),
         ],
@@ -806,9 +1103,7 @@ class _PastBestFooter extends StatelessWidget {
                             fontWeight: hasHistory
                                 ? FontWeight.w700
                                 : FontWeight.w400,
-                            fontStyle: hasHistory
-                                ? FontStyle.normal
-                                : FontStyle.italic,
+
                             color: hasHistory
                                 ? const Color(0xFF2A2E3B)
                                 : AppColors.textMuted,
@@ -878,12 +1173,14 @@ class _WakeSleepCard extends StatelessWidget {
     required this.content,
     required this.variant,
     required this.assetPath,
+    required this.height,
     this.isCurrent = false,
   });
 
   final WakeSleepCopy content;
   final _WakeSleepVariant variant;
   final String assetPath;
+  final double height;
   final bool isCurrent;
 
   bool get _isWake => variant == _WakeSleepVariant.wake;
@@ -900,18 +1197,18 @@ class _WakeSleepCard extends StatelessWidget {
           ];
     final foreground = _isWake ? const Color(0xFF3A2A0F) : Colors.white;
     final subFg = _isWake
-        ? const Color(0xFF3A2A0F).withOpacity(0.65)
-        : Colors.white.withOpacity(0.75);
+        ? const Color(0xFF3A2A0F).withValues(alpha: 0.65)
+        : Colors.white.withValues(alpha: 0.75);
     final tipBg = _isWake
-        ? Colors.white.withOpacity(0.65)
-        : Colors.white.withOpacity(0.12);
+        ? Colors.white.withValues(alpha: 0.65)
+        : Colors.white.withValues(alpha: 0.12);
     final tipBorder = _isWake
-        ? const Color(0xFFB88A3A).withOpacity(0.35)
-        : Colors.white.withOpacity(0.25);
+        ? const Color(0xFFB88A3A).withValues(alpha: 0.35)
+        : Colors.white.withValues(alpha: 0.25);
     final titleFg = _isWake ? const Color(0xFFB86A00) : const Color(0xFFB5B8FF);
 
     return Container(
-      height: 148,
+      height: height,
       padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -994,7 +1291,6 @@ class _WakeSleepCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     height: 1.28,
-                    fontStyle: FontStyle.italic,
                     fontFamily: 'Georgia',
                     fontFamilyFallback: const <String>['serif'],
                     fontWeight: FontWeight.w500,
@@ -1037,43 +1333,23 @@ class _WakeSleepCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Wake: sunrise SVG illustration.
-          // Sleep: Lottie panda animation, rotated 90° and clipped to fill
-          //        the same footprint as the SVG slot.
-          if (_isWake)
-            SvgPicture.asset(
-              assetPath,
+          SvgPicture.asset(
+            assetPath,
+            width: 88,
+            height: 120,
+            fit: BoxFit.contain,
+            placeholderBuilder: (context) => SizedBox(
               width: 88,
               height: 120,
-              fit: BoxFit.contain,
-              placeholderBuilder: (context) => SizedBox(
-                width: 88,
-                height: 120,
-                child: Center(
-                  child: Icon(
-                    Icons.wb_sunny_rounded,
-                    size: 40,
-                    color: foreground.withOpacity(0.7),
-                  ),
-                ),
-              ),
-            )
-          else
-            SizedBox(
-              width: 88,
-              height: 120,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: RotatedBox(
-                  quarterTurns: 1,
-                  child: Lottie.asset(
-                    'assets/lottie/panda_sleeping.json',
-                    fit: BoxFit.cover,
-                    repeat: true,
-                  ),
+              child: Center(
+                child: Icon(
+                  _isWake ? Icons.wb_sunny_rounded : Icons.bedtime_rounded,
+                  size: 40,
+                  color: foreground.withValues(alpha: 0.7),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -1096,8 +1372,8 @@ class _Tag extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: emphasized
-              ? AppColors.primary.withOpacity(0.35)
-              : AppColors.outline.withOpacity(0.7),
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.outline.withValues(alpha: 0.7),
           width: 0.7,
         ),
       ),
@@ -1160,7 +1436,11 @@ class _ModeDropdownState extends State<_ModeDropdown> {
               modeId: widget.modeId,
               onSelect: (id) {
                 _close();
-                widget.onChanged(id);
+                if (id == customModeId) {
+                  _openCustomPlanner();
+                } else {
+                  widget.onChanged(id);
+                }
               },
             ),
           ),
@@ -1176,6 +1456,20 @@ class _ModeDropdownState extends State<_ModeDropdown> {
     _entry?.remove();
     _entry = null;
     if (mounted) setState(() {});
+  }
+
+  /// Push Services page with the Daily Planner auto-opened on top. When the
+  /// user pops the planner they land on the Services listing, not back on
+  /// the home tab.
+  Future<void> _openCustomPlanner() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const ServicesPage(autoOpenServiceId: 'daily_planner'),
+      ),
+    );
+    // The DailyPlannerPage flips the mode to `custom` on save; make sure
+    // the parent picks that up regardless of how they got back.
+    if (mounted) widget.onChanged(ProfileStore.instance.plannerMode.value);
   }
 
   @override

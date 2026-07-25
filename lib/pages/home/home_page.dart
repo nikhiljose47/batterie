@@ -298,8 +298,12 @@ class _LocationChip extends StatelessWidget {
           bg = AppColors.surfaceTint;
         }
 
+        final needsPermission = state.status == WeatherStatus.permissionDenied ||
+            state.status == WeatherStatus.permissionDeniedForever;
         return InkWell(
-          onTap: controller.refresh,
+          onTap: needsPermission
+              ? controller.requestPermissionAndLoad
+              : controller.refresh,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -307,7 +311,7 @@ class _LocationChip extends StatelessWidget {
               color: bg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: fg.withOpacity(0.35),
+                color: fg.withValues(alpha: 0.35),
                 width: 0.8,
               ),
             ),

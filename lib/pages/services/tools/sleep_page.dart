@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
@@ -77,13 +79,34 @@ class _SleepPageState extends State<SleepPage> {
 
   // ── actions ──────────────────────────────────────────────────────────────
 
+  String? _toastMessage;
+  Timer? _toastTimer;
+
+  String _fmtToast(TimeOfDay t) {
+    final h = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m ${t.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  /// Shows a check-mark toast that scales in, holds ~1.4s, then fades out.
+  void _showConfirmation(String message) {
+    _toastTimer?.cancel();
+    setState(() => _toastMessage = message);
+    _toastTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _toastMessage = null);
+    });
+  }
+
   Future<void> _pickScheduleWake() async {
     final t = await showTimePicker(
         context: context,
         initialTime: SleepScheduleStore.instance.wakeTime.value);
     if (t != null) {
       await SleepScheduleStore.instance.setWake(t);
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        _showConfirmation('Wake time set — ${_fmtToast(t)}');
+      }
     }
   }
 
@@ -93,8 +116,17 @@ class _SleepPageState extends State<SleepPage> {
         initialTime: SleepScheduleStore.instance.sleepTime.value);
     if (t != null) {
       await SleepScheduleStore.instance.setSleep(t);
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        _showConfirmation('Sleep time set — ${_fmtToast(t)}');
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _log() async {
@@ -134,30 +166,38 @@ class _SleepPageState extends State<SleepPage> {
 
     return Scaffold(
       appBar: svcAppBar('😴 Sleep Tracker'),
-      body: !_loaded
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.large),
-              children: <Widget>[
-                _buildScheduleCard(),
-                const SizedBox(height: 12),
-                _buildStatsRow(avg, debt),
-                const SizedBox(height: 12),
-                _buildLogCard(),
-                const SizedBox(height: 12),
-                if (_entries.isEmpty)
-                  const EmptyHint('Log a night to start seeing your pattern.')
-                else ...<Widget>[
-                  const SectionLabel('Nights'),
-                  for (final e in _entries.take(14))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: _buildNightRow(e),
-                    ),
-                ],
-                const SizedBox(height: 24),
-              ],
-            ),
+      body: Stack(
+        children: <Widget>[
+          !_loaded
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.all(AppSpacing.large),
+                  children: <Widget>[
+                    _buildScheduleCard(),
+                    const SizedBox(height: 12),
+                    _buildStatsRow(avg, debt),
+                    const SizedBox(height: 12),
+                    _buildLogCard(),
+                    const SizedBox(height: 12),
+                    if (_entries.isEmpty)
+                      const EmptyHint(
+                          'Log a night to start seeing your pattern.')
+                    else ...<Widget>[
+                      const SectionLabel('Nights'),
+                      for (final e in _entries.take(14))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _buildNightRow(e),
+                        ),
+                    ],
+                    const SizedBox(height: 24),
+                  ],
+                ),
+          IgnorePointer(
+            child: _ConfirmationToast(message: _toastMessage),
+          ),
+        ],
+      ),
     );
   }
 
@@ -582,6 +622,75 @@ class _StatCard extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 9.5, color: AppColors.textMuted)),
         ],
+      ),
+    );
+  }
+}
+
+/// Floating confirmation pill — scales & fades in when [message] is non-null
+/// and fades back out when it flips to null. Sits over the page content;
+/// [IgnorePointer] on the parent lets taps pass through it.
+class _ConfirmationToast extends StatelessWidget {
+  const _ConfirmationToast({required this.message});
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = message != null;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: AnimatedSlide(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutBack,
+          offset: visible ? Offset.zero : const Offset(0, -0.5),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            opacity: visible ? 1.0 : 0.0,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutBack,
+                scale: visible ? 1.0 : 0.85,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      const Icon(Icons.check_circle_rounded,
+                          size: 18, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(
+                        message ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

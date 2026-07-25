@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'app.dart';
 import 'pages/profile/profile_store.dart';
+import 'services/custom_mode_store.dart';
 import 'services/sleep_schedule_store.dart';
 
 Future<void> main() async {
@@ -22,5 +23,6 @@ Future<void> main() async {
   await dotenv.load();
   await ProfileStore.instance.init();
   await SleepScheduleStore.instance.init();
+  await CustomModeStore.instance.init();
   runApp(const EnergyHealthApp());
 }

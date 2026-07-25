@@ -8,6 +8,7 @@ import 'tools/api_pages.dart';
 import 'tools/bmi_calculator_page.dart';
 import 'tools/breathing_page.dart';
 import 'tools/counter_page.dart';
+import 'tools/daily_planner_page.dart';
 import 'tools/cycle_pages.dart';
 import 'tools/emergency_page.dart';
 import 'tools/food_log_page.dart';
@@ -71,7 +72,12 @@ const List<_ServiceGroup> _groups = <_ServiceGroup>[
 // ── Page ────────────────────────────────────────────────────────────────────
 
 class ServicesPage extends StatefulWidget {
-  const ServicesPage({super.key});
+  const ServicesPage({super.key, this.autoOpenServiceId});
+
+  /// When set, the page immediately pushes the matching tool on top of
+  /// itself so back-navigation from the tool lands here (not on whichever
+  /// screen opened us). Used by the home-tab "Custom" mode shortcut.
+  final String? autoOpenServiceId;
 
   @override
   State<ServicesPage> createState() => _ServicesPageState();
@@ -79,6 +85,22 @@ class ServicesPage extends StatefulWidget {
 
 class _ServicesPageState extends State<ServicesPage> {
   String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final autoId = widget.autoOpenServiceId;
+    if (autoId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final match = serviceCatalog.firstWhere(
+          (s) => s.id == autoId,
+          orElse: () => serviceCatalog.first,
+        );
+        _openService(match);
+      });
+    }
+  }
 
   bool get _isSearching => _query.trim().isNotEmpty;
 
@@ -127,7 +149,7 @@ class _ServicesPageState extends State<ServicesPage> {
       'bills' => const RecurringPage(config: billsConfig),
       // Plan
       'todo' => const TaskToolPage(config: todoConfig),
-      'daily_planner' => const TaskToolPage(config: plannerConfig),
+      'daily_planner' => const DailyPlannerPage(),
       'reminders' => const TaskToolPage(config: remindersConfig),
       'notes' => const QuickLogPage(config: notesLogConfig),
       'focus' => const TimerToolPage(config: focusTimerConfig),
