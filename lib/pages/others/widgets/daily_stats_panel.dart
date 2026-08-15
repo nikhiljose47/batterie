@@ -8,6 +8,7 @@ import '../../../engine/energy_score_engine.dart';
 import '../../../models/energy_log_record.dart';
 import '../../../models/logged_activity.dart';
 import '../../../models/planner_session_log.dart';
+import '../../../pages/profile/profile_store.dart';
 import '../../../services/energy_log_store.dart';
 
 enum StatsMetric { both, physical, brain }
@@ -72,8 +73,13 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
+      final userId = ProfileStore.instance.userId.value;
+      await _store.claimPlannerSessionLogsForUser(userId);
       final records = await _store.recordsForDate(_dateKey);
-      final sessionLogs = await _store.plannerSessionLogsForDate(_dateKey);
+      final sessionLogs = await _store.plannerSessionLogsForDate(
+        _dateKey,
+        userId: userId,
+      );
       final remark = await _store.remarkForDate(_dateKey);
       if (!mounted) return;
       setState(() {

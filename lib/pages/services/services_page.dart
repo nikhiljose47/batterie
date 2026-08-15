@@ -78,12 +78,14 @@ class ServicesPage extends StatefulWidget {
     this.autoOpenServiceId,
     this.initialTodoMinutes,
     this.initialAlarmMinutes,
+    this.closeOnAutoOpenReturn = false,
   });
 
   /// When set, the page immediately pushes the matching tool on top of
   /// itself so back-navigation from the tool lands here (not on whichever
   /// screen opened us). Used by the home-tab "Custom" mode shortcut.
   final String? autoOpenServiceId;
+  final bool closeOnAutoOpenReturn;
 
   /// Optional minute-of-day used when auto-opening the To-Do service from
   /// a planner card.
@@ -102,13 +104,16 @@ class _ServicesPageState extends State<ServicesPage> {
     super.initState();
     final autoId = widget.autoOpenServiceId;
     if (autoId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
         final match = serviceCatalog.firstWhere(
           (s) => s.id == autoId,
           orElse: () => serviceCatalog.first,
         );
-        _openService(match);
+        await _openService(match);
+        if (widget.closeOnAutoOpenReturn && mounted) {
+          Navigator.of(context).pop();
+        }
       });
     }
   }
@@ -124,7 +129,7 @@ class _ServicesPageState extends State<ServicesPage> {
     }).toList();
   }
 
-  void _openService(AppService service) {
+  Future<void> _openService(AppService service) async {
     final Widget page = switch (service.id) {
       // Health
       'bmi' => const BmiCalculatorPage(),
@@ -175,7 +180,7 @@ class _ServicesPageState extends State<ServicesPage> {
       'holidays' => const HolidaysPage(),
       _ => ServiceDetailPage(service: service),
     };
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => page),
     );
   }

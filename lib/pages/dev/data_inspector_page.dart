@@ -7,6 +7,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/energy_log_record.dart';
 import '../../models/logged_activity.dart';
+import '../../models/planner_session_log.dart';
 import '../../pages/profile/profile_store.dart';
 import '../../services/energy_log_store.dart';
 import '../home_tab/data/mode_advice.dart';
@@ -14,6 +15,7 @@ import '../home_tab/data/mode_advice.dart';
 /// Which data store the inspector should dump.
 enum InspectorSource {
   energyLog('Energy log (SQLite)', Icons.storage_rounded),
+  plannerSessions('Planner sessions (SQLite)', Icons.fact_check_outlined),
   weatherCache('Weather cache (prefs)', Icons.cloud_outlined),
   databaseFull('Full Database & User', Icons.info_outline),
   modeAdvice('Mode advice (const)', Icons.menu_book_outlined);
@@ -48,6 +50,8 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
     switch (widget.source) {
       case InspectorSource.energyLog:
         return _loadEnergyLog();
+      case InspectorSource.plannerSessions:
+        return _loadPlannerSessions();
       case InspectorSource.weatherCache:
         return _loadWeatherCache();
       case InspectorSource.databaseFull:
@@ -97,6 +101,54 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
     return entries;
   }
 
+  Future<List<_InspectorEntry>> _loadPlannerSessions() async {
+    final entries = <_InspectorEntry>[];
+    final store = SqliteEnergyLogStore.instance;
+    final today = DateTime.now();
+    final userId = ProfileStore.instance.userId.value;
+
+    await store.claimPlannerSessionLogsForUser(userId);
+
+    entries.add(_InspectorEntry(
+      title: 'Current user',
+      body: 'user_id: $userId',
+    ));
+
+    for (var back = 0; back <= 7; back++) {
+      final day = today.subtract(Duration(days: back));
+      final key = dateKey(day);
+      List<PlannerSessionLog> logs;
+      try {
+        logs = await store.plannerSessionLogsForDate(key, userId: userId);
+      } catch (e) {
+        entries.add(_InspectorEntry(
+          title: key,
+          body: 'read failed: $e',
+          isError: true,
+        ));
+        continue;
+      }
+      for (final log in logs) {
+        entries.add(_InspectorEntry(
+          title: '$key · ${formatMinutes(log.startMinutes)} · ${log.sessionId}',
+          body: 'User: ${log.userId}\n'
+              'Title: ${log.title}\n'
+              'Window: ${formatMinutes(log.startMinutes)} - ${formatMinutes(log.endMinutes)}\n'
+              'Done: ${log.isDone}\n'
+              'ID: ${log.id}',
+        ));
+      }
+    }
+
+    if (entries.length == 1) {
+      entries.add(const _InspectorEntry(
+        title: 'No planner sessions',
+        body: 'No Today Plan cards marked in the last 8 days.',
+      ));
+    }
+    return entries;
+  }
+
   Future<List<_InspectorEntry>> _loadWeatherCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -128,10 +180,15 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
     final entries = <_InspectorEntry>[];
     final store = SqliteEnergyLogStore.instance;
     final today = DateTime.now();
+    final userId = ProfileStore.instance.userId.value;
+
+    await store.claimPlannerSessionLogsForUser(userId);
 
     entries.add(_InspectorEntry(
       title: '📱 USER INFO',
-      body:
+      body: 'User ID: $userId\n'
+          'Name: ${ProfileStore.instance.name.value}\n'
+          'Planner Mode: ${ProfileStore.instance.plannerMode.value}\n'
           'Profile Photo: ${ProfileStore.instance.photoPath.value ?? "(none)"}',
     ));
 
@@ -177,6 +234,36 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
           ));
         }
       } catch (_) {}
+    }
+
+    entries.add(const _InspectorEntry(
+      title: '📋 PLANNER SESSION LOGS (last 8 days)',
+      body: '—',
+    ));
+
+    for (var back = 0; back <= 7; back++) {
+      final day = today.subtract(Duration(days: back));
+      final key = dateKey(day);
+      try {
+        final logs = await store.plannerSessionLogsForDate(key, userId: userId);
+        for (final log in logs) {
+          entries.add(_InspectorEntry(
+            title:
+                '$key · ${formatMinutes(log.startMinutes)} · ${log.sessionId}',
+            body: 'User: ${log.userId}\n'
+                'Title: ${log.title}\n'
+                'Window: ${formatMinutes(log.startMinutes)} - ${formatMinutes(log.endMinutes)}\n'
+                'Done: ${log.isDone}\n'
+                'ID: ${log.id}',
+          ));
+        }
+      } catch (e) {
+        entries.add(_InspectorEntry(
+          title: '$key planner sessions [ERROR]',
+          body: 'Failed to read: $e',
+          isError: true,
+        ));
+      }
     }
 
     entries.add(const _InspectorEntry(

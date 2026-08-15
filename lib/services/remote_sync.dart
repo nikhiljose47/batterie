@@ -1,5 +1,6 @@
 import '../models/day_template.dart';
 import '../models/energy_log_record.dart';
+import '../models/planner_session_log.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Remote Sync — Supabase migration layer
@@ -72,6 +73,22 @@ import '../models/energy_log_record.dart';
 // alter table day_templates enable row level security;
 // create policy "owner" on day_templates for all using (auth.uid() = user_id);
 //
+// create table if not exists planner_session_logs (
+//   id              text primary key,
+//   user_id         uuid not null references auth.users on delete cascade,
+//   date_key        text not null,
+//   session_id      text not null,
+//   start_minutes   int  not null,
+//   end_minutes     int  not null,
+//   title           text not null,
+//   is_done         bool not null,
+//   updated_at      timestamptz not null default now(),
+//   unique (user_id, date_key, session_id)
+// );
+// alter table planner_session_logs enable row level security;
+// create policy "owner" on planner_session_logs for all using (auth.uid() = user_id);
+// create index on planner_session_logs (user_id, date_key);
+//
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Contract for every remote write the app performs.
@@ -101,10 +118,19 @@ abstract class RemoteSync {
   // ── Energy log ────────────────────────────────────────────────────────────
 
   /// Called after every energy log insert.
-  Future<void> upsertEnergyLog(EnergyLogRecord record, {required String userId});
+  Future<void> upsertEnergyLog(EnergyLogRecord record,
+      {required String userId});
 
   /// Called after an energy log entry is deleted locally.
   Future<void> deleteEnergyLog(String id, {required String userId});
+
+  // ── Planner session logs ─────────────────────────────────────────────────
+
+  /// Called when a Today Plan card is marked done/not done.
+  Future<void> upsertPlannerSessionLog(
+    PlannerSessionLog log, {
+    required String userId,
+  });
 
   // ── Daily remarks ─────────────────────────────────────────────────────────
 
@@ -146,6 +172,12 @@ class NoOpRemoteSync implements RemoteSync {
 
   @override
   Future<void> deleteEnergyLog(String id, {required String userId}) async {}
+
+  @override
+  Future<void> upsertPlannerSessionLog(
+    PlannerSessionLog log, {
+    required String userId,
+  }) async {}
 
   @override
   Future<void> upsertRemark({
@@ -215,6 +247,26 @@ class NoOpRemoteSync implements RemoteSync {
 //     if (uid == null) return;
 //     await _db.from('energy_logs').delete()
 //         .eq('id', id).eq('user_id', uid);
+//   }
+//
+//   @override
+//   Future<void> upsertPlannerSessionLog(
+//     PlannerSessionLog log, {
+//     required String userId,
+//   }) async {
+//     final id = _userId;
+//     if (id == null) return;
+//     await _db.from('planner_session_logs').upsert({
+//       'id': log.id,
+//       'user_id': id,
+//       'date_key': log.date,
+//       'session_id': log.sessionId,
+//       'start_minutes': log.startMinutes,
+//       'end_minutes': log.endMinutes,
+//       'title': log.title,
+//       'is_done': log.isDone,
+//       'updated_at': DateTime.now().toIso8601String(),
+//     });
 //   }
 //
 //   @override

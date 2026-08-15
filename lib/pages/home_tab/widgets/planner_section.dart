@@ -11,6 +11,7 @@ import '../../../models/planner_session_log.dart';
 import '../../../models/weather.dart';
 import '../../../services/custom_mode_store.dart';
 import '../../../services/energy_log_store.dart';
+import '../../../services/remote_sync.dart';
 import '../../profile/profile_store.dart';
 import '../../services/services_page.dart';
 import '../../services/tools/toolkit.dart';
@@ -72,6 +73,8 @@ class PlannerSection extends StatefulWidget {
     required this.modeId,
     required this.onModeChanged,
     this.weatherController,
+    this.onSessionLogsChanged,
+    this.refreshToken = 0,
   });
 
   final double nowMinutes;
@@ -80,6 +83,8 @@ class PlannerSection extends StatefulWidget {
   final String modeId;
   final ValueChanged<String> onModeChanged;
   final WeatherController? weatherController;
+  final ValueChanged<List<PlannerSessionLog>>? onSessionLogsChanged;
+  final int refreshToken;
 
   @override
   State<PlannerSection> createState() => _PlannerSectionState();
@@ -175,6 +180,11 @@ class _PlannerSectionState extends State<PlannerSection> {
         oldWidget.nowMinutes.floor() != widget.nowMinutes.floor()) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
     }
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _loadTodos();
+      _loadSessionLogs();
+      _loadTravelBack();
+    }
   }
 
   void _scrollToCurrent() {
@@ -203,7 +213,6 @@ class _PlannerSectionState extends State<PlannerSection> {
     );
   }
 
-
   void _onCustomChanged() {
     if (mounted && widget.modeId == customModeId) setState(() {});
   }
@@ -227,14 +236,21 @@ class _PlannerSectionState extends State<PlannerSection> {
 
   Future<void> _loadSessionLogs() async {
     try {
-      final logs = await SqliteEnergyLogStore.instance
-          .plannerSessionLogsForDate(dateKey(DateTime.now()));
+      final userId = ProfileStore.instance.userId.value;
+      await SqliteEnergyLogStore.instance
+          .claimPlannerSessionLogsForUser(userId);
+      final logs =
+          await SqliteEnergyLogStore.instance.plannerSessionLogsForDate(
+        dateKey(DateTime.now()),
+        userId: userId,
+      );
       if (!mounted) return;
       setState(() {
         _sessionLogs = <String, PlannerSessionLog>{
           for (final log in logs) log.sessionId: log,
         };
       });
+      widget.onSessionLogsChanged?.call(logs);
     } catch (_) {}
   }
 
@@ -247,8 +263,10 @@ class _PlannerSectionState extends State<PlannerSection> {
     final existing = _sessionLogs[sessionId];
     final isDone = !(existing?.isDone ?? false);
     final today = dateKey(DateTime.now());
+    final userId = ProfileStore.instance.userId.value;
     final log = PlannerSessionLog(
-      id: 'planner_${today}_$sessionId',
+      id: 'planner_${userId}_${today}_$sessionId',
+      userId: userId,
       date: today,
       sessionId: sessionId,
       startMinutes: startMinutes,
@@ -263,9 +281,11 @@ class _PlannerSectionState extends State<PlannerSection> {
         sessionId: log,
       };
     });
+    widget.onSessionLogsChanged?.call(_sessionLogs.values.toList());
 
     try {
       await SqliteEnergyLogStore.instance.savePlannerSessionLog(log);
+      await RemoteSync.instance.upsertPlannerSessionLog(log, userId: userId);
     } catch (_) {}
   }
 
@@ -489,9 +509,8 @@ class _PlannerSectionState extends State<PlannerSection> {
                   variant: _WakeSleepVariant.sleep,
                   assetPath: 'assets/icons/going_to_sleep.svg',
                   isCurrent: _isSleepCurrent,
-                  height: _isSleepCurrent
-                      ? _currentCardHeight
-                      : _regularCardHeight,
+                  height:
+                      _isSleepCurrent ? _currentCardHeight : _regularCardHeight,
                   todos: _todosForSleep(),
                   onAddTodo: () => _openTodoService(widget.sleepMinutes),
                   onToggleTodo: _toggleTodo,

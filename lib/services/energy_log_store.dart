@@ -21,7 +21,12 @@ abstract class EnergyLogStore {
 
   Future<void> savePlannerSessionLog(PlannerSessionLog log);
 
-  Future<List<PlannerSessionLog>> plannerSessionLogsForDate(String date);
+  Future<List<PlannerSessionLog>> plannerSessionLogsForDate(
+    String date, {
+    String? userId,
+  });
+
+  Future<void> claimPlannerSessionLogsForUser(String userId);
 
   Future<void> saveRemark(String date, String remark);
 
@@ -57,7 +62,7 @@ class SqliteEnergyLogStore implements EnergyLogStore {
 
     final db = await openDatabase(
       p.join(dir, 'energy_logs.db'),
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE energy_logs(
@@ -89,6 +94,7 @@ class SqliteEnergyLogStore implements EnergyLogStore {
         await db.execute('''
           CREATE TABLE planner_session_logs(
             id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
             date TEXT NOT NULL,
             session_id TEXT NOT NULL,
             start_minutes INTEGER NOT NULL,
@@ -98,8 +104,8 @@ class SqliteEnergyLogStore implements EnergyLogStore {
           )
         ''');
         await db.execute('''
-          CREATE UNIQUE INDEX idx_planner_session_logs_day_session
-          ON planner_session_logs(date, session_id)
+          CREATE UNIQUE INDEX idx_planner_session_logs_user_day_session
+          ON planner_session_logs(user_id, date, session_id)
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
@@ -117,6 +123,7 @@ class SqliteEnergyLogStore implements EnergyLogStore {
           await db.execute('''
             CREATE TABLE IF NOT EXISTS planner_session_logs(
               id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL DEFAULT 'local_legacy_user',
               date TEXT NOT NULL,
               session_id TEXT NOT NULL,
               start_minutes INTEGER NOT NULL,
@@ -128,6 +135,25 @@ class SqliteEnergyLogStore implements EnergyLogStore {
           await db.execute('''
             CREATE UNIQUE INDEX IF NOT EXISTS idx_planner_session_logs_day_session
             ON planner_session_logs(date, session_id)
+          ''');
+        }
+        if (oldVersion < 4) {
+          final columns = await db.rawQuery(
+            'PRAGMA table_info(planner_session_logs)',
+          );
+          final hasUserId =
+              columns.any((column) => column['name'] == 'user_id');
+          if (!hasUserId) {
+            await db.execute('''
+              ALTER TABLE planner_session_logs
+              ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local_legacy_user'
+            ''');
+          }
+          await db.execute(
+              'DROP INDEX IF EXISTS idx_planner_session_logs_day_session');
+          await db.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_planner_session_logs_user_day_session
+            ON planner_session_logs(user_id, date, session_id)
           ''');
         }
       },
@@ -172,12 +198,29 @@ class SqliteEnergyLogStore implements EnergyLogStore {
   }
 
   @override
-  Future<List<PlannerSessionLog>> plannerSessionLogsForDate(String date) async {
+  Future<void> claimPlannerSessionLogsForUser(String userId) async {
     final db = await _database;
+    await db.update(
+      'planner_session_logs',
+      <String, Object?>{'user_id': userId},
+      where: 'user_id = ?',
+      whereArgs: ['local_legacy_user'],
+    );
+  }
+
+  @override
+  Future<List<PlannerSessionLog>> plannerSessionLogsForDate(
+    String date, {
+    String? userId,
+  }) async {
+    final db = await _database;
+    final where = userId == null ? 'date = ?' : 'date = ? AND user_id = ?';
+    final whereArgs =
+        userId == null ? <Object?>[date] : <Object?>[date, userId];
     final rows = await db.query(
       'planner_session_logs',
-      where: 'date = ?',
-      whereArgs: [date],
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'start_minutes ASC',
     );
     return rows.map(PlannerSessionLog.fromMap).toList();

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // of the app is unaffected.
 //
 // Current keys:
+//   profile.user.id    — stable local user id (String, generated once)
 //   profile.name       — display name (String, default 'You')
 //   profile.photo.path — absolute path to local profile photo (String?)
 //   user.planner.mode  — selected day mode id (String, default 'healthy')
@@ -28,13 +30,24 @@ class ProfileStore {
   static const _nameKey = 'profile.name';
   static const _photoKey = 'profile.photo.path';
   static const _modeKey = 'user.planner.mode';
+  static const _userIdKey = 'profile.user.id';
 
+  final ValueNotifier<String> userId = ValueNotifier<String>('');
   final ValueNotifier<String> name = ValueNotifier<String>('You');
   final ValueNotifier<String?> photoPath = ValueNotifier<String?>(null);
   final ValueNotifier<String> plannerMode = ValueNotifier<String>('healthy');
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+
+    final storedUserId = prefs.getString(_userIdKey);
+    if (storedUserId != null && storedUserId.isNotEmpty) {
+      userId.value = storedUserId;
+    } else {
+      final generated = _generateLocalUserId();
+      await prefs.setString(_userIdKey, generated);
+      userId.value = generated;
+    }
 
     final storedName = prefs.getString(_nameKey);
     if (storedName != null && storedName.isNotEmpty) name.value = storedName;
@@ -81,5 +94,12 @@ class ProfileStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_photoKey);
     photoPath.value = null;
+  }
+
+  String _generateLocalUserId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'local_$hex';
   }
 }

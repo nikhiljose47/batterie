@@ -1,6 +1,7 @@
 class PlannerSessionLog {
   const PlannerSessionLog({
     required this.id,
+    required this.userId,
     required this.date,
     required this.sessionId,
     required this.startMinutes,
@@ -10,6 +11,7 @@ class PlannerSessionLog {
   });
 
   final String id;
+  final String userId;
   final String date;
   final String sessionId;
   final int startMinutes;
@@ -19,6 +21,7 @@ class PlannerSessionLog {
 
   Map<String, Object?> toMap() => <String, Object?>{
         'id': id,
+        'user_id': userId,
         'date': date,
         'session_id': sessionId,
         'start_minutes': startMinutes,
@@ -30,6 +33,7 @@ class PlannerSessionLog {
   factory PlannerSessionLog.fromMap(Map<String, Object?> map) {
     return PlannerSessionLog(
       id: map['id'] as String,
+      userId: (map['user_id'] as String?) ?? 'local_legacy_user',
       date: map['date'] as String,
       sessionId: map['session_id'] as String,
       startMinutes: map['start_minutes'] as int,
