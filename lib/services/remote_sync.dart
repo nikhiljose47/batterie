@@ -29,7 +29,7 @@ import '../models/energy_log_record.dart';
 // create table if not exists profiles (
 //   id          uuid primary key references auth.users on delete cascade,
 //   name        text    not null default 'You',
-//   planner_mode text   not null default 'normal',
+//   planner_mode text   not null default 'healthy',
 //   photo_url   text,            -- Supabase Storage URL, not a local path
 //   updated_at  timestamptz not null default now()
 // );

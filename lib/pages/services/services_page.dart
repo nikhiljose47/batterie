@@ -5,6 +5,7 @@ import '../../constants/app_spacing.dart';
 import 'data/service_catalog.dart';
 import 'service_detail_page.dart';
 import 'tools/api_pages.dart';
+import 'tools/alarm_page.dart';
 import 'tools/bmi_calculator_page.dart';
 import 'tools/breathing_page.dart';
 import 'tools/counter_page.dart';
@@ -72,12 +73,22 @@ const List<_ServiceGroup> _groups = <_ServiceGroup>[
 // ── Page ────────────────────────────────────────────────────────────────────
 
 class ServicesPage extends StatefulWidget {
-  const ServicesPage({super.key, this.autoOpenServiceId});
+  const ServicesPage({
+    super.key,
+    this.autoOpenServiceId,
+    this.initialTodoMinutes,
+    this.initialAlarmMinutes,
+  });
 
   /// When set, the page immediately pushes the matching tool on top of
   /// itself so back-navigation from the tool lands here (not on whichever
   /// screen opened us). Used by the home-tab "Custom" mode shortcut.
   final String? autoOpenServiceId;
+
+  /// Optional minute-of-day used when auto-opening the To-Do service from
+  /// a planner card.
+  final int? initialTodoMinutes;
+  final int? initialAlarmMinutes;
 
   @override
   State<ServicesPage> createState() => _ServicesPageState();
@@ -148,8 +159,12 @@ class _ServicesPageState extends State<ServicesPage> {
       'subscriptions' => const RecurringPage(config: subsConfig),
       'bills' => const RecurringPage(config: billsConfig),
       // Plan
-      'todo' => const TaskToolPage(config: todoConfig),
+      'todo' => TaskToolPage(
+          config: todoConfig,
+          initialDueMinutes: widget.initialTodoMinutes,
+        ),
       'daily_planner' => const DailyPlannerPage(),
+      'alarms' => AlarmPage(initialAlarmMinutes: widget.initialAlarmMinutes),
       'reminders' => const TaskToolPage(config: remindersConfig),
       'notes' => const QuickLogPage(config: notesLogConfig),
       'focus' => const TimerToolPage(config: focusTimerConfig),
@@ -192,7 +207,7 @@ class _ServicesPageState extends State<ServicesPage> {
                     child: Divider(
                       height: 1,
                       thickness: 1,
-                      color: AppColors.outline.withValues(alpha: 0.5),
+                      color: AppColors.outline.withOpacity(0.5),
                     ),
                   ),
                 _buildGroup(_groups[i]),
@@ -218,7 +233,7 @@ class _ServicesPageState extends State<ServicesPage> {
             hintText: 'Search — "water", "budget", "sleep"…',
             hintStyle: TextStyle(
               fontSize: 12,
-              color: AppColors.textMuted.withValues(alpha: 0.8),
+              color: AppColors.textMuted.withOpacity(0.8),
             ),
             prefixIcon: const Icon(Icons.search_rounded,
                 size: 18, color: AppColors.textMuted),
@@ -227,8 +242,7 @@ class _ServicesPageState extends State<ServicesPage> {
             contentPadding: EdgeInsets.zero,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  BorderSide(color: AppColors.outline.withValues(alpha: 0.9)),
+              borderSide: BorderSide(color: AppColors.outline.withOpacity(0.9)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -242,9 +256,8 @@ class _ServicesPageState extends State<ServicesPage> {
   }
 
   Widget _buildGroup(_ServiceGroup g) {
-    final items = serviceCatalog
-        .where((s) => g.cats.contains(s.category))
-        .toList();
+    final items =
+        serviceCatalog.where((s) => g.cats.contains(s.category)).toList();
     if (items.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -279,7 +292,7 @@ class _ServicesPageState extends State<ServicesPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: g.color.withValues(alpha: 0.10),
+                  color: g.color.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -392,8 +405,8 @@ class _ServiceTile extends StatelessWidget {
                     color: categoryTint(service.category),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Text(service.emoji,
-                      style: const TextStyle(fontSize: 15)),
+                  child:
+                      Text(service.emoji, style: const TextStyle(fontSize: 15)),
                 ),
                 const Spacer(),
                 Text(
@@ -423,8 +436,7 @@ class _ServiceTile extends StatelessWidget {
               service.tagline,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontSize: 9.5, color: AppColors.textMuted),
+              style: const TextStyle(fontSize: 9.5, color: AppColors.textMuted),
             ),
           ],
         ),

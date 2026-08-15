@@ -10,8 +10,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text(AppStrings.appName), findsOneWidget);
-    expect(find.text(AppStrings.youTab), findsOneWidget);
-    expect(find.text(AppStrings.othersTab), findsOneWidget);
+    expect(find.byIcon(Icons.bolt_outlined), findsOneWidget);
+    expect(find.text(AppStrings.updatesTab), findsOneWidget);
     expect(find.text(AppStrings.newsTab), findsOneWidget);
     expect(find.byIcon(Icons.person_rounded), findsOneWidget);
   });

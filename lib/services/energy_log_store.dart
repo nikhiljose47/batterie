@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/day_template.dart';
 import '../models/energy_log_record.dart';
+import '../models/planner_session_log.dart';
 
 /// Storage contract for daily energy data.
 ///
@@ -17,6 +18,10 @@ abstract class EnergyLogStore {
   Future<void> saveDay(String date, List<EnergyLogRecord> records);
 
   Future<List<EnergyLogRecord>> recordsForDate(String date);
+
+  Future<void> savePlannerSessionLog(PlannerSessionLog log);
+
+  Future<List<PlannerSessionLog>> plannerSessionLogsForDate(String date);
 
   Future<void> saveRemark(String date, String remark);
 
@@ -52,7 +57,7 @@ class SqliteEnergyLogStore implements EnergyLogStore {
 
     final db = await openDatabase(
       p.join(dir, 'energy_logs.db'),
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE energy_logs(
@@ -81,6 +86,21 @@ class SqliteEnergyLogStore implements EnergyLogStore {
             items TEXT NOT NULL
           )
         ''');
+        await db.execute('''
+          CREATE TABLE planner_session_logs(
+            id TEXT PRIMARY KEY,
+            date TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            start_minutes INTEGER NOT NULL,
+            end_minutes INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            is_done INTEGER NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE UNIQUE INDEX idx_planner_session_logs_day_session
+          ON planner_session_logs(date, session_id)
+        ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -91,6 +111,23 @@ class SqliteEnergyLogStore implements EnergyLogStore {
               emoji TEXT NOT NULL,
               items TEXT NOT NULL
             )
+          ''');
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS planner_session_logs(
+              id TEXT PRIMARY KEY,
+              date TEXT NOT NULL,
+              session_id TEXT NOT NULL,
+              start_minutes INTEGER NOT NULL,
+              end_minutes INTEGER NOT NULL,
+              title TEXT NOT NULL,
+              is_done INTEGER NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_planner_session_logs_day_session
+            ON planner_session_logs(date, session_id)
           ''');
         }
       },
@@ -122,6 +159,28 @@ class SqliteEnergyLogStore implements EnergyLogStore {
       orderBy: 'start_minutes ASC',
     );
     return rows.map(EnergyLogRecord.fromMap).toList();
+  }
+
+  @override
+  Future<void> savePlannerSessionLog(PlannerSessionLog log) async {
+    final db = await _database;
+    await db.insert(
+      'planner_session_logs',
+      log.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<List<PlannerSessionLog>> plannerSessionLogsForDate(String date) async {
+    final db = await _database;
+    final rows = await db.query(
+      'planner_session_logs',
+      where: 'date = ?',
+      whereArgs: [date],
+      orderBy: 'start_minutes ASC',
+    );
+    return rows.map(PlannerSessionLog.fromMap).toList();
   }
 
   @override

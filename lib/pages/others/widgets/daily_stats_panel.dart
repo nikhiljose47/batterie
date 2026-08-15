@@ -7,6 +7,7 @@ import '../../../constants/app_spacing.dart';
 import '../../../engine/energy_score_engine.dart';
 import '../../../models/energy_log_record.dart';
 import '../../../models/logged_activity.dart';
+import '../../../models/planner_session_log.dart';
 import '../../../services/energy_log_store.dart';
 
 enum StatsMetric { both, physical, brain }
@@ -47,6 +48,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
   int _dayOffset = 0; // 0 = today, 1 = yesterday, ... up to _daysBack - 1
   StatsMetric _metric = StatsMetric.both;
   List<EnergyLogRecord> _records = const <EnergyLogRecord>[];
+  List<PlannerSessionLog> _sessionLogs = const <PlannerSessionLog>[];
   bool _loading = true;
   bool _remarkSaved = false;
 
@@ -71,10 +73,12 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     setState(() => _loading = true);
     try {
       final records = await _store.recordsForDate(_dateKey);
+      final sessionLogs = await _store.plannerSessionLogsForDate(_dateKey);
       final remark = await _store.remarkForDate(_dateKey);
       if (!mounted) return;
       setState(() {
         _records = records;
+        _sessionLogs = sessionLogs;
         _remarkController.text = remark ?? '';
         _loading = false;
         _remarkSaved = false;
@@ -83,6 +87,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
       if (!mounted) return;
       setState(() {
         _records = const <EnergyLogRecord>[];
+        _sessionLogs = const <PlannerSessionLog>[];
         _loading = false;
       });
     }
@@ -107,6 +112,12 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
       : (_records.map((r) => r.brainAfter).reduce((a, b) => a + b) /
               _records.length)
           .round();
+
+  int? get _donePercent {
+    if (_sessionLogs.isEmpty) return null;
+    final done = _sessionLogs.where((log) => log.isDone).length;
+    return ((done / _sessionLogs.length) * 100).round();
+  }
 
   /// Plain-language read of the day: best case "all green", otherwise names
   /// the activity right before the lowest dip.
@@ -221,7 +232,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
-              : _records.isEmpty
+              : _records.isEmpty && _sessionLogs.isEmpty
                   ? _EmptyDay(isToday: _dayOffset == 0)
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(
@@ -243,6 +254,18 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                               ),
                             ),
                           ),
+                        if (_summary == null && _sessionLogs.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                bottom: AppSpacing.medium),
+                            child: Text(
+                              '${_sessionLogs.where((log) => log.isDone).length}/${_sessionLogs.length} planner cards marked done.',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
 
                         // Chart
                         Container(
@@ -256,6 +279,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                           child: CustomPaint(
                             painter: _EnergyChartPainter(
                               records: _records,
+                              sessionLogs: _sessionLogs,
                               metric: _metric,
                             ),
                             child: const SizedBox.expand(),
@@ -288,9 +312,8 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                             const SizedBox(width: AppSpacing.small),
                             Expanded(
                               child: _AverageCard(
-                                label: 'Activities',
-                                value: _records.length,
-                                suffix: '',
+                                label: 'Sessions done',
+                                value: _donePercent,
                                 color: AppColors.primary,
                                 background: AppColors.surfaceTint,
                               ),
@@ -357,6 +380,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.small),
+                        ..._sessionLogs.map((log) => _PlannerLogRow(log: log)),
                         ..._records.map((r) => _LogRow(
                               record: r,
                               activityName:
@@ -495,9 +519,14 @@ class _FilterChipGroup<T> extends StatelessWidget {
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
 class _EnergyChartPainter extends CustomPainter {
-  const _EnergyChartPainter({required this.records, required this.metric});
+  const _EnergyChartPainter({
+    required this.records,
+    required this.sessionLogs,
+    required this.metric,
+  });
 
   final List<EnergyLogRecord> records;
+  final List<PlannerSessionLog> sessionLogs;
   final StatsMetric metric;
 
   @override
@@ -521,10 +550,14 @@ class _EnergyChartPainter extends CustomPainter {
           Offset(0, y - (level == 0 ? 12 : 0) - (level == 1.0 ? -2 : 0)));
     }
 
-    if (records.isEmpty) return;
+    if (records.isEmpty && sessionLogs.isEmpty) return;
 
-    final minX = records.first.startMinutes - 30;
-    final maxX = records.last.startMinutes + 30;
+    final timeAnchors = <int>[
+      ...records.map((record) => record.startMinutes),
+      ...sessionLogs.map((log) => log.startMinutes),
+    ]..sort();
+    final minX = timeAnchors.first - 30;
+    final maxX = timeAnchors.last + 30;
     final span = (maxX - minX).clamp(60, 1440);
 
     double xFor(int minutes) =>
@@ -558,23 +591,54 @@ class _EnergyChartPainter extends CustomPainter {
       }
     }
 
-    if (metric != StatsMetric.brain) {
+    if (records.isNotEmpty && metric != StatsMetric.brain) {
       drawSeries(
         records.map((r) => r.physicalAfter).toList(),
         AppColors.energyPhysicalAccent,
       );
     }
-    if (metric != StatsMetric.physical) {
+    if (records.isNotEmpty && metric != StatsMetric.physical) {
       drawSeries(
         records.map((r) => r.brainAfter).toList(),
         AppColors.energyBrainAccent,
       );
     }
+
+    final baselineY = size.height - 14;
+    for (final log in sessionLogs) {
+      final x = xFor(log.startMinutes);
+      final color = log.isDone ? AppColors.primary : AppColors.error;
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(x, baselineY), width: 10, height: 10),
+        const Radius.circular(3),
+      );
+      canvas.drawRRect(
+        rect,
+        Paint()..color = color.withOpacity(log.isDone ? 0.9 : 0.75),
+      );
+      if (log.isDone) {
+        final check = Path()
+          ..moveTo(x - 3, baselineY)
+          ..lineTo(x - 1, baselineY + 2)
+          ..lineTo(x + 3.5, baselineY - 3);
+        canvas.drawPath(
+          check,
+          Paint()
+            ..color = Colors.white
+            ..strokeWidth = 1.4
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round,
+        );
+      }
+    }
   }
 
   @override
   bool shouldRepaint(_EnergyChartPainter oldDelegate) =>
-      oldDelegate.records != records || oldDelegate.metric != metric;
+      oldDelegate.records != records ||
+      oldDelegate.sessionLogs != sessionLogs ||
+      oldDelegate.metric != metric;
 }
 
 class _ChartLegend extends StatelessWidget {
@@ -608,6 +672,11 @@ class _ChartLegend extends StatelessWidget {
         ],
         if (metric != StatsMetric.physical)
           dot(AppColors.energyBrainAccent, 'Brain'),
+        if (metric != StatsMetric.physical)
+          const SizedBox(width: AppSpacing.medium),
+        dot(AppColors.primary, 'Done'),
+        const SizedBox(width: AppSpacing.medium),
+        dot(AppColors.error, 'Not done'),
       ],
     );
   }
@@ -621,14 +690,12 @@ class _AverageCard extends StatelessWidget {
     required this.value,
     required this.color,
     required this.background,
-    this.suffix = '%',
   });
 
   final String label;
   final int? value;
   final Color color;
   final Color background;
-  final String suffix;
 
   @override
   Widget build(BuildContext context) {
@@ -655,7 +722,7 @@ class _AverageCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            value == null ? '—' : '$value$suffix',
+            value == null ? '—' : '$value%',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -760,6 +827,70 @@ class _CoachEntry extends StatelessWidget {
 }
 
 // ── Log rows ──────────────────────────────────────────────────────────────────
+
+class _PlannerLogRow extends StatelessWidget {
+  const _PlannerLogRow({required this.log});
+
+  final PlannerSessionLog log;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = log.isDone ? AppColors.primary : AppColors.error;
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.small),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.medium,
+        vertical: AppSpacing.small,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            log.isDone ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  log.title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${formatMinutes(log.startMinutes)} · ${formatMinutes(log.endMinutes)}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            log.isDone ? 'Done' : 'Not done',
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _LogRow extends StatelessWidget {
   const _LogRow({required this.record, required this.activityName});

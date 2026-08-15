@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+
+import '../../../data/coder/coder_advice.dart';
 import '../../../services/custom_mode_store.dart';
 import '../../../services/sleep_schedule_store.dart';
 
@@ -30,7 +33,7 @@ SleepScheduleStore get _scheduleStore => SleepScheduleStore.instance;
 //  • Add a new mode:
 //       1. Copy `_normal` to a new const, e.g. `_studying`.
 //       2. Rewrite each entry's text.
-//       3. Add `'studying': _studying,` to `modeAdviceMap` at the bottom.
+//       3. Add `'studying': _studying,` to `modeAdviceSourceMap` at the bottom.
 //       4. Add it to the mode dropdown in `home_tab_page.dart` (`_dayModes`).
 //
 //  • Add a new time slot:
@@ -64,25 +67,38 @@ class DayMode {
 }
 
 /// Full ordered list of modes — base modes first, Student, then Pro variants.
-/// Keys must match the `modeAdviceMap` entries at the bottom of this file.
+/// Keys must match the `modeAdviceSourceMap` entries at the bottom of this file.
 const List<DayMode> allDayModes = <DayMode>[
-  DayMode(id: 'normal',           emoji: '🙂', label: 'Normal'),
-  DayMode(id: 'athletic',         emoji: '🏃', label: 'Athletic'),
-  DayMode(id: 'gym',              emoji: '🏋️', label: 'Gym'),
-  DayMode(id: 'office',           emoji: '💼', label: 'Office'),
-  DayMode(id: 'nicotine_free',    emoji: '🚭', label: 'Nicotine Free'),
-  DayMode(id: 'student',          emoji: '📚', label: 'Student'),
-  DayMode(id: 'normal_pro',       emoji: '🙂', label: 'Normal Pro',       isPro: true),
-  DayMode(id: 'athletic_pro',     emoji: '🏃', label: 'Athletic Pro',     isPro: true),
-  DayMode(id: 'gym_pro',          emoji: '🏋️', label: 'Gym Pro',          isPro: true),
-  DayMode(id: 'office_pro',       emoji: '💼', label: 'Office Pro',       isPro: true),
-  DayMode(id: 'nicotine_free_pro',emoji: '🚭', label: 'Quit Pro',         isPro: true),
-  DayMode(id: 'custom',           emoji: '✨', label: 'Custom'),
+  DayMode(id: 'healthy', emoji: '🙂', label: 'Healthy'),
+  DayMode(id: 'athletic', emoji: '🏃', label: 'Athletic'),
+  DayMode(id: 'gym', emoji: '🏋️', label: 'Gym'),
+  DayMode(id: 'office', emoji: '💼', label: 'Office'),
+  DayMode(id: 'nicotine_free', emoji: '🚭', label: 'Nicotine Free'),
+  DayMode(id: 'student', emoji: '📚', label: 'Student'),
+  DayMode(id: 'coder_pro', emoji: '</>', label: 'Coder Pro', isPro: true),
+  DayMode(
+      id: 'coder_super_plus',
+      emoji: '++',
+      label: 'Coder Super+',
+      isPro: true),
+  DayMode(id: 'healthy_pro', emoji: '🙂', label: 'Healthy Pro', isPro: true),
+  DayMode(id: 'athletic_pro', emoji: '🏃', label: 'Athletic Pro', isPro: true),
+  DayMode(id: 'gym_pro', emoji: '🏋️', label: 'Gym Pro', isPro: true),
+  DayMode(id: 'office_pro', emoji: '💼', label: 'Office Pro', isPro: true),
+  DayMode(id: 'nicotine_free_pro', emoji: '🚭', label: 'Quit Pro', isPro: true),
 ];
 
-/// Marker id — picking this mode should send the user to the Daily Planner
-/// service to fill in their own per-slot advice.
+/// Legacy marker id. New saved plans use `custom_1` ... `custom_5`.
 const String customModeId = 'custom';
+
+List<DayMode> get customDayModes {
+  return CustomModeStore.instance.plans.value
+      .map((plan) => DayMode(id: plan.id, emoji: '✨', label: plan.name))
+      .toList();
+}
+
+List<DayMode> get allSelectableDayModes =>
+    <DayMode>[...allDayModes, ...customDayModes];
 
 /// User's target wake time in minutes — driven by [SleepScheduleStore].
 int get homeDayWakeMinutes => _scheduleStore.wakeMinutes;
@@ -107,8 +123,13 @@ class TimeSlot {
   int get startHour => startMinutes ~/ 60;
   int get endHour => endMinutes ~/ 60;
 
-  bool contains(int minutes) =>
-      minutes >= startMinutes && minutes < endMinutes;
+  bool contains(int minutes) {
+    var candidate = _normalizeMinuteOfDay(minutes);
+    while (candidate < startMinutes) {
+      candidate += kDayMinutes;
+    }
+    return candidate < endMinutes;
+  }
 
   String get rangeLabel {
     String fmt(int m) {
@@ -128,27 +149,63 @@ class TimeSlot {
 class ModeAdvice {
   const ModeAdvice({
     required this.recommendation,
-    required this.attribution,
-    required this.crowd,
     required this.tip,
-    required this.history,
+    this.descriptions = const <String>[],
   });
 
-  /// MacBook-keynote-style short phrase — rendered as the card's quote.
+  /// Short phrase rendered as the card's main text.
   final String recommendation;
 
-  /// Sits under the recommendation as an author line
-  /// (e.g. `— your athletic morning`).
-  final String attribution;
-
-  /// What most people are doing in this window.
-  final String crowd;
-
-  /// Energy-aware coaching tip for this window under this mode.
+  /// Energy-aware coaching title for this window under this mode.
   final String tip;
 
-  /// A world-history moment that happened around this time of day.
-  final String history;
+  /// Short support bullets shown under the headline.
+  final List<String> descriptions;
+}
+
+typedef AdviceMap = Map<String, Object>;
+
+ModeAdvice _modeAdviceFromMap(AdviceMap source) {
+  final descriptions =
+      (source['descriptions'] as List<Object>? ?? const <Object>[])
+          .whereType<String>()
+          .where((text) => text.trim().isNotEmpty)
+          .map((text) => text.trim())
+          .toList();
+  return ModeAdvice(
+    recommendation: (source['recommendation'] as String?) ?? '',
+    tip: (source['tip'] as String?) ?? '',
+    descriptions: descriptions,
+  );
+}
+
+ModeAdvice _customAdviceFromSlot({
+  required CustomSlot slot,
+  required ModeAdvice fallback,
+}) {
+  return ModeAdvice(
+    recommendation: slot.recommendation.isNotEmpty
+        ? slot.recommendation
+        : fallback.recommendation,
+    tip: slot.tip.isNotEmpty ? slot.tip : fallback.tip,
+    descriptions: slot.descriptions.isNotEmpty
+        ? slot.descriptions
+        : fallback.descriptions,
+  );
+}
+
+const List<String> modeAdviceHistory = <String>[
+  '1969 - Apollo 11 cruised toward the Moon',
+  '1889 - The Eiffel Tower opened to visitors',
+  '1876 - Bell made the first clear telephone call',
+  '1903 - The Wright brothers prepared for first flight',
+  '1985 - The first .com domain was registered',
+  '1776 - Independence was approved in Philadelphia',
+  '1938 - War of the Worlds aired on radio',
+];
+
+String historyForPlannerSlot(int slotIndex) {
+  return modeAdviceHistory[slotIndex % modeAdviceHistory.length];
 }
 
 /// Special copy shown on the wake / sleep cards. These sit outside the
@@ -195,6 +252,7 @@ const WakeSleepCopy sleepCardContent = WakeSleepCopy(
 /// Number of slots in the day. Kept as a compile-time constant so the
 /// per-mode advice lists (which are `const`) stay in sync with the layout.
 const int kSlotCount = 7;
+const int kDayMinutes = 24 * 60;
 
 /// Minutes reserved after wake for the "wake" card (breakfast, sunlight,
 /// morning routine). The first planner slot begins at [wake + this].
@@ -203,23 +261,60 @@ const int kWakeBufferMinutes = 120;
 /// True when [nowMinutes] falls inside the wake-card window
 /// (right after wake, before the first planner slot).
 bool isWakeWindow(num nowMinutes) {
-  final wake = homeDayWakeMinutes;
-  return nowMinutes >= wake && nowMinutes < wake + kWakeBufferMinutes;
+  return isWakeWindowFor(nowMinutes, wakeMinutes: homeDayWakeMinutes);
+}
+
+bool isWakeWindowFor(num nowMinutes, {required int wakeMinutes}) {
+  return TimeSlot(
+    startMinutes: wakeMinutes,
+    endMinutes: wakeMinutes + kWakeBufferMinutes,
+  ).contains(nowMinutes.floor());
 }
 
 /// True when [nowMinutes] is either before wake (previous night still
 /// carrying over) or at/after sleep — i.e. the sleep card is current.
 bool isSleepWindow(num nowMinutes) {
-  return nowMinutes < homeDayWakeMinutes || nowMinutes >= homeDaySleepMinutes;
+  return isSleepWindowFor(
+    nowMinutes,
+    wakeMinutes: homeDayWakeMinutes,
+    sleepMinutes: homeDaySleepMinutes,
+  );
+}
+
+bool isSleepWindowFor(
+  num nowMinutes, {
+  required int wakeMinutes,
+  required int sleepMinutes,
+}) {
+  final sleepEnd = _sleepEndForDay(
+    wakeMinutes: wakeMinutes,
+    sleepMinutes: sleepMinutes,
+  );
+  var candidate = _normalizeMinuteOfDay(nowMinutes.floor());
+  while (candidate < wakeMinutes) {
+    candidate += kDayMinutes;
+  }
+  return candidate >= sleepEnd;
 }
 
 /// Live-computed planner slots — divides the current
 /// [wake + kWakeBufferMinutes → sleep] window evenly into [kSlotCount]
 /// pieces, rounded to 15-minute boundaries so labels stay tidy. The last
 /// slot absorbs any rounding remainder so it always ends exactly at sleep.
-List<TimeSlot> get plannerSlots {
-  final wake = homeDayWakeMinutes;
-  final sleep = homeDaySleepMinutes;
+List<TimeSlot> get plannerSlots => plannerSlotsFor(
+      wakeMinutes: homeDayWakeMinutes,
+      sleepMinutes: homeDaySleepMinutes,
+    );
+
+List<TimeSlot> plannerSlotsFor({
+  required int wakeMinutes,
+  required int sleepMinutes,
+}) {
+  final wake = _normalizeMinuteOfDay(wakeMinutes);
+  final sleep = _sleepEndForDay(
+    wakeMinutes: wake,
+    sleepMinutes: sleepMinutes,
+  );
   final start = wake + kWakeBufferMinutes;
   final total = sleep > start ? sleep - start : 60 * 12; // sane fallback
   const step = 15;
@@ -240,17 +335,41 @@ List<TimeSlot> get plannerSlots {
   return slots;
 }
 
+int _normalizeMinuteOfDay(num minutes) {
+  final value = minutes.floor() % kDayMinutes;
+  return value < 0 ? value + kDayMinutes : value;
+}
+
+int _sleepEndForDay({
+  required int wakeMinutes,
+  required int sleepMinutes,
+}) {
+  final wake = _normalizeMinuteOfDay(wakeMinutes);
+  var sleep = _normalizeMinuteOfDay(sleepMinutes);
+  if (sleep <= wake) sleep += kDayMinutes;
+  return sleep;
+}
+
 /// Formatted "6:00 AM" for the current wake target.
 String get wakeTimeLabel {
   final t = _scheduleStore.wakeTime.value;
-  final h12 = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
-  final m = t.minute.toString().padLeft(2, '0');
-  return '$h12:$m ${t.hour < 12 ? 'AM' : 'PM'}';
+  return timeOfDayLabel(t);
 }
 
 /// Formatted "10:00 PM" for the current sleep target.
 String get sleepTimeLabel {
   final t = _scheduleStore.sleepTime.value;
+  return timeOfDayLabel(t);
+}
+
+String minutesLabel(int minutes) {
+  final normalized = minutes % (24 * 60);
+  return timeOfDayLabel(
+    TimeOfDay(hour: normalized ~/ 60, minute: normalized % 60),
+  );
+}
+
+String timeOfDayLabel(TimeOfDay t) {
   final h12 = t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour);
   final m = t.minute.toString().padLeft(2, '0');
   return '$h12:$m ${t.hour < 12 ? 'AM' : 'PM'}';
@@ -260,745 +379,372 @@ String get sleepTimeLabel {
 //                              Mode: NORMAL
 // ═════════════════════════════════════════════════════════════════════════
 
-const List<ModeAdvice> _normal = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Do the one thing you\'ve been avoiding.',
-    attribution: '— your morning peak',
-    crowd: '💼 Deep work',
-    tip: '🧠 Peak focus — hardest task first',
-    history: '1969 · Apollo 11 cruised to the Moon',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Reply, decide, then step away for lunch.',
-    attribution: '— your late morning',
-    crowd: '🗣 Meetings & calls',
-    tip: '🥤 Hydrate — focus dips before lunch',
-    history: '1889 · Eiffel Tower opened to crowds',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Eat slow. A 10-minute walk beats caffeine.',
-    attribution: '— your post-lunch dip',
-    crowd: '🍽 Lunch & social',
-    tip: '😴 Post-lunch dip — 10 min walk fixes it',
-    history: '1903 · Wright brothers planned first flight',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Batch the small wins while the second wind lasts.',
-    attribution: '— your afternoon',
-    crowd: '💻 Focused work',
-    tip: '☕ Second wind — batch small wins',
-    history: '1876 · Bell placed the first phone call',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Move your body. Sunlight while you can.',
-    attribution: '— your evening',
-    crowd: '🚶 Out & commuting',
-    tip: '🏃 Body peak — best time to exercise',
-    history: '1776 · Independence declared by evening',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Real conversations only. Dim the screens.',
-    attribution: '— your wind down',
-    crowd: '📱 Social & family',
-    tip: '📵 Dim the screens — let the brain land',
-    history: '1969 · "One small step" — 8:17 PM',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Plan tomorrow in one line. Then close the loop.',
-    attribution: '— your bedtime',
-    crowd: '🌙 Winding down',
-    tip: '🌙 Prep tomorrow, then lights out',
-    history: '1938 · War of the Worlds aired at night',
-  ),
+// Broad, accessible mode advice. Each list has one item per planner slot.
+const AdviceMap _steadyStart = <String, Object>{
+  'recommendation': 'Pick one useful task and make the first step small.',
+  'tip': 'Start with 10 focused minutes',
+  'descriptions': <String>[
+    'Choose one outcome for this session.',
+    'Write the first tiny step before starting.',
+    'Keep distractions outside the first 10 minutes.',
+  ],
+};
+
+const AdviceMap _focusedProgress = <String, Object>{
+  'recommendation':
+      'Use this block for the work that needs your clearest mind.',
+  'tip': 'One task, one timer, fewer tabs',
+  'descriptions': <String>[
+    'Use this for work that needs a clear mind.',
+    'Keep only the needed app or notebook open.',
+    'Pause notifications until the block ends.',
+  ],
+};
+
+const AdviceMap _replyAndDecide = <String, Object>{
+  'recommendation':
+      'Answer messages, make small decisions, then take a real break.',
+  'tip': 'Batch messages so they do not take the whole day',
+  'descriptions': <String>[
+    'Reply to important people first.',
+    'Make small decisions in one batch.',
+    'Close the loop before taking a break.',
+  ],
+};
+
+const AdviceMap _recharge = <String, Object>{
+  'recommendation': 'Eat, hydrate, and step away long enough to feel reset.',
+  'tip': 'A short walk helps more than scrolling',
+  'descriptions': <String>[
+    'Eat something steady and drink water.',
+    'Step away from the same screen or seat.',
+    'Return with one simple next action.',
+  ],
+};
+
+const AdviceMap _secondWind = <String, Object>{
+  'recommendation': 'Close a few small loops while your momentum is back.',
+  'tip': 'Finish, file, reply, or clean up one thing',
+  'descriptions': <String>[
+    'Pick low-friction tasks that still matter.',
+    'Clear loose ends while energy is returning.',
+    'Save deep thinking for a better window.',
+  ],
+};
+
+const AdviceMap _moveAndReset = <String, Object>{
+  'recommendation': 'Move your body a little before the evening gets full.',
+  'tip': 'Ten minutes outside can change the tone of the night',
+  'descriptions': <String>[
+    'Move, stretch, or take a short walk.',
+    'Handle one errand before settling in.',
+    'Let the day shift out of work mode.',
+  ],
+};
+
+const AdviceMap _closeTheDay = <String, Object>{
+  'recommendation': 'Give attention to people, home, or quiet recovery.',
+  'tip': 'Dim screens and make the room easier to sleep in',
+  'descriptions': <String>[
+    'Give attention to people or home.',
+    'Choose calmer light and quieter inputs.',
+    'Avoid starting anything hard to stop.',
+  ],
+};
+
+const AdviceMap _bedtimePrep = <String, Object>{
+  'recommendation': 'Write tomorrow\'s first step, then let today be done.',
+  'tip': 'Set clothes, charger, and one priority before bed',
+  'descriptions': <String>[
+    'Write tomorrow\'s first step.',
+    'Put essentials where morning-you can see them.',
+    'Let the day be complete enough.',
+  ],
+};
+
+const AdviceMap _activeStart = <String, Object>{
+  'recommendation':
+      'Check your energy, warm up gently, and choose a realistic pace.',
+  'tip': 'Easy movement first; intensity is optional',
+  'descriptions': <String>[
+    'Check how your body feels today.',
+    'Warm up before asking for intensity.',
+    'Choose a pace you can recover from.',
+  ],
+};
+
+const AdviceMap _trainingBlock = <String, Object>{
+  'recommendation':
+      'Train the plan you can recover from, not the plan your ego likes.',
+  'tip': 'Leave a little energy for the rest of life',
+  'descriptions': <String>[
+    'Train the plan, not the mood.',
+    'Stop before form starts falling apart.',
+    'Recovery counts as part of the session.',
+  ],
+};
+
+const AdviceMap _mobilityReset = <String, Object>{
+  'recommendation': 'Stretch what feels tight and log what helped today.',
+  'tip': 'Two calm minutes are better than skipping recovery',
+  'descriptions': <String>[
+    'Stretch the area that feels tightest.',
+    'Log one thing that helped.',
+    'Keep it light enough to repeat tomorrow.',
+  ],
+};
+
+const AdviceMap _officeStart = <String, Object>{
+  'recommendation': 'Protect a quiet block before the day fills with requests.',
+  'tip': 'Mute notifications for the first important task',
+  'descriptions': <String>[
+    'Protect one quiet work block.',
+    'Start before messages set the agenda.',
+    'Keep the output small and shippable.',
+  ],
+};
+
+const AdviceMap _officeClose = <String, Object>{
+  'recommendation':
+      'Define done, note tomorrow\'s priority, and leave work at work.',
+  'tip': 'A clean stop makes tomorrow easier',
+  'descriptions': <String>[
+    'Define what is done for today.',
+    'Note tomorrow\'s first priority.',
+    'Leave work with a clean handoff.',
+  ],
+};
+
+const AdviceMap _habitReset = <String, Object>{
+  'recommendation':
+      'Notice the urge, name the need, and choose one replacement action.',
+  'tip': 'Water, breath, walk, or message someone',
+  'descriptions': <String>[
+    'Name the urge without judging it.',
+    'Meet the real need with a small action.',
+    'Change location if the cue is strong.',
+  ],
+};
+
+const AdviceMap _triggerPlan = <String, Object>{
+  'recommendation':
+      'Change the scene before an old routine starts automatically.',
+  'tip': 'Move seats, hold water, step outside, or call a friend',
+  'descriptions': <String>[
+    'Spot the cue before it runs the routine.',
+    'Swap in a replacement action quickly.',
+    'Make the old pattern slightly harder.',
+  ],
+};
+
+const AdviceMap _studyStart = <String, Object>{
+  'recommendation':
+      'Study the hardest idea first while attention is still fresh.',
+  'tip': 'Explain the idea out loud after reading it',
+  'descriptions': <String>[
+    'Start with the hardest concept.',
+    'Turn reading into recall.',
+    'Keep study blocks short enough to repeat.',
+  ],
+};
+
+const AdviceMap _studyReview = <String, Object>{
+  'recommendation':
+      'Review what matters, then stop before your brain gets noisy.',
+  'tip': 'Short recall beats long rereading',
+  'descriptions': <String>[
+    'Review the material that fades fastest.',
+    'Use recall before checking notes.',
+    'Stop while your brain can still settle.',
+  ],
+};
+
+const AdviceMap _proPlan = <String, Object>{
+  'recommendation':
+      'Choose the highest-value outcome and remove one friction point.',
+  'tip': 'Make the next action visible and specific',
+  'descriptions': <String>[
+    'Choose the highest-value outcome.',
+    'Remove one friction point before starting.',
+    'Measure energy as well as output.',
+  ],
+};
+
+const AdviceMap _proReview = <String, Object>{
+  'recommendation':
+      'Review signals, adjust the plan, and keep the standard humane.',
+  'tip': 'Track energy, not only output',
+  'descriptions': <String>[
+    'Review what helped and what drained you.',
+    'Adjust the next block instead of forcing it.',
+    'Keep the standard useful and humane.',
+  ],
+};
+
+const List<AdviceMap> _normal = <AdviceMap>[
+  _steadyStart,
+  _focusedProgress,
+  _replyAndDecide,
+  _recharge,
+  _secondWind,
+  _moveAndReset,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                             Mode: ATHLETIC
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _athletic = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Fuel first. Mobility, then your hardest session.',
-    attribution: '— your athletic morning',
-    crowd: '🥣 Fuel & mobility',
-    tip: '🍳 Protein + carbs before you push',
-    history: '1896 · First modern Olympics opened in Athens',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Push through the peak. Don\'t save it for later.',
-    attribution: '— your athletic prime',
-    crowd: '🏋️ Peak training',
-    tip: '⚡ VO2 max window — hit intervals now',
-    history: '1954 · Bannister ran the 4-min mile at 6 PM',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Refuel, then rest. Recovery is training too.',
-    attribution: '— your recovery',
-    crowd: '🍚 Refuel',
-    tip: '🥛 Protein window — eat within 45 min',
-    history: '1936 · Jesse Owens ran his 4th gold',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Skills, not intensity. Sharpen the movement.',
-    attribution: '— your technique block',
-    crowd: '🎯 Skill drills',
-    tip: '🧠 Learning peak — practice fine motor',
-    history: '1968 · Fosbury Flop debuted in Mexico',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Second session, lighter load. Move for joy.',
-    attribution: '— your second wind',
-    crowd: '🚴 Easy cardio',
-    tip: '🏃 Body temp peak — run feels effortless',
-    history: '1954 · Diane Leather broke 5-min mile',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Cool it down. Long stretch, quiet meal.',
-    attribution: '— your cooldown',
-    crowd: '🧘 Stretch & eat',
-    tip: '🧘 Parasympathetic on — foam roll now',
-    history: '1968 · Beamon\'s long jump: 8.90 m',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Prep tomorrow\'s kit. Sleep is your best supplement.',
-    attribution: '— your recovery block',
-    crowd: '😴 Sleep prep',
-    tip: '💤 GH surge in deep sleep — protect it',
-    history: '1980 · Miracle on Ice ended near 10 PM',
-  ),
+const List<AdviceMap> _athletic = <AdviceMap>[
+  _activeStart,
+  _trainingBlock,
+  _recharge,
+  _mobilityReset,
+  _moveAndReset,
+  _closeTheDay,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                               Mode: GYM
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _gym = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Warm up properly. Your joints will thank you at 60.',
-    attribution: '— your gym morning',
-    crowd: '🔥 Warm-up',
-    tip: '🩸 Circulate first — dynamic stretch',
-    history: '1893 · First bodybuilding show, London',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Heavy compounds. Squat, press, pull — earn it.',
-    attribution: '— your lift block',
-    crowd: '🏋️ Heavy sets',
-    tip: '💪 Strength peak — go for PRs',
-    history: '1972 · Alexeev cleaned 230 kg',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Refuel with real food. Rest between sessions.',
-    attribution: '— your gym recovery',
-    crowd: '🍗 Refuel',
-    tip: '🥩 40g protein — muscle repair window',
-    history: '1977 · "Pumping Iron" hit theaters',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Accessories, isolation. Chase the pump, not the ego.',
-    attribution: '— your volume block',
-    crowd: '💪 Hypertrophy',
-    tip: '📈 Volume window — 8-12 rep range',
-    history: '1968 · Arnold\'s first Mr. Olympia',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Conditioning. Sled, sprint, or 20 min zone 2.',
-    attribution: '— your metcon',
-    crowd: '🔥 Conditioning',
-    tip: '❤️ Cardio + strength = longevity',
-    history: '2001 · CrossFit went online',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Stretch the tight spots. Log the session.',
-    attribution: '— your cooldown',
-    crowd: '📓 Log & stretch',
-    tip: '📉 Cortisol dropping — mobility now',
-    history: '1965 · Gold\'s Gym opened in Venice',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Casein, foam roll, lights out. Grow while you sleep.',
-    attribution: '— your night lift',
-    crowd: '😴 Recovery',
-    tip: '💤 Testosterone rises in deep sleep',
-    history: '1930 · Steve Reeves born',
-  ),
+const List<AdviceMap> _gym = <AdviceMap>[
+  _activeStart,
+  _trainingBlock,
+  _recharge,
+  _focusedProgress,
+  _moveAndReset,
+  _mobilityReset,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                              Mode: OFFICE
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _office = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Close your inbox. One deep-work block, no meetings.',
-    attribution: '— your office morning',
-    crowd: '💻 Deep work',
-    tip: '🧠 Prefrontal peak — hardest task now',
-    history: '1985 · Excel 1.0 shipped for Mac',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Batch the meetings. Stand up between calls.',
-    attribution: '— your meeting block',
-    crowd: '🗣 Meetings',
-    tip: '🚶 Move 2 min between calls',
-    history: '1990 · Web servers went live at CERN',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Walk to lunch. Screens off, actual food.',
-    attribution: '— your break',
-    crowd: '🍱 Lunch',
-    tip: '☀️ 10 min sunlight = sharper 3 PM',
-    history: '1876 · First typewriter shipped',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Reply, review, ship. Small closures build momentum.',
-    attribution: '— your afternoon',
-    crowd: '📧 Reply & review',
-    tip: '☕ Second focus wave — batch replies',
-    history: '1969 · ARPANET first packet at 10:30 PM',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Shut it down cleanly. Write tomorrow\'s top three.',
-    attribution: '— your close-out',
-    crowd: '📝 Wrap up',
-    tip: '🧾 Log wins — future you will read them',
-    history: '1985 · First .com registered',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Off screens. Family, walks, or a real book.',
-    attribution: '— your unplug',
-    crowd: '📱 Family time',
-    tip: '📵 Screens dim mind — real light in',
-    history: '1928 · First TV broadcast (WGY)',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'No inbox. No Slack. Set tomorrow\'s intent.',
-    attribution: '— your close',
-    crowd: '🌙 Wind down',
-    tip: '🌙 Blue light off — melatonin rises',
-    history: '1997 · Deep Blue beat Kasparov',
-  ),
+const List<AdviceMap> _office = <AdviceMap>[
+  _officeStart,
+  _replyAndDecide,
+  _recharge,
+  _secondWind,
+  _officeClose,
+  _closeTheDay,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                           Mode: NICOTINE FREE
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _nicotineFree = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Cold water on your face. Breathe. Urge peaks in 3 min.',
-    attribution: '— your quit morning',
-    crowd: '🌊 Cravings peak',
-    tip: '💨 Box breathe 4-4-4-4 through cravings',
-    history: '1964 · Surgeon General linked smoking to cancer',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Chew ice, sip water, walk. Ride the wave.',
-    attribution: '— your late morning',
-    crowd: '🥤 Hydrate hard',
-    tip: '🧊 Chew ice — replaces the hand ritual',
-    history: '1971 · Cigarette ads banned on US TV',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Eat real food. Sugar spikes make cravings worse.',
-    attribution: '— your lunch',
-    crowd: '🍎 Fresh food',
-    tip: '🍏 Fiber + protein — steady glucose',
-    history: '2003 · Ireland went smoke-free',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Walk after coffee. Break the old chain.',
-    attribution: '— your afternoon',
-    crowd: '🚶 New rituals',
-    tip: '🚶 Replace smoke break with 5 min walk',
-    history: '2007 · UK indoor smoking ban',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Move. Sweat clears the receptors faster.',
-    attribution: '— your evening',
-    crowd: '🏃 Sweat it out',
-    tip: '🏃 20 min cardio — dopamine reset',
-    history: '1998 · US Tobacco Settlement Agreement',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Change the scene. Not the couch, not the porch.',
-    attribution: '— your trigger hour',
-    crowd: '🏡 Reset the space',
-    tip: '🪟 Fresh air — 10 min outside',
-    history: '2019 · India banned e-cigs',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Sleep early — cravings fall with rest.',
-    attribution: '— your recovery',
-    crowd: '😴 Rest deep',
-    tip: '💤 Sleep = strongest craving defense',
-    history: '2008 · US raised tobacco tax by \$0.61',
-  ),
+const List<AdviceMap> _nicotineFree = <AdviceMap>[
+  _habitReset,
+  _focusedProgress,
+  _recharge,
+  _triggerPlan,
+  _moveAndReset,
+  _closeTheDay,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                             Mode: STUDENT
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _student = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Hardest subject first. Your brain is sharpest right now.',
-    attribution: '— your study peak',
-    crowd: '📖 Deep focus',
-    tip: '🧠 Peak retention — shut all notifications',
-    history: '1687 · Newton wrote Principia in total isolation',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Teach it back. If you can\'t explain it, you don\'t know it.',
-    attribution: '— your recall block',
-    crowd: '✏️ Active recall',
-    tip: '✏️ Active recall beats re-reading 3× over',
-    history: '1905 · Einstein wrote 4 landmark papers in one year',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Eat, walk, skim. Don\'t study hard during the post-lunch dip.',
-    attribution: '— your recharge',
-    crowd: '🍱 Lunch break',
-    tip: '😴 20-min nap now — memory consolidates in sleep',
-    history: '1453 · Gutenberg\'s press cut the cost of study',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'New material or group work. Fresh eyes handle complex ideas.',
-    attribution: '— your afternoon block',
-    crowd: '👥 Group study',
-    tip: '📊 Interleave subjects — fights the forgetting curve',
-    history: '1636 · Harvard founded to push new learning forward',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Move your body. A 20-minute walk doubles afternoon retention.',
-    attribution: '— your brain break',
-    crowd: '🚶 Decompressing',
-    tip: '🏃 Exercise before revision = +20% next-day recall',
-    history: '1768 · First Encyclopaedia Britannica published',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Spaced repetition. Tonight\'s review is tomorrow\'s memory.',
-    attribution: '— your revision hour',
-    crowd: '🃏 Flashcards',
-    tip: '🗂 Review: 1h later, 1 day, 1 week — that\'s the curve',
-    history: '1885 · Ebbinghaus first mapped the forgetting curve',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Write tomorrow\'s first task. Then close the books for good.',
-    attribution: '— your study close',
-    crowd: '🌙 Wrap up',
-    tip: '📒 Sleep cements today\'s learning — protect it',
-    history: '1956 · Miller published "The Magical Number 7"',
-  ),
+const List<AdviceMap> _student = <AdviceMap>[
+  _studyStart,
+  _focusedProgress,
+  _recharge,
+  _replyAndDecide,
+  _moveAndReset,
+  _studyReview,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                           Mode: NORMAL PRO
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _normalPro = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Cortisol peaks at 9 AM. Use the stress hormone — don\'t fight it.',
-    attribution: '— your neuroscience morning',
-    crowd: '🔬 Peak cortisol',
-    tip: '⏰ Delay caffeine 90 min post-wake for best effect',
-    history: '1958 · NASA designed peak-performance daily schedules',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Decision fatigue starts now. Clear shallow work, not your mind.',
-    attribution: '— your mid-morning',
-    crowd: '🗣 Collaboration',
-    tip: '🧠 Spend high willpower only on key decisions',
-    history: '1995 · Baumeister first coined "decision fatigue"',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Post-lunch dip is biology. A nap here beats two coffees.',
-    attribution: '— your dip window',
-    crowd: '😴 Recovery dip',
-    tip: '🛌 10-min nap — set alarm to avoid sleep inertia',
-    history: '500 BC · Aristotle napped holding a key over a bowl',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Cognitive rebound. Use it for creative or deep analytical work.',
-    attribution: '— your second peak',
-    crowd: '💡 Creative work',
-    tip: '🎨 Afternoon = right-brain mode is unlocked',
-    history: '1935 · Graham Wallas mapped the four stages of creativity',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Body temperature peaks. Reaction time is at its fastest now.',
-    attribution: '— your physical peak',
-    crowd: '🏃 Exercise',
-    tip: '⚡ Personal-best attempts belong in this window',
-    history: '1984 · USOC studied time-of-day performance gains',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Parasympathetic mode on. Digest, connect, restore.',
-    attribution: '— your recovery phase',
-    crowd: '🏡 Family & rest',
-    tip: '💬 Deep conversations measurably lower cortisol',
-    history: '1970s · Cardiologists defined HRV as recovery marker',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Melatonin rising. Blue light now costs 45 min of deep sleep.',
-    attribution: '— your circadian prep',
-    crowd: '🌙 Sleep onset',
-    tip: '🕯 Dim lights + 18 °C room = faster sleep onset',
-    history: '1980 · Lewy discovered the light–melatonin link',
-  ),
+const List<AdviceMap> _normalPro = <AdviceMap>[
+  _proPlan,
+  _focusedProgress,
+  _replyAndDecide,
+  _recharge,
+  _secondWind,
+  _proReview,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                          Mode: ATHLETIC PRO
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _athleticPro = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Periodize, don\'t improvise. Know your training block for today.',
-    attribution: '— your periodization',
-    crowd: '📋 Block planning',
-    tip: '🗓 Base → build → peak → taper — know your phase',
-    history: '1952 · Matveyev formalised periodization theory',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Zone 4–5 work. Push the VO₂ ceiling, not the floor.',
-    attribution: '— your intensity block',
-    crowd: '🔥 High intensity',
-    tip: '❤️ 170–185 bpm is your Zone 4 territory',
-    history: '1976 · Åstrand standardised VO₂ max measurement',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Carb + protein within 30 minutes. The anabolic window is real.',
-    attribution: '— your fueling window',
-    crowd: '🍚 Precision refuel',
-    tip: '📐 4:1 carb-to-protein ratio after high intensity',
-    history: '1967 · Karlsson first mapped glycogen depletion rates',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Technical skills need a fresher CNS than you might think.',
-    attribution: '— your skill block',
-    crowd: '🎯 Technical drills',
-    tip: '🧠 Motor learning peaks ~6h after your warm-up',
-    history: '1967 · Fitts\'s Law of motor skill acquisition',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Zone 2 recovery run. Aerobic base compounds every single day.',
-    attribution: '— your base build',
-    crowd: '🏃 Zone 2',
-    tip: '💓 Keep HR 120–145 bpm — you should be able to talk',
-    history: '2007 · Iñigo San Millán popularised Zone 2 training',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Cold, contrast, or compression. Choose one recovery tool.',
-    attribution: '— your recovery stack',
-    crowd: '🧊 Recovery',
-    tip: '🌡 Cold 10 min → warm 10 min — repeat 3 rounds',
-    history: '1978 · Jones published the first DOMS mechanisms paper',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Log HRV. Low tomorrow = pull back. High = push hard.',
-    attribution: '— your readiness check',
-    crowd: '📊 HRV & sleep',
-    tip: '📱 HRV drop > 10% = scheduled deload or full rest',
-    history: '1973 · Ewing mapped HRV relationship with training load',
-  ),
+const List<AdviceMap> _athleticPro = <AdviceMap>[
+  _proPlan,
+  _trainingBlock,
+  _recharge,
+  _mobilityReset,
+  _moveAndReset,
+  _proReview,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                            Mode: GYM PRO
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _gymPro = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'RPE 3 warm-up. Prime the CNS properly before you load the bar.',
-    attribution: '— your CNS activation',
-    crowd: '⚡ CNS priming',
-    tip: '🔁 Potentiation set: 30% × 8 before your working sets',
-    history: '1980 · Zatsiorsky defined maximum strength methods',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Progressive overload is the only rule. One more rep or 2.5 kg.',
-    attribution: '— your strength block',
-    crowd: '🏋️ Working sets',
-    tip: '📈 Linear: add 2.5 kg weekly on main compound lifts',
-    history: '1945 · DeLorme published Progressive Resistance Exercise',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Leucine triggers MPS. Get at least 3g in your post-workout meal.',
-    attribution: '— your MPS window',
-    crowd: '🍳 Muscle synthesis',
-    tip: '🥩 Leucine threshold: 40g chicken or three whole eggs',
-    history: '1998 · Norton established the leucine threshold model',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: '2 RIR on every set. Growth happens at the edge, not past it.',
-    attribution: '— your volume block',
-    crowd: '💪 Hypertrophy',
-    tip: '📏 2 reps in reserve = optimal hypertrophy stimulus',
-    history: '2001 · Krieger published the volume dose-response study',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Zone 2 cardio protects the heart without stealing muscle.',
-    attribution: '— your cardio boundary',
-    crowd: '❤️ Conditioning',
-    tip: '🚴 Low-intensity cardio: zero muscle interference at this dose',
-    history: '1990 · Hickson studied interference effect limits',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Myofascial release + protein. Two simultaneous repair signals.',
-    attribution: '— your repair block',
-    crowd: '🧘 Recovery',
-    tip: '🫙 Casein shake + foam roll = the optimal repair combo',
-    history: '1977 · Rolf Institute formalised myofascial release work',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Growth hormone surges in slow-wave sleep. Earn the sleep.',
-    attribution: '— your anabolic night',
-    crowd: '💤 Anabolic sleep',
-    tip: '😴 GH peaks ~1h after sleep onset — protect that window',
-    history: '1963 · Takahashi documented the GH–sleep link',
-  ),
+const List<AdviceMap> _gymPro = <AdviceMap>[
+  _proPlan,
+  _trainingBlock,
+  _recharge,
+  _focusedProgress,
+  _moveAndReset,
+  _proReview,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                           Mode: OFFICE PRO
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _officePro = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'Maker time. No meetings before noon — protect it fiercely.',
-    attribution: '— your maker schedule',
-    crowd: '🔕 Zero interrupts',
-    tip: '🎧 Deep work: no Slack, one tab, one task',
-    history: '2009 · Paul Graham wrote "Maker\'s Schedule, Manager\'s Schedule"',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Batch your decisions here. Willpower is highest before lunch.',
-    attribution: '— your decision peak',
-    crowd: '⚖️ Key decisions',
-    tip: '🧠 Save peak willpower for your two highest-stakes calls',
-    history: '2011 · Danziger\'s judge study proved decision fatigue',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Strategic lunch. A 10-minute walk gives you a 20% sharper 3 PM.',
-    attribution: '— your tactical break',
-    crowd: '🚶 Recovery walk',
-    tip: '☀️ Outdoor lunch = melatonin reset + measurable mood lift',
-    history: '1920 · Henry Ford introduced the 8-hour workday',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Manager tasks now. Meetings, reviews, replies — none need peak brain.',
-    attribution: '— your manager schedule',
-    crowd: '📧 Admin mode',
-    tip: '📬 Batch all emails twice a day — once right now',
-    history: '1956 · Parkinson\'s Law published in The Economist',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Shutdown ritual. Define "done", log the wins, set tomorrow\'s one thing.',
-    attribution: '— your shutdown ritual',
-    crowd: '🔒 Close-out',
-    tip: '📋 3 wins + top task for tomorrow = zero morning drag',
-    history: '1990 · Newport coined the "shutdown complete" ritual',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Detach fully. The brain sorts unsolved problems during genuine downtime.',
-    attribution: '— your incubation phase',
-    crowd: '🏡 True rest',
-    tip: '🧩 Hard problems often solve themselves in rest mode',
-    history: '1926 · Wallas named incubation the third stage of creativity',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Pre-mortem tomorrow. Name the one thing that must not fail.',
-    attribution: '— your strategic wind-down',
-    crowd: '📝 Pre-mortem',
-    tip: '🎯 Clear top task → zero decision cost at tomorrow\'s start',
-    history: '1989 · Klein developed the pre-mortem technique',
-  ),
+const List<AdviceMap> _officePro = <AdviceMap>[
+  _proPlan,
+  _officeStart,
+  _replyAndDecide,
+  _recharge,
+  _officeClose,
+  _proReview,
+  _bedtimePrep,
 ];
 
-// ═════════════════════════════════════════════════════════════════════════
-//                        Mode: NICOTINE FREE PRO
-// ═════════════════════════════════════════════════════════════════════════
-
-const List<ModeAdvice> _nicotineFreePro = <ModeAdvice>[
-  // 09–11
-  ModeAdvice(
-    recommendation: 'HALT check — Hungry, Angry, Lonely, Tired? Fix the real need first.',
-    attribution: '— your craving root',
-    crowd: '🛡 HALT check',
-    tip: '🔎 A craving = an unmet need. Name it precisely.',
-    history: '1970 · HALT model emerged from addiction counselling',
-  ),
-  // 11–13
-  ModeAdvice(
-    recommendation: 'Urge surfing: ride the wave, don\'t wrestle it. Peak lasts 3 minutes.',
-    attribution: '— your urge window',
-    crowd: '🌊 Urge surf',
-    tip: '⏱ Peak craving = 3 min max — breathe through the whole thing',
-    history: '1994 · Marlatt and colleagues developed urge surfing',
-  ),
-  // 13–15
-  ModeAdvice(
-    recommendation: 'Stable blood sugar is your secret weapon. Spikes mimic nicotine cues.',
-    attribution: '— your metabolic anchor',
-    crowd: '🍎 Stable glucose',
-    tip: '🥗 Low-GI lunch → fewer false craving signals this afternoon',
-    history: '1977 · Hughes first linked nicotine and blood glucose',
-  ),
-  // 15–17
-  ModeAdvice(
-    recommendation: 'Reward the milestone. Your quit bank grows every waking hour.',
-    attribution: '— your reward anchor',
-    crowd: '🏆 Reward',
-    tip: '💰 Calculate money saved and keep it visible today',
-    history: '2003 · NRT studies doubled 12-month quit rates',
-  ),
-  // 17–19
-  ModeAdvice(
-    recommendation: 'Dopamine reset: exercise fires the same pathways nicotine hijacked.',
-    attribution: '— your dopamine repair',
-    crowd: '🏃 Dopamine run',
-    tip: '🧬 20-min run = nicotine-equivalent dopamine release',
-    history: '2002 · Volkow mapped dopamine pathways in addiction',
-  ),
-  // 19–21
-  ModeAdvice(
-    recommendation: 'Social triggers are set-ups. Sit differently. Hold your drink. Leave briefly.',
-    attribution: '— your trigger shield',
-    crowd: '🛡 Social shield',
-    tip: '🔄 Cue → routine → reward. Break the routine first.',
-    history: '2012 · Duhigg\'s The Power of Habit published',
-  ),
-  // 21–22
-  ModeAdvice(
-    recommendation: 'Another day banked. Sleep cements the quit-behaviour pathways.',
-    attribution: '— your daily win',
-    crowd: '💤 Win banked',
-    tip: '😴 Sleep quality = top predictor of next-day quit success',
-    history: '2014 · Sleep quality was linked to quit success rates',
-  ),
+const List<AdviceMap> _nicotineFreePro = <AdviceMap>[
+  _proPlan,
+  _habitReset,
+  _recharge,
+  _triggerPlan,
+  _moveAndReset,
+  _proReview,
+  _bedtimePrep,
 ];
-
-// ═════════════════════════════════════════════════════════════════════════
 //                       Register all modes here
 // ═════════════════════════════════════════════════════════════════════════
 //
 // One line per mode. Keys must match DayMode.id values in `allDayModes`.
 
-const Map<String, List<ModeAdvice>> modeAdviceMap =
-    <String, List<ModeAdvice>>{
-  'normal':            _normal,
-  'athletic':          _athletic,
-  'gym':               _gym,
-  'office':            _office,
-  'nicotine_free':     _nicotineFree,
-  'student':           _student,
-  'normal_pro':        _normalPro,
-  'athletic_pro':      _athleticPro,
-  'gym_pro':           _gymPro,
-  'office_pro':        _officePro,
+const Map<String, List<AdviceMap>> modeAdviceSourceMap =
+    <String, List<AdviceMap>>{
+  'healthy': _normal,
+  'athletic': _athletic,
+  'gym': _gym,
+  'office': _office,
+  'nicotine_free': _nicotineFree,
+  'student': _student,
+  'coder_pro': coderProAdvice,
+  'coder_super_plus': coderSuperPlusAdvice,
+  'healthy_pro': _normalPro,
+  'athletic_pro': _athleticPro,
+  'gym_pro': _gymPro,
+  'office_pro': _officePro,
   'nicotine_free_pro': _nicotineFreePro,
 };
 
-/// Safe lookup: falls back to 'normal' if a mode id has no curated data
+/// Safe lookup: falls back to 'healthy' if a mode id has no curated data
 /// yet, so a new dropdown entry can never crash the planner.
 /// For the special [customModeId], reads live from [CustomModeStore] and
-/// falls back per-slot to the normal advice for any blank entries.
+/// falls back per-slot to the healthy advice for any blank entries.
 List<ModeAdvice> adviceForMode(String modeId) {
-  if (modeId == customModeId) {
-    final slots = CustomModeStore.instance.slots.value;
-    final fallback = modeAdviceMap['normal']!;
-    return List<ModeAdvice>.generate(fallback.length, (i) {
+  final normalizedModeId = switch (modeId) {
+    'normal' => 'healthy',
+    'normal_pro' => 'healthy_pro',
+    _ => modeId,
+  };
+  final healthy =
+      modeAdviceSourceMap['healthy']!.map(_modeAdviceFromMap).toList();
+  if (CustomModeStore.isCustomModeId(modeId)) {
+    final plan = CustomModeStore.instance.planForModeId(modeId);
+    final slots = plan.slots;
+    return List<ModeAdvice>.generate(healthy.length, (i) {
       final s = i < slots.length ? slots[i] : const CustomSlot();
-      final base = fallback[i];
-      return ModeAdvice(
-        recommendation:
-            s.recommendation.isNotEmpty ? s.recommendation : base.recommendation,
-        attribution: '— your plan',
-        crowd: s.crowd.isNotEmpty ? s.crowd : base.crowd,
-        tip: s.tip.isNotEmpty ? s.tip : base.tip,
-        history: base.history,
+      return _customAdviceFromSlot(
+        slot: s,
+        fallback: healthy[i],
       );
     });
   }
-  return modeAdviceMap[modeId] ?? modeAdviceMap['normal']!;
+  final source =
+      modeAdviceSourceMap[normalizedModeId] ?? modeAdviceSourceMap['healthy']!;
+  return source.map(_modeAdviceFromMap).toList();
 }
 
 /// Optional runtime sanity check — call from `main.dart` during dev to
 /// catch a mode list that got out of sync with `plannerSlots`.
 bool debugAssertModeData() {
   final expected = plannerSlots.length;
-  for (final entry in modeAdviceMap.entries) {
+  for (final entry in modeAdviceSourceMap.entries) {
     assert(
       entry.value.length == expected,
       'Mode "${entry.key}" has ${entry.value.length} entries, '

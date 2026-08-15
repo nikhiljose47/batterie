@@ -131,7 +131,8 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
 
     entries.add(_InspectorEntry(
       title: '📱 USER INFO',
-      body: 'Profile Photo: ${ProfileStore.instance.photoPath.value ?? "(none)"}',
+      body:
+          'Profile Photo: ${ProfileStore.instance.photoPath.value ?? "(none)"}',
     ));
 
     entries.add(const _InspectorEntry(
@@ -158,7 +159,8 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
         for (final r in records) {
           final emoji = activityEmojis[r.activityId] ?? '⚡';
           entries.add(_InspectorEntry(
-            title: '$key · ${formatMinutes(r.startMinutes)} · $emoji ${r.activityId}',
+            title:
+                '$key · ${formatMinutes(r.startMinutes)} · $emoji ${r.activityId}',
             body: 'Duration: ${r.durationMinutes} min\n'
                 'Physical: ${r.physicalAfter}/100 · Brain: ${r.brainAfter}/100\n'
                 'ID: ${r.id}',
@@ -221,16 +223,18 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
 
   Future<List<_InspectorEntry>> _loadModeAdvice() async {
     final entries = <_InspectorEntry>[];
-    for (final mode in modeAdviceMap.entries) {
+    for (final mode in allDayModes) {
+      final advice = adviceForMode(mode.id);
       final lines = <String>[];
-      for (var i = 0; i < mode.value.length; i++) {
+      for (var i = 0; i < advice.length; i++) {
         final slot = plannerSlots[i];
-        final a = mode.value[i];
+        final a = advice[i];
         lines.add('${slot.rangeLabel}: ${a.recommendation}\n'
-            '   tip: ${a.tip}\n   crowd: ${a.crowd}');
+            '   tip: ${a.tip}\n'
+            '   history: ${historyForPlannerSlot(i)}');
       }
       entries.add(_InspectorEntry(
-        title: 'mode: ${mode.key} (${mode.value.length} slots)',
+        title: 'mode: ${mode.id} (${advice.length} slots)',
         body: lines.join('\n'),
       ));
     }

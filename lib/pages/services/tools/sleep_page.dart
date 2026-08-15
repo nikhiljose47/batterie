@@ -137,7 +137,8 @@ class _SleepPageState extends State<SleepPage> {
       _entries.insert(0, <String, dynamic>{
         'day': day,
         'bed': '${_logBed.hour}:${_logBed.minute.toString().padLeft(2, '0')}',
-        'wake': '${_logWake.hour}:${_logWake.minute.toString().padLeft(2, '0')}',
+        'wake':
+            '${_logWake.hour}:${_logWake.minute.toString().padLeft(2, '0')}',
         'minutes': minutes,
       });
     });
@@ -244,7 +245,7 @@ class _SleepPageState extends State<SleepPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
+                        color: Colors.white.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
@@ -271,7 +272,8 @@ class _SleepPageState extends State<SleepPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       // Wake
-                      Expanded(child: _scheduleTimeTile(
+                      Expanded(
+                          child: _scheduleTimeTile(
                         emoji: '🌅',
                         label: 'WAKE UP',
                         labelColor: const Color(0xFF66BB6A),
@@ -305,7 +307,8 @@ class _SleepPageState extends State<SleepPage> {
                         ),
                       ),
                       // Sleep
-                      Expanded(child: _scheduleTimeTile(
+                      Expanded(
+                          child: _scheduleTimeTile(
                         emoji: '🌙',
                         label: 'BEDTIME',
                         labelColor: const Color(0xFFB5B8FF),
@@ -335,10 +338,9 @@ class _SleepPageState extends State<SleepPage> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.09),
+          color: Colors.white.withOpacity(0.09),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: Colors.white.withValues(alpha: 0.18), width: 0.8),
+          border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,9 +437,7 @@ class _SleepPageState extends State<SleepPage> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: ok
-                      ? const Color(0xFF2E7D32)
-                      : const Color(0xFFEF6C00),
+                  color: ok ? const Color(0xFF2E7D32) : const Color(0xFFEF6C00),
                 ),
               ),
             ],
@@ -504,11 +504,11 @@ class _SleepPageState extends State<SleepPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppColors.outline.withValues(alpha: 0.8), width: 0.8),
+        border:
+            Border.all(color: AppColors.outline.withOpacity(0.8), width: 0.8),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -544,16 +544,15 @@ class _SleepPageState extends State<SleepPage> {
               children: <Widget>[
                 Text(
                   '$bedStr → $wakeStr',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textMuted),
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
                 const SizedBox(height: 5),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
                     value: (minutes / _targetMinutes).clamp(0.0, 1.2),
-                    backgroundColor:
-                        AppColors.outline.withValues(alpha: 0.25),
+                    backgroundColor: AppColors.outline.withOpacity(0.25),
                     valueColor: AlwaysStoppedAnimation<Color>(accent),
                     minHeight: 4,
                   ),
@@ -573,8 +572,7 @@ class _SleepPageState extends State<SleepPage> {
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: Icon(Icons.close_rounded,
-                  size: 15,
-                  color: AppColors.textMuted.withValues(alpha: 0.5)),
+                  size: 15, color: AppColors.textMuted.withOpacity(0.5)),
             ),
           ),
         ],
@@ -603,10 +601,10 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+        border: Border.all(color: AppColors.outline.withOpacity(0.8)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -619,8 +617,8 @@ class _StatCard extends StatelessWidget {
                   fontSize: 22, fontWeight: FontWeight.w800, color: color)),
           const SizedBox(height: 3),
           Text(label,
-              style: const TextStyle(
-                  fontSize: 9.5, color: AppColors.textMuted)),
+              style:
+                  const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
         ],
       ),
     );
@@ -656,14 +654,14 @@ class _ConfirmationToast extends StatelessWidget {
                 curve: Curves.easeOutBack,
                 scale: visible ? 1.0 : 0.85,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2E7D32),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: <BoxShadow>[
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
+                        color: Colors.black.withOpacity(0.18),
                         blurRadius: 18,
                         offset: const Offset(0, 6),
                       ),

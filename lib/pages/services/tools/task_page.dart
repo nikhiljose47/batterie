@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
 import 'toolkit.dart';
 
-/// Task-list template. Powers To-Do (plain tasks), Reminders (date+time,
-/// sorted by due, overdue highlighted) and Daily Planner (today-only
-/// time blocks).
 class TaskConfig {
   const TaskConfig({
     required this.id,
@@ -23,39 +19,49 @@ class TaskConfig {
   final String addHint;
   final bool withDate;
   final bool withTime;
-
-  /// Planner mode: entries are pinned to today.
   final bool todayOnly;
   final String? note;
 }
 
 const todoConfig = TaskConfig(
   id: 'todo',
-  title: '✅ To-Do List',
-  addHint: 'Add a task…',
+  title: 'Today To-Do',
+  addHint: 'What needs doing?',
+  withTime: true,
+  todayOnly: true,
+  note: 'Tasks from planner cards open here with the time prefilled.',
 );
 
 const remindersConfig = TaskConfig(
   id: 'reminders',
-  title: '⏰ Reminders',
-  addHint: 'Remind me to…',
+  title: 'Reminders',
+  addHint: 'What should be remembered?',
   withDate: true,
   withTime: true,
-  note: 'Reminders live in-app for now — open the app to check what\'s '
-      'due. OS notifications can be added as a next step.',
+  note: 'Create a dated reminder and keep it visible in the app.',
 );
 
 class TaskToolPage extends StatefulWidget {
-  const TaskToolPage({super.key, required this.config});
+  const TaskToolPage({
+    super.key,
+    required this.config,
+    this.initialDueMinutes,
+  });
+
   final TaskConfig config;
+  final int? initialDueMinutes;
 
   @override
   State<TaskToolPage> createState() => _TaskToolPageState();
 }
 
 class _TaskToolPageState extends State<TaskToolPage> {
+  static const int _titleLimit = 72;
+  static const int _detailsLimit = 180;
+
+  final TextEditingController _title = TextEditingController();
+  final TextEditingController _details = TextEditingController();
   List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
-  final TextEditingController _input = TextEditingController();
   DateTime? _pickedDate;
   TimeOfDay? _pickedTime;
   bool _loaded = false;
@@ -65,6 +71,11 @@ class _TaskToolPageState extends State<TaskToolPage> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialDueMinutes;
+    if (initial != null &&
+        (widget.config.withTime || widget.config.todayOnly)) {
+      _pickedTime = TimeOfDay(hour: (initial ~/ 60) % 24, minute: initial % 60);
+    }
     ServiceStore.loadList(_key).then((list) {
       if (!mounted) return;
       setState(() {
@@ -76,17 +87,29 @@ class _TaskToolPageState extends State<TaskToolPage> {
 
   @override
   void dispose() {
-    _input.dispose();
+    _title.dispose();
+    _details.dispose();
     super.dispose();
   }
 
   DateTime? _dueOf(Map<String, dynamic> item) =>
       DateTime.tryParse(item['due'] as String? ?? '');
 
+  String _itemTitle(Map<String, dynamic> item) {
+    return (item['title'] as String?) ??
+        (item['text'] as String?) ??
+        'Untitled task';
+  }
+
+  String _itemDetails(Map<String, dynamic> item) {
+    return item['details'] as String? ?? '';
+  }
+
   Future<void> _add() async {
     final c = widget.config;
-    final text = _input.text.trim();
-    if (text.isEmpty) return;
+    final title = _title.text.trim();
+    final details = _details.text.trim();
+    if (title.isEmpty && details.isEmpty) return;
 
     DateTime? due;
     if (c.todayOnly || c.withDate || c.withTime) {
@@ -94,17 +117,25 @@ class _TaskToolPageState extends State<TaskToolPage> {
           c.todayOnly ? DateTime.now() : (_pickedDate ?? DateTime.now());
       final tod = _pickedTime;
       due = DateTime(
-          base.year, base.month, base.day, tod?.hour ?? 9, tod?.minute ?? 0);
+        base.year,
+        base.month,
+        base.day,
+        tod?.hour ?? 9,
+        tod?.minute ?? 0,
+      );
     }
 
     setState(() {
       _items.add(<String, dynamic>{
         'id': DateTime.now().microsecondsSinceEpoch.toString(),
-        'text': text,
+        'title': title.isEmpty ? details : title,
+        'text': title.isEmpty ? details : title,
+        'details': details,
         'done': false,
         if (due != null) 'due': due.toIso8601String(),
       });
-      _input.clear();
+      _title.clear();
+      _details.clear();
       _pickedDate = null;
       _pickedTime = null;
     });
@@ -136,7 +167,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
         return due != null && svcDay(due) == today;
       }).toList();
     }
-    // Sort: undone first, then by due time, then insertion.
+
     visible.sort((a, b) {
       final doneA = a['done'] as bool? ?? false;
       final doneB = b['done'] as bool? ?? false;
@@ -147,8 +178,8 @@ class _TaskToolPageState extends State<TaskToolPage> {
       return 0;
     });
 
-    final open = visible.where((i) => !(i['done'] as bool? ?? false));
-    final done = visible.where((i) => i['done'] as bool? ?? false);
+    final open = visible.where((i) => !(i['done'] as bool? ?? false)).toList();
+    final done = visible.where((i) => i['done'] as bool? ?? false).toList();
 
     return Scaffold(
       appBar: svcAppBar(c.title),
@@ -157,197 +188,412 @@ class _TaskToolPageState extends State<TaskToolPage> {
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.large),
               children: <Widget>[
-                if (c.note != null)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceTint.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(c.note!,
-                        style: const TextStyle(
-                            fontSize: 10.5,
-                            fontStyle: FontStyle.italic,
-                            color: AppColors.textMuted)),
-                  ),
-
-                // Add row
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: SizedBox(
-                        height: 38,
-                        child: TextField(
-                          controller: _input,
-                          onSubmitted: (_) => _add(),
-                          style: const TextStyle(fontSize: 12.5),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: c.addHint,
-                            hintStyle: TextStyle(
-                                fontSize: 11.5,
-                                color: AppColors.textMuted.withOpacity(0.8)),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                  color: AppColors.outline.withOpacity(0.9)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                  color: AppColors.primary, width: 1.2),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: _add,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 40,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.add_rounded,
-                            color: Colors.white, size: 22),
-                      ),
+                _buildComposer(c, open.length, done.length),
+                const SizedBox(height: 16),
+                if (open.isEmpty && done.isEmpty)
+                  const EmptyHint('Nothing here yet. Add your first note.')
+                else ...<Widget>[
+                  if (open.isNotEmpty) ...<Widget>[
+                    SectionLabel(c.todayOnly ? "Today's tasks" : 'Open'),
+                    _TaskGrid(
+                      items: open,
+                      dueLabel: _dueLabel,
+                      titleOf: _itemTitle,
+                      detailsOf: _itemDetails,
+                      onToggle: _toggle,
+                      onRemove: _remove,
                     ),
                   ],
-                ),
-                if (c.withDate || c.withTime)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(
-                      children: <Widget>[
-                        if (c.withDate)
-                          SvcChip(
-                            label: _pickedDate == null
-                                ? '📅 Date'
-                                : '📅 ${svcDayLabel(svcDay(_pickedDate!))}',
-                            selected: _pickedDate != null,
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime.now()
-                                    .subtract(const Duration(days: 1)),
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 365)),
-                              );
-                              if (picked != null) {
-                                setState(() => _pickedDate = picked);
-                              }
-                            },
-                          ),
-                        if (c.withDate) const SizedBox(width: 6),
-                        if (c.withTime)
-                          SvcChip(
-                            label: _pickedTime == null
-                                ? '🕐 Time'
-                                : '🕐 ${_pickedTime!.format(context)}',
-                            selected: _pickedTime != null,
-                            onTap: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay.now(),
-                              );
-                              if (picked != null) {
-                                setState(() => _pickedTime = picked);
-                              }
-                            },
-                          ),
-                      ],
+                  if (done.isNotEmpty) ...<Widget>[
+                    const SectionLabel('Done'),
+                    _TaskGrid(
+                      items: done,
+                      dueLabel: _dueLabel,
+                      titleOf: _itemTitle,
+                      detailsOf: _itemDetails,
+                      onToggle: _toggle,
+                      onRemove: _remove,
                     ),
-                  ),
-                const SizedBox(height: 6),
-
-                if (open.isEmpty && done.isEmpty)
-                  const EmptyHint('Nothing here yet — add the first one.'),
-                if (open.isNotEmpty) ...<Widget>[
-                  SectionLabel(c.todayOnly ? "Today's blocks" : 'Open'),
-                  for (final item in open) _tile(item, false),
-                ],
-                if (done.isNotEmpty) ...<Widget>[
-                  const SectionLabel('Done'),
-                  for (final item in done) _tile(item, true),
+                  ],
                 ],
               ],
             ),
     );
   }
 
-  Widget _tile(Map<String, dynamic> item, bool done) {
-    final due = _dueOf(item);
-    final overdue = !done &&
-        due != null &&
-        widget.config.withDate &&
-        due.isBefore(DateTime.now());
-
-    String? dueLabel;
-    if (due != null) {
-      if (widget.config.withDate) {
-        dueLabel = '${svcDayLabel(svcDay(due))} · ${svcClock(due)}';
-      } else if (widget.config.withTime) {
-        dueLabel = svcClock(due);
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: WhiteCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          children: <Widget>[
-            Checkbox(
-              value: done,
-              activeColor: AppColors.primary,
-              onChanged: (_) => _toggle(item['id'] as String),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    item['text'] as String,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      decoration: done ? TextDecoration.lineThrough : null,
-                      color:
-                          done ? AppColors.textMuted : const Color(0xFF2A2E3B),
-                    ),
-                  ),
-                  if (dueLabel != null)
-                    Text(
-                      overdue ? '⚠️ $dueLabel' : dueLabel,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
-                        color: overdue
-                            ? const Color(0xFFC62828)
-                            : AppColors.textMuted,
-                      ),
-                    ),
-                ],
+  Widget _buildComposer(TaskConfig c, int openCount, int doneCount) {
+    final colors = Theme.of(context).colorScheme;
+    return WhiteCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              _TaskStat(label: 'Open', value: openCount.toString()),
+              const SizedBox(width: 8),
+              _TaskStat(label: 'Done', value: doneCount.toString()),
+              const Spacer(),
+              Icon(Icons.lightbulb_outline_rounded,
+                  size: 20, color: colors.primary),
+            ],
+          ),
+          if (c.note != null) ...<Widget>[
+            const SizedBox(height: 10),
+            Text(
+              c.note!,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface.withOpacity(0.55),
               ),
             ),
-            InkWell(
-              onTap: () => _remove(item['id'] as String),
-              child: Icon(Icons.close_rounded,
-                  size: 16, color: AppColors.textMuted.withOpacity(0.6)),
+          ],
+          const SizedBox(height: 14),
+          TextField(
+            controller: _title,
+            maxLength: _titleLimit,
+            textInputAction: TextInputAction.next,
+            style: TextStyle(
+              fontSize: 18,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
+              color: colors.onSurface,
+            ),
+            decoration: _fieldDecoration(
+              context,
+              hint: c.addHint,
+              counter: '${_title.text.length}/$_titleLimit',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _details,
+            maxLength: _detailsLimit,
+            maxLines: 5,
+            minLines: 3,
+            style: TextStyle(
+              fontSize: 14.5,
+              height: 1.42,
+              fontWeight: FontWeight.w600,
+              color: colors.onSurface.withOpacity(0.78),
+            ),
+            decoration: _fieldDecoration(
+              context,
+              hint: 'Add details',
+              counter: '${_details.text.length}/$_detailsLimit',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          if (c.withDate || c.withTime) ...<Widget>[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                if (c.withDate)
+                  SvcChip(
+                    label: _pickedDate == null
+                        ? 'Date'
+                        : svcDayLabel(svcDay(_pickedDate!)),
+                    selected: _pickedDate != null,
+                    onTap: _selectDate,
+                  ),
+                if (c.withTime)
+                  SvcChip(
+                    label: _pickedTime == null
+                        ? 'Time'
+                        : _pickedTime!.format(context),
+                    selected: _pickedTime != null,
+                    onTap: _selectTime,
+                  ),
+              ],
             ),
           ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: FilledButton.icon(
+              onPressed: _add,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add task'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _fieldDecoration(
+    BuildContext context, {
+    required String hint,
+    required String counter,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return InputDecoration(
+      counterText: counter,
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: colors.onSurface.withOpacity(0.38),
+        fontWeight: FontWeight.w700,
+      ),
+      filled: true,
+      fillColor: colors.surfaceTint.withOpacity(0.55),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: colors.outline.withOpacity(0.5)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: colors.primary, width: 1.4),
+      ),
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _pickedDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _pickedDate = picked);
+  }
+
+  Future<void> _selectTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _pickedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null) setState(() => _pickedTime = picked);
+  }
+
+  String? _dueLabel(Map<String, dynamic> item) {
+    final due = _dueOf(item);
+    if (due == null) return null;
+    if (widget.config.withDate) {
+      return '${svcDayLabel(svcDay(due))} - ${svcClock(due)}';
+    }
+    if (widget.config.withTime) return svcClock(due);
+    return null;
+  }
+}
+
+class _TaskGrid extends StatelessWidget {
+  const _TaskGrid({
+    required this.items,
+    required this.dueLabel,
+    required this.titleOf,
+    required this.detailsOf,
+    required this.onToggle,
+    required this.onRemove,
+  });
+
+  final List<Map<String, dynamic>> items;
+  final String? Function(Map<String, dynamic>) dueLabel;
+  final String Function(Map<String, dynamic>) titleOf;
+  final String Function(Map<String, dynamic>) detailsOf;
+  final ValueChanged<String> onToggle;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumns = constraints.maxWidth >= 620;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: <Widget>[
+            for (final item in items)
+              SizedBox(
+                width: twoColumns
+                    ? (constraints.maxWidth - 10) / 2
+                    : constraints.maxWidth,
+                child: _TaskNoteCard(
+                  item: item,
+                  title: titleOf(item),
+                  details: detailsOf(item),
+                  dueLabel: dueLabel(item),
+                  onToggle: () => onToggle(item['id'] as String),
+                  onRemove: () => onRemove(item['id'] as String),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TaskNoteCard extends StatelessWidget {
+  const _TaskNoteCard({
+    required this.item,
+    required this.title,
+    required this.details,
+    required this.dueLabel,
+    required this.onToggle,
+    required this.onRemove,
+  });
+
+  final Map<String, dynamic> item;
+  final String title;
+  final String details;
+  final String? dueLabel;
+  final VoidCallback onToggle;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final done = item['done'] as bool? ?? false;
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: done
+                  ? colors.outline.withOpacity(0.52)
+                  : colors.primary.withOpacity(0.28),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 17,
+                        height: 1.22,
+                        fontWeight: FontWeight.w900,
+                        decoration: done ? TextDecoration.lineThrough : null,
+                        color: done
+                            ? colors.onSurface.withOpacity(0.42)
+                            : colors.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    done
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 24,
+                    color: done
+                        ? colors.primary
+                        : colors.onSurface.withOpacity(0.34),
+                  ),
+                ],
+              ),
+              if (details.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 10),
+                Text(
+                  details,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface.withOpacity(done ? 0.38 : 0.62),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  if (dueLabel != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceTint.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        dueLabel!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: colors.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: onRemove,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 19,
+                      color: colors.onSurface.withOpacity(0.48),
+                    ),
+                    tooltip: 'Delete',
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _TaskStat extends StatelessWidget {
+  const _TaskStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.surfaceTint.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: colors.onSurface.withOpacity(0.56),
+            ),
+          ),
+        ],
       ),
     );
   }

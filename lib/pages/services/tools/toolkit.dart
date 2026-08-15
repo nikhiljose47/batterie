@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../constants/app_colors.dart';
-
 // ═══════════════════════════════════════════════════════════════════════
 //  SERVICES TOOLKIT — shared storage + UI bits every mini-app uses.
 //
@@ -94,15 +92,16 @@ class SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(left: 4, top: 6, bottom: 8),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
-          color: AppColors.textMuted,
+          color: colors.onSurface.withOpacity(0.58),
         ),
       ),
     );
@@ -116,13 +115,22 @@ class WhiteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: padding ?? const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline.withOpacity(0.8)),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outline.withOpacity(0.58)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(dark ? 0.22 : 0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: child,
     );
@@ -135,6 +143,7 @@ class EmptyHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 28),
       child: Center(
@@ -144,7 +153,7 @@ class EmptyHint extends StatelessWidget {
           style: TextStyle(
             fontSize: 11.5,
             fontStyle: FontStyle.italic,
-            color: AppColors.textMuted.withOpacity(0.8),
+            color: colors.onSurface.withOpacity(0.56),
           ),
         ),
       ),
@@ -166,18 +175,17 @@ class SvcChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
+          color: selected ? colors.primary : colors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? AppColors.primary
-                : AppColors.outline.withOpacity(0.9),
+            color: selected ? colors.primary : colors.outline.withOpacity(0.58),
           ),
         ),
         child: Text(
@@ -185,7 +193,7 @@ class SvcChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : const Color(0xFF2A2E3B),
+            color: selected ? colors.onPrimary : colors.onSurface,
           ),
         ),
       ),

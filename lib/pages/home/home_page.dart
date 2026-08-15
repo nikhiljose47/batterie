@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
 import '../dashboard/dashboard_controller.dart';
@@ -11,6 +10,7 @@ import '../news/news_page.dart';
 import '../others/others_page.dart';
 import '../profile/profile_page.dart';
 import '../profile/templates_page.dart';
+import '../settings/settings_page.dart';
 import '../services/services_page.dart';
 import '../weather/weather_controller.dart';
 import 'home_controller.dart';
@@ -61,6 +61,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 40,
@@ -77,12 +78,12 @@ class _HomePageState extends State<HomePage>
               MaterialPageRoute<void>(builder: (_) => const ServicesPage()),
             ),
             borderRadius: BorderRadius.circular(8),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Icon(
                 Icons.widgets_outlined,
                 size: 19,
-                color: AppColors.textMuted,
+                color: colors.onSurface.withOpacity(0.58),
               ),
             ),
           ),
@@ -115,12 +116,12 @@ class _HomePageState extends State<HomePage>
                   ),
                 ),
             ],
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Icon(
                 Icons.science_outlined,
                 size: 19,
-                color: AppColors.textMuted,
+                color: colors.onSurface.withOpacity(0.58),
               ),
             ),
           ),
@@ -148,16 +149,23 @@ class _HomePageState extends State<HomePage>
                   label: 'Templates',
                 ),
               ),
+              PopupMenuItem<_ProfileMenuAction>(
+                value: _ProfileMenuAction.settings,
+                child: _ProfileMenuItem(
+                  icon: Icons.settings_outlined,
+                  label: 'Settings',
+                ),
+              ),
             ],
-            child: const Padding(
-              padding: EdgeInsets.only(right: AppSpacing.medium),
+            child: Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.medium),
               child: CircleAvatar(
                 radius: 14,
-                backgroundColor: AppColors.surfaceTint,
+                backgroundColor: colors.surfaceTint,
                 child: Icon(
                   Icons.person_rounded,
                   size: 17,
-                  color: AppColors.primary,
+                  color: colors.primary,
                 ),
               ),
             ),
@@ -166,16 +174,18 @@ class _HomePageState extends State<HomePage>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),
           child: DecoratedBox(
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(bottom: BorderSide(color: AppColors.outline)),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border(
+                bottom: BorderSide(color: colors.outline.withOpacity(0.6)),
+              ),
             ),
             child: TabBar(
               controller: _tabController,
-              indicatorColor: AppColors.primary,
+              indicatorColor: colors.primary,
               indicatorWeight: 2,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textMuted,
+              labelColor: colors.primary,
+              unselectedLabelColor: colors.onSurface.withOpacity(0.58),
               labelPadding: EdgeInsets.zero,
               tabs: const <Widget>[
                 _ThinTab(icon: Icons.home_outlined, label: AppStrings.homeTab),
@@ -210,6 +220,7 @@ class _HomePageState extends State<HomePage>
       _ProfileMenuAction.profile => const ProfilePage(),
       _ProfileMenuAction.templates =>
         TemplatesPage(controller: _dashboardController),
+      _ProfileMenuAction.settings => const SettingsPage(),
     };
 
     Navigator.of(context).push(
@@ -234,6 +245,7 @@ class _HomePageState extends State<HomePage>
 enum _ProfileMenuAction {
   profile,
   templates,
+  settings,
 }
 
 class _ProfileMenuItem extends StatelessWidget {
@@ -247,9 +259,10 @@ class _ProfileMenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Row(
       children: <Widget>[
-        Icon(icon, size: 20, color: AppColors.textMuted),
+        Icon(icon, size: 20, color: colors.onSurface.withOpacity(0.62)),
         const SizedBox(width: AppSpacing.medium),
         Text(label),
       ],
@@ -267,6 +280,7 @@ class _LocationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -286,20 +300,21 @@ class _LocationChip extends StatelessWidget {
           label = location.placeLabel ??
               '${location.latitude.toStringAsFixed(1)}°,'
                   '${location.longitude.toStringAsFixed(1)}°';
-          fg = const Color(0xFF2E7D32);
-          bg = const Color(0xFFE8F5E9);
+          fg = colors.primary;
+          bg = colors.primary.withOpacity(0.12);
         } else if (isOff) {
           label = 'Location off';
-          fg = const Color(0xFFC62828);
-          bg = const Color(0xFFFFEBEE);
+          fg = colors.error;
+          bg = colors.error.withOpacity(0.12);
         } else {
           label = 'Locating…';
-          fg = AppColors.textMuted;
-          bg = AppColors.surfaceTint;
+          fg = colors.onSurface.withOpacity(0.62);
+          bg = colors.surfaceTint;
         }
 
-        final needsPermission = state.status == WeatherStatus.permissionDenied ||
-            state.status == WeatherStatus.permissionDeniedForever;
+        final needsPermission =
+            state.status == WeatherStatus.permissionDenied ||
+                state.status == WeatherStatus.permissionDeniedForever;
         return InkWell(
           onTap: needsPermission
               ? controller.requestPermissionAndLoad
@@ -311,7 +326,7 @@ class _LocationChip extends StatelessWidget {
               color: bg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: fg.withValues(alpha: 0.35),
+                color: fg.withOpacity(0.35),
                 width: 0.8,
               ),
             ),

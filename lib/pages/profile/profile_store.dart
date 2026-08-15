@@ -13,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Current keys:
 //   profile.name       — display name (String, default 'You')
 //   profile.photo.path — absolute path to local profile photo (String?)
-//   user.planner.mode  — selected day mode id (String, default 'normal')
+//   user.planner.mode  — selected day mode id (String, default 'healthy')
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Singleton that holds the user's profile data in memory (ValueNotifiers)
@@ -31,7 +31,7 @@ class ProfileStore {
 
   final ValueNotifier<String> name = ValueNotifier<String>('You');
   final ValueNotifier<String?> photoPath = ValueNotifier<String?>(null);
-  final ValueNotifier<String> plannerMode = ValueNotifier<String>('normal');
+  final ValueNotifier<String> plannerMode = ValueNotifier<String>('healthy');
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,7 +40,9 @@ class ProfileStore {
     if (storedName != null && storedName.isNotEmpty) name.value = storedName;
 
     final storedMode = prefs.getString(_modeKey);
-    if (storedMode != null && storedMode.isNotEmpty) plannerMode.value = storedMode;
+    if (storedMode != null && storedMode.isNotEmpty) {
+      plannerMode.value = _normalizePlannerMode(storedMode);
+    }
 
     final stored = prefs.getString(_photoKey);
     if (stored != null && File(stored).existsSync()) photoPath.value = stored;
@@ -55,9 +57,18 @@ class ProfileStore {
   }
 
   Future<void> setPlannerMode(String modeId) async {
+    final normalized = _normalizePlannerMode(modeId);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_modeKey, modeId);
-    plannerMode.value = modeId;
+    await prefs.setString(_modeKey, normalized);
+    plannerMode.value = normalized;
+  }
+
+  String _normalizePlannerMode(String modeId) {
+    return switch (modeId) {
+      'normal' => 'healthy',
+      'normal_pro' => 'healthy_pro',
+      _ => modeId,
+    };
   }
 
   Future<void> setPhoto(String path) async {

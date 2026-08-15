@@ -8,7 +8,9 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'app.dart';
 import 'pages/profile/profile_store.dart';
 import 'services/custom_mode_store.dart';
+import 'services/alarm_notification_service.dart';
 import 'services/sleep_schedule_store.dart';
+import 'services/theme_mode_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,5 +26,7 @@ Future<void> main() async {
   await ProfileStore.instance.init();
   await SleepScheduleStore.instance.init();
   await CustomModeStore.instance.init();
+  await ThemeModeStore.instance.init();
+  await AlarmNotificationService.instance.init();
   runApp(const EnergyHealthApp());
 }

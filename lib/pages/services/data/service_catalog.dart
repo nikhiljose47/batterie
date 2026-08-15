@@ -446,6 +446,19 @@ const List<AppService> serviceCatalog = <AppService>[
     ],
   ),
   AppService(
+    id: 'alarms',
+    emoji: '⏰',
+    name: 'Alarms',
+    tagline: 'Planner alarms with sound',
+    category: ServiceCategory.productivity,
+    keywords: <String>['alarm', 'clock', 'wake', 'notify', 'ring'],
+    features: <String>[
+      'Create alarms from planner cards',
+      'Custom sound notification',
+      'Works after app close where OS allows',
+    ],
+  ),
+  AppService(
     id: 'reminders',
     emoji: '⏰',
     name: 'Reminders',
