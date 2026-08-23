@@ -163,11 +163,9 @@ class _HabitToolPageState extends State<HabitToolPage> {
                   child: Row(
                     children: <Widget>[
                       Text(
-                        _items.isEmpty
-                            ? '—'
-                            : '$doneToday / ${_items.length}',
+                        _items.isEmpty ? '—' : '$doneToday / ${_items.length}',
                         style: const TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.w800),
+                            fontSize: 24, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(width: 10),
                       Expanded(

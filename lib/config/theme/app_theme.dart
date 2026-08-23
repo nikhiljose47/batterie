@@ -22,6 +22,7 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.scaffoldBackground,
       useMaterial3: true,
+      fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surface,
         surfaceTintColor: AppColors.surface,
@@ -31,7 +32,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           color: AppColors.primary,
         ),
       ),
@@ -43,7 +44,7 @@ class AppTheme {
         selectedLabelStyle: TextStyle(fontSize: 12),
         unselectedLabelStyle: TextStyle(fontSize: 12),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -123,6 +124,7 @@ class AppTheme {
       scaffoldBackgroundColor: scaffold,
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
         backgroundColor: surface,
         surfaceTintColor: surface,
@@ -132,7 +134,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           color: AppColors.secondary,
         ),
       ),
@@ -144,7 +146,7 @@ class AppTheme {
         selectedLabelStyle: TextStyle(fontSize: 12),
         unselectedLabelStyle: TextStyle(fontSize: 12),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,

@@ -1,11 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
-import 'profile_store.dart';
+import 'profile_bloc.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,8 +19,8 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _picking = false;
 
   Future<void> _editName() async {
-    final controller =
-        TextEditingController(text: ProfileStore.instance.name.value);
+    final profileBloc = context.read<ProfileBloc>();
+    final controller = TextEditingController(text: profileBloc.state.name);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -45,7 +46,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (result != null && result.trim().isNotEmpty) {
-      await ProfileStore.instance.setName(result);
+      await profileBloc.setName(result);
     }
   }
 
@@ -60,7 +61,7 @@ class _ProfilePageState extends State<ProfilePage> {
         imageQuality: 85,
       );
       if (file != null && mounted) {
-        await ProfileStore.instance.setPhoto(file.path);
+        await context.read<ProfileBloc>().setPhoto(file.path);
       }
     } finally {
       if (mounted) setState(() => _picking = false);
@@ -80,7 +81,8 @@ class _ProfilePageState extends State<ProfilePage> {
           _buildPhotoCard(),
           const SizedBox(height: AppSpacing.large),
           const _InfoTile(icon: Icons.cake_outlined, label: 'Age', value: '28'),
-          const _InfoTile(icon: Icons.public_rounded, label: 'Country', value: 'India'),
+          const _InfoTile(
+              icon: Icons.public_rounded, label: 'Country', value: 'India'),
           const _InfoTile(
             icon: Icons.monitor_heart_outlined,
             label: 'Details',
@@ -93,9 +95,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildPhotoCard() {
-    return ValueListenableBuilder<String?>(
-      valueListenable: ProfileStore.instance.photoPath,
-      builder: (context, path, _) {
+    return BlocBuilder<ProfileBloc, ProfileState>(
+      builder: (context, profile) {
+        final path = profile.photoPath;
         final hasPhoto = path != null && File(path).existsSync();
         return Container(
           padding: const EdgeInsets.all(AppSpacing.large),
@@ -111,10 +113,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Stack(
                   children: <Widget>[
                     CircleAvatar(
+                      key: ValueKey<String?>(path),
                       radius: 44,
                       backgroundColor: AppColors.surfaceTint,
-                      backgroundImage:
-                          hasPhoto ? FileImage(File(path)) : null,
+                      backgroundImage: hasPhoto ? FileImage(File(path)) : null,
                       child: hasPhoto
                           ? null
                           : const Icon(Icons.person_rounded,
@@ -146,9 +148,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 14),
-              ValueListenableBuilder<String>(
-                valueListenable: ProfileStore.instance.name,
-                builder: (_, displayName, __) => GestureDetector(
+              BlocSelector<ProfileBloc, ProfileState, String>(
+                selector: (state) => state.name,
+                builder: (_, displayName) => GestureDetector(
                   onTap: _editName,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -156,7 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       Text(
                         displayName,
                         style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w800),
+                            fontSize: 20, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(width: 6),
                       const Icon(Icons.edit_rounded,
@@ -173,7 +175,7 @@ class _ProfilePageState extends State<ProfilePage> {
               if (hasPhoto) ...<Widget>[
                 const SizedBox(height: 10),
                 GestureDetector(
-                  onTap: () => ProfileStore.instance.clearPhoto(),
+                  onTap: () => context.read<ProfileBloc>().clearPhoto(),
                   child: const Text(
                     'Remove photo',
                     style: TextStyle(

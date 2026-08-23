@@ -1,7 +1,15 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import '../../constants/article_constants.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
+import '../../repositories/energy_health_repository.dart';
+import '../../shared/widgets/profile_avatar.dart';
+import '../auth/auth_page.dart';
 import '../dashboard/dashboard_controller.dart';
 import '../dashboard/dashboard_page.dart';
 import '../dev/data_inspector_page.dart';
@@ -27,6 +35,8 @@ class _HomePageState extends State<HomePage>
   late final HomeController _controller;
   late final DashboardController _dashboardController;
   late final TabController _tabController;
+  Timer? _articlePreloadTimer;
+  int _othersRefreshToken = 0;
 
   /// Shared with the Home tab so the top-bar location chip and the planner
   /// weather read from the same snapshot.
@@ -38,25 +48,55 @@ class _HomePageState extends State<HomePage>
     _controller = HomeController();
     _dashboardController = DashboardController()..load();
     _weatherController = WeatherController()..load();
+    final initialIndex = _controller.state.selectedIndex.clamp(0, 3) as int;
     _tabController = TabController(
       length: 4,
       vsync: this,
-      initialIndex: _controller.state.selectedIndex,
+      initialIndex: initialIndex,
     );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         _controller.updateSelectedIndex(_tabController.index);
+        if (_tabController.index == 1 && mounted) {
+          setState(() => _othersRefreshToken++);
+        }
       }
     });
+    _articlePreloadTimer = Timer(
+      const Duration(seconds: 4),
+      _preloadArticleImages,
+    );
   }
 
   @override
   void dispose() {
+    _articlePreloadTimer?.cancel();
     _tabController.dispose();
     _dashboardController.dispose();
     _weatherController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _preloadArticleImages() async {
+    if (!mounted) return;
+    try {
+      final articles = await const EnergyHealthRepository().getNewsArticles();
+      if (!mounted) return;
+      final urls = articles
+          .take(ArticleConstants.preloadArticleCount)
+          .map(ArticleConstants.webImageForArticle)
+          .whereType<String>()
+          .where((url) => url.isNotEmpty)
+          .toSet();
+      for (final url in urls) {
+        if (!mounted) return;
+        await precacheImage(NetworkImage(url), context);
+      }
+    } catch (_) {
+      // Article loading is non-critical; the Articles tab keeps its own
+      // local image fallback if a warm-up request fails.
+    }
   }
 
   @override
@@ -126,6 +166,19 @@ class _HomePageState extends State<HomePage>
             ),
           ),
           const SizedBox(width: 4),
+          StreamBuilder<User?>(
+            stream: _authStateChanges(),
+            builder: (context, snapshot) {
+              if (snapshot.data != null) return const SizedBox.shrink();
+              return TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const AuthPage()),
+                ),
+                child: const Text('Sign in'),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
           PopupMenuButton<_ProfileMenuAction>(
             tooltip: 'Profile',
             offset: const Offset(0, 36),
@@ -159,14 +212,10 @@ class _HomePageState extends State<HomePage>
             ],
             child: Padding(
               padding: const EdgeInsets.only(right: AppSpacing.medium),
-              child: CircleAvatar(
+              child: ProfileAvatar(
                 radius: 14,
                 backgroundColor: colors.surfaceTint,
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 17,
-                  color: colors.primary,
-                ),
+                iconSize: 17,
               ),
             ),
           ),
@@ -190,29 +239,34 @@ class _HomePageState extends State<HomePage>
               tabs: const <Widget>[
                 _ThinTab(icon: Icons.home_outlined, label: AppStrings.homeTab),
                 _ThinTab(
-                    icon: Icons.update_rounded, label: AppStrings.updatesTab),
+                  icon: Icons.stacked_line_chart_rounded,
+                  label: AppStrings.statusTab,
+                ),
                 _ThinTab(icon: Icons.bolt_outlined, label: AppStrings.youTab),
                 _ThinTab(
-                    icon: Icons.article_outlined, label: AppStrings.newsTab),
+                  icon: Icons.article_outlined,
+                  label: AppStrings.articlesTab,
+                ),
               ],
             ),
           ),
         ),
       ),
-      // Swipe left/right between tabs, WhatsApp-style. The dashboard's rail
-      // still scrolls fine underneath — the deepest scrollable under the
-      // finger wins the gesture, so dragging on the rail scrolls the rail,
-      // and dragging anywhere else changes tabs.
       body: TabBarView(
         controller: _tabController,
         children: <Widget>[
           HomeTabPage(weatherController: _weatherController),
-          const OthersPage(),
+          OthersPage(refreshToken: _othersRefreshToken),
           DashboardPage(controller: _dashboardController),
           const NewsPage(),
         ],
       ),
     );
+  }
+
+  Stream<User?> _authStateChanges() {
+    if (Firebase.apps.isEmpty) return const Stream<User?>.empty();
+    return FirebaseAuth.instance.authStateChanges();
   }
 
   void _handleProfileMenu(_ProfileMenuAction action) {
@@ -359,7 +413,6 @@ class _LocationChip extends StatelessWidget {
   }
 }
 
-/// Compact icon+label tab, sized to keep the whole top bar thin.
 class _ThinTab extends StatelessWidget {
   const _ThinTab({required this.icon, required this.label});
 
@@ -376,9 +429,10 @@ class _ThinTab extends StatelessWidget {
         children: <Widget>[
           Icon(icon, size: 18),
           const SizedBox(width: 6),
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );

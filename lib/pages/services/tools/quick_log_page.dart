@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
+import '../../../services/service_energy_logger.dart';
 import 'toolkit.dart';
 
 /// Timestamped-entry log template. One page powers Notes, Journal,
@@ -95,13 +96,7 @@ const hobbyLogConfig = QuickLogConfig(
 const moodLogConfig = QuickLogConfig(
   id: 'mood',
   title: '🙂 Mood Tracker',
-  chips: <String>[
-    '😞 Low',
-    '😕 Meh',
-    '🙂 Okay',
-    '😀 Good',
-    '🤩 Great'
-  ],
+  chips: <String>['😞 Low', '😕 Meh', '🙂 Okay', '😀 Good', '🤩 Great'],
   chipRequired: true,
   textHint: 'Why? (optional)',
   emptyHint: 'One tap a day builds your mood picture.',
@@ -182,6 +177,29 @@ class _QuickLogPageState extends State<QuickLogPage> {
       _chip = null;
     });
     await ServiceStore.saveList(_key, _entries);
+    await _writeEnergyLog(num);
+  }
+
+  Future<void> _writeEnergyLog(int? number) async {
+    final activityId = switch (widget.config.id) {
+      'screen_time' => 'social_media_scrolling',
+      'journal' => 'mindfulness_meditation',
+      'mood' => 'mindfulness_meditation',
+      'symptoms' => 'slow_breathing_exercise',
+      'hobby' => 'cooking_light_meal',
+      _ => 'mindfulness_meditation',
+    };
+    final duration = switch (widget.config.id) {
+      'screen_time' => (number ?? 30).clamp(1, 1440).toInt(),
+      'hobby' => (number ?? 30).clamp(1, 1440).toInt(),
+      _ => 5,
+    };
+    await ServiceEnergyLogger.instance.addServiceLog(
+      sourceId: widget.config.id,
+      activityId: activityId,
+      at: DateTime.now(),
+      durationMinutes: duration,
+    );
   }
 
   Future<void> _delete(int index) async {

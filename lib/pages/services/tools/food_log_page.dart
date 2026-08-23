@@ -146,9 +146,8 @@ class _FoodLogPageState extends State<FoodLogPage> {
     }
 
     return Scaffold(
-      appBar: svcAppBar(widget.showMacros
-          ? '🥦 Nutrition Tracker'
-          : '🍽️ Calorie Counter'),
+      appBar: svcAppBar(
+          widget.showMacros ? '🥦 Nutrition Tracker' : '🍽️ Calorie Counter'),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -165,7 +164,7 @@ class _FoodLogPageState extends State<FoodLogPage> {
                             '$todayKcal',
                             style: TextStyle(
                               fontSize: 26,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: over
                                   ? const Color(0xFFC62828)
                                   : const Color(0xFF2A2E3B),
@@ -309,7 +308,7 @@ class _FoodLogPageState extends State<FoodLogPage> {
                               '${e['kcal']} kcal',
                               style: const TextStyle(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.primary),
                             ),
                             const SizedBox(width: 8),
@@ -374,7 +373,7 @@ class _MacroStat extends StatelessWidget {
       children: <Widget>[
         Text('${value}g',
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+                fontSize: 16, fontWeight: FontWeight.w700, color: color)),
         Text(label,
             style: const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
       ],

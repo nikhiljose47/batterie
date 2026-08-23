@@ -29,6 +29,7 @@ class NewsArticleCard extends StatelessWidget {
           children: <Widget>[
             ArticleHeroImage(
               imageUrl: article.imageUrl,
+              imageTag: article.imageTag,
               height: AppSpacing.newsImageHeight,
             ),
             Padding(
@@ -58,7 +59,7 @@ class NewsArticleCard extends StatelessWidget {
                   Text(
                     article.title,
                     style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.small),

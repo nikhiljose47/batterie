@@ -62,7 +62,7 @@ class _RecipePageState extends State<RecipePage> {
           children: <Widget>[
             Text(existing == null ? 'New recipe' : 'Edit recipe',
                 style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             TextField(
               controller: name,
@@ -176,7 +176,7 @@ class _RecipePageState extends State<RecipePage> {
                                         const Text('INGREDIENTS',
                                             style: TextStyle(
                                                 fontSize: 9,
-                                                fontWeight: FontWeight.w800,
+                                                fontWeight: FontWeight.w700,
                                                 letterSpacing: 0.8,
                                                 color: AppColors.textMuted)),
                                         const SizedBox(height: 3),
@@ -190,7 +190,7 @@ class _RecipePageState extends State<RecipePage> {
                                         const Text('STEPS',
                                             style: TextStyle(
                                                 fontSize: 9,
-                                                fontWeight: FontWeight.w800,
+                                                fontWeight: FontWeight.w700,
                                                 letterSpacing: 0.8,
                                                 color: AppColors.textMuted)),
                                         const SizedBox(height: 3),

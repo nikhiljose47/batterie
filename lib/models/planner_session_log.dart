@@ -1,3 +1,19 @@
+class PlannerSessionStatus {
+  const PlannerSessionStatus._();
+
+  static const String done = 'done';
+  static const String partial = 'partial';
+  static const String notDone = 'not_done';
+
+  static String normalize(Object? value, {required bool isDone}) {
+    final text = value is String ? value.trim() : '';
+    return switch (text) {
+      done || partial || notDone => text,
+      _ => isDone ? done : notDone,
+    };
+  }
+}
+
 class PlannerSessionLog {
   const PlannerSessionLog({
     required this.id,
@@ -8,7 +24,9 @@ class PlannerSessionLog {
     required this.endMinutes,
     required this.title,
     required this.isDone,
-  });
+    String? status,
+  }) : status = status ??
+            (isDone ? PlannerSessionStatus.done : PlannerSessionStatus.notDone);
 
   final String id;
   final String userId;
@@ -18,6 +36,10 @@ class PlannerSessionLog {
   final int endMinutes;
   final String title;
   final bool isDone;
+  final String status;
+
+  bool get isPartiallyDone => status == PlannerSessionStatus.partial;
+  bool get isExplicitlyNotDone => status == PlannerSessionStatus.notDone;
 
   Map<String, Object?> toMap() => <String, Object?>{
         'id': id,
@@ -28,6 +50,7 @@ class PlannerSessionLog {
         'end_minutes': endMinutes,
         'title': title,
         'is_done': isDone ? 1 : 0,
+        'status': status,
       };
 
   factory PlannerSessionLog.fromMap(Map<String, Object?> map) {
@@ -40,6 +63,10 @@ class PlannerSessionLog {
       endMinutes: map['end_minutes'] as int,
       title: map['title'] as String,
       isDone: (map['is_done'] as int) == 1,
+      status: PlannerSessionStatus.normalize(
+        map['status'],
+        isDone: (map['is_done'] as int) == 1,
+      ),
     );
   }
 }

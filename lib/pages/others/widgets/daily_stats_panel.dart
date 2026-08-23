@@ -10,8 +10,46 @@ import '../../../models/logged_activity.dart';
 import '../../../models/planner_session_log.dart';
 import '../../../pages/profile/profile_store.dart';
 import '../../../services/energy_log_store.dart';
+import '../../services/tools/toolkit.dart';
 
-enum StatsMetric { both, physical, brain }
+enum StatsHeatmapRange {
+  threeDays('3 days', 3),
+  week('1 week', 7),
+  month('1 month', 31),
+  threeMonths('3 months', 92),
+  sixMonths('6 months', 183),
+  all('All time', null);
+
+  const StatsHeatmapRange(this.label, this.days);
+  final String label;
+  final int? days;
+}
+
+const List<String> _contributionListKeys = <String>[
+  'svc.notes.entries',
+  'svc.journal.entries',
+  'svc.symptoms.entries',
+  'svc.hobby.entries',
+  'svc.mood.entries',
+  'svc.screen_time.entries',
+  'svc.food.entries',
+  'svc.sleep.entries',
+  'svc.focus.sessions',
+  'svc.meditation.sessions',
+  'svc.sleep_sounds.sessions',
+  'svc.fasting.sessions',
+  'svc.expenses.entries',
+];
+
+const List<String> _contributionTaskKeys = <String>[
+  'svc.todo.items',
+  'svc.reminders.items',
+];
+
+const List<String> _contributionCounterKeys = <String>[
+  'svc.water.days',
+  'svc.nicotine.days',
+];
 
 const List<String> _weekdayLabels = <String>[
   'Mon',
@@ -23,13 +61,19 @@ const List<String> _weekdayLabels = <String>[
   'Sun',
 ];
 
-/// Statistics for a chosen day (today or up to 6 days back): a day rail,
-/// energy chart, averages, a plain-language summary, improvement tips, an
-/// editable remark, and the raw activity log — all read from the local store.
+/// Statistics for a chosen day plus a GitHub-style activity heatmap. The
+/// heatmap reads persisted state, so actions that are added and then removed
+/// do not leave a counted contribution behind.
 class DailyStatsPanel extends StatefulWidget {
-  const DailyStatsPanel({super.key, this.store, this.onOpenCoach});
+  const DailyStatsPanel({
+    super.key,
+    this.store,
+    this.onOpenCoach,
+    this.refreshToken = 0,
+  });
 
   final EnergyLogStore? store;
+  final int refreshToken;
 
   /// Called when the user taps the "Chat with AI coach" entry point.
   final VoidCallback? onOpenCoach;
@@ -47,9 +91,10 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
   final TextEditingController _remarkController = TextEditingController();
 
   int _dayOffset = 0; // 0 = today, 1 = yesterday, ... up to _daysBack - 1
-  StatsMetric _metric = StatsMetric.both;
+  StatsHeatmapRange _heatmapRange = StatsHeatmapRange.month;
   List<EnergyLogRecord> _records = const <EnergyLogRecord>[];
   List<PlannerSessionLog> _sessionLogs = const <PlannerSessionLog>[];
+  List<_ContributionDay> _contributionDays = const <_ContributionDay>[];
   bool _loading = true;
   bool _remarkSaved = false;
 
@@ -65,6 +110,14 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
   }
 
   @override
+  void didUpdateWidget(covariant DailyStatsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
+  }
+
+  @override
   void dispose() {
     _remarkController.dispose();
     super.dispose();
@@ -74,17 +127,20 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     setState(() => _loading = true);
     try {
       final userId = ProfileStore.instance.userId.value;
+      await _store.claimEnergyLogsForUser(userId);
       await _store.claimPlannerSessionLogsForUser(userId);
-      final records = await _store.recordsForDate(_dateKey);
+      final records = await _store.recordsForDate(_dateKey, userId: userId);
       final sessionLogs = await _store.plannerSessionLogsForDate(
         _dateKey,
         userId: userId,
       );
       final remark = await _store.remarkForDate(_dateKey);
+      final contributionDays = await _loadContributionDays(userId);
       if (!mounted) return;
       setState(() {
         _records = records;
         _sessionLogs = sessionLogs;
+        _contributionDays = contributionDays;
         _remarkController.text = remark ?? '';
         _loading = false;
         _remarkSaved = false;
@@ -94,8 +150,123 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
       setState(() {
         _records = const <EnergyLogRecord>[];
         _sessionLogs = const <PlannerSessionLog>[];
+        _contributionDays = const <_ContributionDay>[];
         _loading = false;
       });
+    }
+  }
+
+  Future<List<_ContributionDay>> _loadContributionDays(String userId) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final fixedDays = _heatmapRange.days;
+    final start = fixedDays == null
+        ? (await _earliestContributionDate(userId)) ?? today
+        : today.subtract(Duration(days: fixedDays - 1));
+    final days = today.difference(start).inDays + 1;
+    final counts = <String, int>{
+      for (var i = 0; i < days; i++) dateKey(start.add(Duration(days: i))): 0,
+    };
+
+    for (final key in counts.keys.toList()) {
+      final energyRecords = await _store.recordsForDate(key, userId: userId);
+      final plannerLogs =
+          await _store.plannerSessionLogsForDate(key, userId: userId);
+      counts[key] = (counts[key] ?? 0) +
+          energyRecords.length +
+          plannerLogs.where((log) => log.isDone).length;
+    }
+
+    await _addListEntryCounts(counts, _contributionListKeys);
+    await _addTaskCounts(counts, _contributionTaskKeys);
+    await _addCounterCounts(counts, _contributionCounterKeys);
+
+    return counts.entries
+        .map((entry) => _ContributionDay(
+              date: DateTime.parse(entry.key),
+              count: entry.value,
+            ))
+        .toList(growable: false);
+  }
+
+  Future<DateTime?> _earliestContributionDate(String userId) async {
+    DateTime? earliest;
+
+    void include(DateTime? date) {
+      if (date == null) return;
+      final day = DateTime(date.year, date.month, date.day);
+      if (earliest == null || day.isBefore(earliest!)) earliest = day;
+    }
+
+    for (final key in await _store.activityDates(userId: userId)) {
+      include(DateTime.tryParse(key));
+    }
+    for (final key in _contributionListKeys) {
+      final entries = await ServiceStore.loadList(key);
+      for (final entry in entries) {
+        final raw = entry['t'] ?? entry['createdAt'] ?? entry['date'];
+        include(raw is String ? DateTime.tryParse(raw) : null);
+      }
+    }
+    for (final key in _contributionTaskKeys) {
+      final items = await ServiceStore.loadList(key);
+      for (final item in items) {
+        include(DateTime.tryParse((item['due'] as String?) ?? ''));
+      }
+    }
+    for (final key in _contributionCounterKeys) {
+      final days = await ServiceStore.loadMap(key);
+      for (final entry in days.entries) {
+        final count = (entry.value as num?)?.round() ?? 0;
+        if (count > 0) include(DateTime.tryParse(entry.key));
+      }
+    }
+
+    return earliest;
+  }
+
+  Future<void> _addListEntryCounts(
+    Map<String, int> counts,
+    List<String> keys,
+  ) async {
+    for (final key in keys) {
+      final entries = await ServiceStore.loadList(key);
+      for (final entry in entries) {
+        final raw = entry['t'] ?? entry['createdAt'] ?? entry['date'];
+        final when = raw is String ? DateTime.tryParse(raw) : null;
+        if (when == null) continue;
+        final day = dateKey(when);
+        if (counts.containsKey(day)) counts[day] = counts[day]! + 1;
+      }
+    }
+  }
+
+  Future<void> _addTaskCounts(
+    Map<String, int> counts,
+    List<String> keys,
+  ) async {
+    for (final key in keys) {
+      final items = await ServiceStore.loadList(key);
+      for (final item in items) {
+        final due = DateTime.tryParse((item['due'] as String?) ?? '');
+        if (due == null) continue;
+        final day = dateKey(due);
+        if (counts.containsKey(day)) counts[day] = counts[day]! + 1;
+      }
+    }
+  }
+
+  Future<void> _addCounterCounts(
+    Map<String, int> counts,
+    List<String> keys,
+  ) async {
+    for (final key in keys) {
+      final days = await ServiceStore.loadMap(key);
+      for (final entry in days.entries) {
+        final count = (entry.value as num?)?.round() ?? 0;
+        if (count <= 0 || !counts.containsKey(entry.key)) continue;
+        counts[entry.key] = counts[entry.key]! + count;
+      }
     }
   }
 
@@ -192,7 +363,47 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        // ── Day rail + metric filter ────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.large,
+            AppSpacing.medium,
+            AppSpacing.large,
+            AppSpacing.small,
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.grid_view_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Your Activity',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1C2030),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Day rail + contribution range filter ────────────────────────
         const SizedBox(height: AppSpacing.small),
         SizedBox(
           height: 52,
@@ -214,15 +425,20 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
           ),
           child: Row(
             children: <Widget>[
-              const Spacer(),
-              _FilterChipGroup<StatsMetric>(
-                value: _metric,
-                options: const <(StatsMetric, String)>[
-                  (StatsMetric.both, 'Both'),
-                  (StatsMetric.physical, 'Physical'),
-                  (StatsMetric.brain, 'Brain'),
-                ],
-                onChanged: (metric) => setState(() => _metric = metric),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: _FilterChipGroup<StatsHeatmapRange>(
+                    value: _heatmapRange,
+                    options: StatsHeatmapRange.values
+                        .map((range) => (range, range.label))
+                        .toList(growable: false),
+                    onChanged: (range) {
+                      setState(() => _heatmapRange = range);
+                      _load();
+                    },
+                  ),
+                ),
               ),
             ],
           ),
@@ -238,7 +454,9 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
-              : _records.isEmpty && _sessionLogs.isEmpty
+              : _records.isEmpty &&
+                      _sessionLogs.isEmpty &&
+                      !_contributionDays.any((day) => day.count > 0)
                   ? _EmptyDay(isToday: _dayOffset == 0)
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(
@@ -273,26 +491,10 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                             ),
                           ),
 
-                        // Chart
-                        Container(
-                          height: 150,
-                          padding: const EdgeInsets.all(AppSpacing.medium),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.outline),
-                          ),
-                          child: CustomPaint(
-                            painter: _EnergyChartPainter(
-                              records: _records,
-                              sessionLogs: _sessionLogs,
-                              metric: _metric,
-                            ),
-                            child: const SizedBox.expand(),
-                          ),
+                        _ContributionHeatmapCard(
+                          days: _contributionDays,
+                          range: _heatmapRange,
                         ),
-                        const SizedBox(height: AppSpacing.small),
-                        _ChartLegend(metric: _metric),
                         const SizedBox(height: AppSpacing.medium),
 
                         // Averages
@@ -522,167 +724,354 @@ class _FilterChipGroup<T> extends StatelessWidget {
   }
 }
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
+// ── Contribution heatmap ────────────────────────────────────────────────────
 
-class _EnergyChartPainter extends CustomPainter {
-  const _EnergyChartPainter({
-    required this.records,
-    required this.sessionLogs,
-    required this.metric,
+class _ContributionDay {
+  const _ContributionDay({
+    required this.date,
+    required this.count,
   });
 
-  final List<EnergyLogRecord> records;
-  final List<PlannerSessionLog> sessionLogs;
-  final StatsMetric metric;
+  final DateTime date;
+  final int count;
+}
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = AppColors.outline
-      ..strokeWidth = 1;
+class _ContributionHeatmapCard extends StatelessWidget {
+  const _ContributionHeatmapCard({
+    required this.days,
+    required this.range,
+  });
 
-    // Horizontal gridlines at 0 / 50 / 100
-    for (final level in <double>[0, 0.5, 1.0]) {
-      final y = size.height * (1 - level);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${(level * 100).round()}',
-          style: const TextStyle(fontSize: 9, color: AppColors.textMuted),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      textPainter.paint(canvas,
-          Offset(0, y - (level == 0 ? 12 : 0) - (level == 1.0 ? -2 : 0)));
+  final List<_ContributionDay> days;
+  final StatsHeatmapRange range;
+
+  int get _total => days.fold<int>(0, (sum, day) => sum + day.count);
+  int get _activeDays => days.where((day) => day.count > 0).length;
+
+  int get _currentStreak {
+    var streak = 0;
+    for (final day in days.reversed) {
+      if (day.count <= 0) break;
+      streak++;
     }
+    return streak;
+  }
 
-    if (records.isEmpty && sessionLogs.isEmpty) return;
+  Color _colorFor(BuildContext context, int count) {
+    final colors = Theme.of(context).colorScheme;
+    if (count <= 0) return colors.surfaceContainerHighest.withOpacity(0.7);
+    if (count == 1) return const Color(0xFFC8E6A0);
+    if (count <= 3) return const Color(0xFF8BC766);
+    if (count <= 6) return const Color(0xFF4FA646);
+    return const Color(0xFF216E39);
+  }
 
-    final timeAnchors = <int>[
-      ...records.map((record) => record.startMinutes),
-      ...sessionLogs.map((log) => log.startMinutes),
-    ]..sort();
-    final minX = timeAnchors.first - 30;
-    final maxX = timeAnchors.last + 30;
-    final span = (maxX - minX).clamp(60, 1440);
+  String _monthLabel(DateTime date) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[date.month - 1];
+  }
 
-    double xFor(int minutes) =>
-        ((minutes - minX) / span) * (size.width - 24) + 20;
-    double yFor(int score) => size.height * (1 - score / 100);
-
-    void drawSeries(List<int> values, Color color) {
-      final linePaint = Paint()
-        ..color = color
-        ..strokeWidth = 2
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      final dotPaint = Paint()..color = color;
-
-      final path = Path();
-      for (var i = 0; i < records.length; i++) {
-        final point = Offset(xFor(records[i].startMinutes), yFor(values[i]));
-        if (i == 0) {
-          path.moveTo(point.dx, point.dy);
-        } else {
-          path.lineTo(point.dx, point.dy);
-        }
-      }
-      canvas.drawPath(path, linePaint);
-      for (var i = 0; i < records.length; i++) {
-        canvas.drawCircle(
-          Offset(xFor(records[i].startMinutes), yFor(values[i])),
-          3,
-          dotPaint,
-        );
-      }
+  List<List<_ContributionDay?>> _weeks() {
+    if (days.isEmpty) return const <List<_ContributionDay?>>[];
+    final first = days.first.date;
+    final leading = first.weekday - 1;
+    final cells = <_ContributionDay?>[
+      for (var i = 0; i < leading; i++) null,
+      ...days,
+    ];
+    while (cells.length % 7 != 0) {
+      cells.add(null);
     }
-
-    if (records.isNotEmpty && metric != StatsMetric.brain) {
-      drawSeries(
-        records.map((r) => r.physicalAfter).toList(),
-        AppColors.energyPhysicalAccent,
-      );
-    }
-    if (records.isNotEmpty && metric != StatsMetric.physical) {
-      drawSeries(
-        records.map((r) => r.brainAfter).toList(),
-        AppColors.energyBrainAccent,
-      );
-    }
-
-    final baselineY = size.height - 14;
-    for (final log in sessionLogs) {
-      final x = xFor(log.startMinutes);
-      final color = log.isDone ? AppColors.primary : AppColors.error;
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(x, baselineY), width: 10, height: 10),
-        const Radius.circular(3),
-      );
-      canvas.drawRRect(
-        rect,
-        Paint()..color = color.withOpacity(log.isDone ? 0.9 : 0.75),
-      );
-      if (log.isDone) {
-        final check = Path()
-          ..moveTo(x - 3, baselineY)
-          ..lineTo(x - 1, baselineY + 2)
-          ..lineTo(x + 3.5, baselineY - 3);
-        canvas.drawPath(
-          check,
-          Paint()
-            ..color = Colors.white
-            ..strokeWidth = 1.4
-            ..style = PaintingStyle.stroke
-            ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round,
-        );
-      }
-    }
+    return <List<_ContributionDay?>>[
+      for (var i = 0; i < cells.length; i += 7) cells.sublist(i, i + 7),
+    ];
   }
 
   @override
-  bool shouldRepaint(_EnergyChartPainter oldDelegate) =>
-      oldDelegate.records != records ||
-      oldDelegate.sessionLogs != sessionLogs ||
-      oldDelegate.metric != metric;
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final weeks = _weeks();
+    const cell = 13.0;
+    const gap = 4.0;
+    final chartWidth = math.max(
+      220.0,
+      weeks.length * (cell + gap) - gap,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.medium),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outline.withOpacity(0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.apps_rounded,
+                size: 18,
+                color: colors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'App activity contributions',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface,
+                  ),
+                ),
+              ),
+              Text(
+                range.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface.withOpacity(0.52),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Counts saved actions still present: done cards, service entries, tasks, counters, and logs.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.28,
+              color: colors.onSurface.withOpacity(0.58),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: chartWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  SizedBox(
+                    height: 18,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        for (var w = 0; w < weeks.length; w++)
+                          SizedBox(
+                            width: cell + gap,
+                            child: Text(
+                              _monthStartLabel(weeks[w], w),
+                              maxLines: 1,
+                              overflow: TextOverflow.visible,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: colors.onSurface.withOpacity(0.46),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 24,
+                        child: Column(
+                          children: const <Widget>[
+                            _WeekdayHeatmapLabel('M'),
+                            _WeekdayHeatmapLabel(''),
+                            _WeekdayHeatmapLabel('W'),
+                            _WeekdayHeatmapLabel(''),
+                            _WeekdayHeatmapLabel('F'),
+                            _WeekdayHeatmapLabel(''),
+                            _WeekdayHeatmapLabel(''),
+                          ],
+                        ),
+                      ),
+                      for (final week in weeks)
+                        Padding(
+                          padding: const EdgeInsets.only(right: gap),
+                          child: Column(
+                            children: <Widget>[
+                              for (final day in week)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: gap),
+                                  child: Tooltip(
+                                    message: day == null
+                                        ? ''
+                                        : '${dateKey(day.date)} · ${day.count} actions',
+                                    child: Container(
+                                      width: cell,
+                                      height: cell,
+                                      decoration: BoxDecoration(
+                                        color: day == null
+                                            ? Colors.transparent
+                                            : _colorFor(context, day.count),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              Text(
+                'Less',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colors.onSurface.withOpacity(0.52),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 5),
+              for (final count in const <int>[0, 1, 3, 6, 9]) ...<Widget>[
+                Container(
+                  width: 13,
+                  height: 13,
+                  decoration: BoxDecoration(
+                    color: _colorFor(context, count),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                'More',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colors.onSurface.withOpacity(0.52),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _ContributionStat(
+                  value: '$_total',
+                  label: 'Total actions',
+                ),
+              ),
+              Expanded(
+                child: _ContributionStat(
+                  value: '$_activeDays',
+                  label: 'Active days',
+                ),
+              ),
+              Expanded(
+                child: _ContributionStat(
+                  value: '$_currentStreak',
+                  label: 'Current streak',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _monthStartLabel(List<_ContributionDay?> week, int index) {
+    _ContributionDay? first;
+    for (final day in week) {
+      if (day != null) {
+        first = day;
+        break;
+      }
+    }
+    if (first == null) return '';
+    if (first.date.day <= 7 || index == 0) {
+      return _monthLabel(first.date);
+    }
+    return '';
+  }
 }
 
-class _ChartLegend extends StatelessWidget {
-  const _ChartLegend({required this.metric});
+class _WeekdayHeatmapLabel extends StatelessWidget {
+  const _WeekdayHeatmapLabel(this.label);
 
-  final StatsMetric metric;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    Widget dot(Color color, String label) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-            ),
-          ],
-        );
+    return SizedBox(
+      height: 17,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.42),
+        ),
+      ),
+    );
+  }
+}
 
-    return Row(
+class _ContributionStat extends StatelessWidget {
+  const _ContributionStat({
+    required this.value,
+    required this.label,
+  });
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
       children: <Widget>[
-        if (metric != StatsMetric.brain) ...<Widget>[
-          dot(AppColors.energyPhysicalAccent, 'Physical'),
-          const SizedBox(width: AppSpacing.medium),
-        ],
-        if (metric != StatsMetric.physical)
-          dot(AppColors.energyBrainAccent, 'Brain'),
-        if (metric != StatsMetric.physical)
-          const SizedBox(width: AppSpacing.medium),
-        dot(AppColors.primary, 'Done'),
-        const SizedBox(width: AppSpacing.medium),
-        dot(AppColors.error, 'Not done'),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface.withOpacity(0.52),
+          ),
+        ),
       ],
     );
   }
@@ -783,48 +1172,47 @@ class _CoachEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.large),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.medium,
+          vertical: AppSpacing.small,
+        ),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: <Color>[AppColors.primary, Color(0xFF7B88FF)],
-          ),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.outline.withOpacity(0.45)),
         ),
         child: Row(
           children: <Widget>[
-            const CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.bolt, color: Colors.white),
-            ),
+            Icon(Icons.bolt_outlined, color: colors.primary, size: 18),
             const SizedBox(width: AppSpacing.medium),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const Text(
+                  Text(
                     'AI Energy Coach',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                      color: colors.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
                     ),
                   ),
                   Text(
                     'Chat about sleep, focus, recovery, and more.',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 12,
+                      color: colors.onSurface.withOpacity(0.58),
+                      fontSize: 11,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.white),
+            Icon(Icons.chevron_right, color: colors.onSurfaceVariant, size: 18),
           ],
         ),
       ),

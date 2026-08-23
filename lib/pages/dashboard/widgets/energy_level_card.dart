@@ -229,7 +229,7 @@ class _BatteryGauge extends StatelessWidget {
                               '$pct%',
                               style: TextStyle(
                                 fontSize: 26,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 height: 1.1,
                                 color:
                                     percent > 0.55 ? Colors.white : accentColor,

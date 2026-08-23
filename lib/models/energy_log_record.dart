@@ -4,6 +4,7 @@
 class EnergyLogRecord {
   const EnergyLogRecord({
     required this.id,
+    required this.userId,
     required this.date,
     required this.startMinutes,
     required this.durationMinutes,
@@ -13,6 +14,7 @@ class EnergyLogRecord {
   });
 
   final String id;
+  final String userId;
 
   /// Day key in YYYY-MM-DD.
   final String date;
@@ -26,6 +28,7 @@ class EnergyLogRecord {
 
   Map<String, Object?> toMap() => <String, Object?>{
         'id': id,
+        'user_id': userId,
         'date': date,
         'start_minutes': startMinutes,
         'duration_minutes': durationMinutes,
@@ -37,6 +40,7 @@ class EnergyLogRecord {
   factory EnergyLogRecord.fromMap(Map<String, Object?> map) {
     return EnergyLogRecord(
       id: map['id'] as String,
+      userId: (map['user_id'] as String?) ?? 'local_legacy_user',
       date: map['date'] as String,
       startMinutes: map['start_minutes'] as int,
       durationMinutes: map['duration_minutes'] as int,

@@ -323,7 +323,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
                                           : '${c.presets[_preset]}:00'),
                                   style: const TextStyle(
                                     fontSize: 32,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     color: Color(0xFF2A2E3B),
                                     fontFeatures: <FontFeature>[
                                       FontFeature.tabularFigures()
@@ -404,7 +404,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
                             ? '${(weekTotal / 60).toStringAsFixed(1)} h'
                             : '$weekTotal min',
                         style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w800),
+                            fontSize: 18, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(width: 8),
                       const Text('this week',

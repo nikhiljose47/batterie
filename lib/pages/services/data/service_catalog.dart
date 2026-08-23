@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+const String serviceRecentIdsPrefsKey = 'services.recent.ids.v1';
+const int serviceRecentMaxItems = 6;
+
 // ═══════════════════════════════════════════════════════════════════════
 //  SERVICE CATALOG — the single source of truth for the Services hub.
 //
@@ -435,14 +438,47 @@ const List<AppService> serviceCatalog = <AppService>[
   AppService(
     id: 'daily_planner',
     emoji: '🗓️',
-    name: 'Daily Planner',
-    tagline: 'Time-block your day',
+    name: 'Change Mode',
+    tagline: 'Change and tune your day mode',
     category: ServiceCategory.productivity,
-    keywords: <String>['planner', 'schedule', 'time block', 'agenda'],
+    keywords: <String>['planner', 'schedule', 'time block', 'agenda', 'track'],
     features: <String>[
-      'Hour-by-hour blocks',
-      'Pulls tasks from To-Do',
-      'Links to your energy planner',
+      'Create custom day modes faster',
+      'Edit time-block suggestions',
+      'Connects to your Home day card',
+    ],
+  ),
+  AppService(
+    id: 'day_mode',
+    emoji: '🧭',
+    name: 'Day Mode',
+    tagline: 'Compare your day with the plan',
+    category: ServiceCategory.productivity,
+    keywords: <String>[
+      'mode',
+      'review',
+      'compare',
+      'planner',
+      'notepad',
+      'track',
+    ],
+    features: <String>[
+      'Notebook-style day comparison',
+      'Current mode plan on the left',
+      'Your completed items on the right',
+    ],
+  ),
+  AppService(
+    id: 'calculator',
+    emoji: '🧮',
+    name: 'Calculator',
+    tagline: 'Quick math and expressions',
+    category: ServiceCategory.productivity,
+    keywords: <String>['calculator', 'math', 'sum', 'divide', 'multiply'],
+    features: <String>[
+      'Basic expression calculator',
+      'Parentheses and decimals',
+      'Recent calculation history',
     ],
   ),
   AppService(
@@ -555,21 +591,21 @@ const List<AppService> serviceCatalog = <AppService>[
 
 /// Tile accent per category — keeps the grid colorful but consistent.
 Color categoryTint(ServiceCategory c) => switch (c) {
-      ServiceCategory.health => const Color(0xFFE8F5E9),
+      ServiceCategory.health => const Color(0xFFEAF7F0),
       ServiceCategory.women => const Color(0xFFFCE4EC),
       ServiceCategory.mind => const Color(0xFFEDE7F6),
       ServiceCategory.food => const Color(0xFFFFF3E0),
       ServiceCategory.finance => const Color(0xFFE3F2FD),
-      ServiceCategory.productivity => const Color(0xFFE0F2F1),
+      ServiceCategory.productivity => const Color(0xFFEEF2FF),
       ServiceCategory.lifestyle => const Color(0xFFFFF8E1),
     };
 
 Color categoryAccent(ServiceCategory c) => switch (c) {
-      ServiceCategory.health => const Color(0xFF2E7D32),
+      ServiceCategory.health => const Color(0xFF2F855A),
       ServiceCategory.women => const Color(0xFFC2185B),
       ServiceCategory.mind => const Color(0xFF5E35B1),
       ServiceCategory.food => const Color(0xFFEF6C00),
       ServiceCategory.finance => const Color(0xFF1565C0),
-      ServiceCategory.productivity => const Color(0xFF00695C),
+      ServiceCategory.productivity => const Color(0xFF4F46E5),
       ServiceCategory.lifestyle => const Color(0xFFF9A825),
     };

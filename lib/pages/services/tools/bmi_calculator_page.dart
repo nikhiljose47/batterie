@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
+import 'toolkit.dart';
 
 /// BMI Calculator — the first fully working service, and the reference
 /// template for building the others: one page, self-contained state,
@@ -14,6 +15,7 @@ class BmiCalculatorPage extends StatefulWidget {
 }
 
 class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
+  static const String _bodyMetricsKey = 'svc.body.metrics';
   double _heightCm = 170;
   double _weightKg = 65;
 
@@ -59,6 +61,32 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadMetrics();
+  }
+
+  Future<void> _loadMetrics() async {
+    final map = await ServiceStore.loadMap(_bodyMetricsKey);
+    final height = (map['heightCm'] as num?)?.toDouble();
+    final weight = (map['weightKg'] as num?)?.toDouble();
+    if (!mounted) return;
+    setState(() {
+      if (height != null && height > 0) _heightCm = height;
+      if (weight != null && weight > 0) _weightKg = weight;
+    });
+  }
+
+  Future<void> _saveMetrics() {
+    return ServiceStore.saveMap(_bodyMetricsKey, <String, dynamic>{
+      'heightCm': _heightCm,
+      'weightKg': _weightKg,
+      'bmi': _bmi,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final verdict = _verdict;
     final range = _healthyRange;
@@ -89,7 +117,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
                   _bmi.toStringAsFixed(1),
                   style: TextStyle(
                     fontSize: 44,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: verdict.color,
                     height: 1.0,
                   ),
@@ -99,7 +127,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
                   verdict.label.toUpperCase(),
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
                     color: verdict.color,
                   ),
@@ -153,7 +181,10 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
             value: _heightCm,
             min: 120,
             max: 210,
-            onChanged: (v) => setState(() => _heightCm = v),
+            onChanged: (v) {
+              setState(() => _heightCm = v);
+              _saveMetrics();
+            },
           ),
           const SizedBox(height: 10),
           _SliderCard(
@@ -163,7 +194,10 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
             value: _weightKg,
             min: 30,
             max: 160,
-            onChanged: (v) => setState(() => _weightKg = v),
+            onChanged: (v) {
+              setState(() => _weightKg = v);
+              _saveMetrics();
+            },
           ),
           const SizedBox(height: 14),
 
@@ -230,7 +264,7 @@ class _SliderCard extends StatelessWidget {
                 valueLabel,
                 style: const TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                 ),
               ),

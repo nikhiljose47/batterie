@@ -123,7 +123,7 @@ class _VerticalBatteryLevel extends StatelessWidget {
                     '${(percent * 100).round()}%',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                   ),
               ],
@@ -191,7 +191,7 @@ class _HorizontalBatteryLevel extends StatelessWidget {
                     '${(percent * 100).round()}%',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                   ),
               ],

@@ -148,6 +148,26 @@ class EnergyScoreEngine {
       confidence: ActivityConfidence.medium,
       tags: <String>['break', 'gain'],
     ),
+    EnergyActivity(
+      id: 'drink_water_after_mild_thirst',
+      name: 'Drink water',
+      referenceMinutes: 5,
+      physicalDelta: 2,
+      brainDelta: 1,
+      intensity: ActivityIntensity.sedentary,
+      confidence: ActivityConfidence.medium,
+      tags: <String>['hydration', 'gain'],
+    ),
+    EnergyActivity(
+      id: 'nicotine_use',
+      name: 'Nicotine use',
+      referenceMinutes: 5,
+      physicalDelta: -2,
+      brainDelta: -5,
+      intensity: ActivityIntensity.sedentary,
+      confidence: ActivityConfidence.low,
+      tags: <String>['nicotine'],
+    ),
   ];
 
   EnergyScoreResult estimate(EnergyCheckIn checkIn) {

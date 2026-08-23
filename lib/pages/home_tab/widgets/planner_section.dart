@@ -11,6 +11,7 @@ import '../../../models/planner_session_log.dart';
 import '../../../models/weather.dart';
 import '../../../services/custom_mode_store.dart';
 import '../../../services/energy_log_store.dart';
+import '../../../services/google_calendar_service.dart';
 import '../../../services/remote_sync.dart';
 import '../../profile/profile_store.dart';
 import '../../services/services_page.dart';
@@ -75,6 +76,8 @@ class PlannerSection extends StatefulWidget {
     this.weatherController,
     this.onSessionLogsChanged,
     this.refreshToken = 0,
+    this.showCurrentOnly = false,
+    this.onShowAll,
   });
 
   final double nowMinutes;
@@ -85,12 +88,15 @@ class PlannerSection extends StatefulWidget {
   final WeatherController? weatherController;
   final ValueChanged<List<PlannerSessionLog>>? onSessionLogsChanged;
   final int refreshToken;
+  final bool showCurrentOnly;
+  final VoidCallback? onShowAll;
 
   @override
-  State<PlannerSection> createState() => _PlannerSectionState();
+  State<PlannerSection> createState() => PlannerSectionState();
 }
 
-class _PlannerSectionState extends State<PlannerSection> {
+class PlannerSectionState extends State<PlannerSection> {
+  static const String _plannerFontFamily = 'Inter';
   static const double _regularCardHeight = 320.0;
   static const double _currentCardHeight = 510.0;
   static const double _cardGap = 12.0;
@@ -101,6 +107,8 @@ class _PlannerSectionState extends State<PlannerSection> {
   /// did in this window across the last week.
   Map<int, String> _bestFromPast = const <int, String>{};
   List<_TimedTodo> _todos = const <_TimedTodo>[];
+  List<GoogleCalendarEvent> _googleCurrentTasks = const <GoogleCalendarEvent>[];
+  bool _googleTasksLoading = false;
   Map<String, PlannerSessionLog> _sessionLogs =
       const <String, PlannerSessionLog>{};
 
@@ -169,6 +177,7 @@ class _PlannerSectionState extends State<PlannerSection> {
     // purposeful reveal rather than a full-list fly-down from the top.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrent();
+      if (widget.showCurrentOnly) _loadGoogleItemsForCurrentPeriod();
     });
   }
 
@@ -184,6 +193,14 @@ class _PlannerSectionState extends State<PlannerSection> {
       _loadTodos();
       _loadSessionLogs();
       _loadTravelBack();
+    }
+    if (!oldWidget.showCurrentOnly && widget.showCurrentOnly) {
+      _loadGoogleItemsForCurrentPeriod();
+    } else if (widget.showCurrentOnly &&
+        (oldWidget.nowMinutes.floor() != widget.nowMinutes.floor() ||
+            oldWidget.wakeMinutes != widget.wakeMinutes ||
+            oldWidget.sleepMinutes != widget.sleepMinutes)) {
+      _loadGoogleItemsForCurrentPeriod();
     }
   }
 
@@ -213,6 +230,16 @@ class _PlannerSectionState extends State<PlannerSection> {
     );
   }
 
+  void scrollToCurrentCard() => _animateToCurrent();
+
+  Future<void> refreshGoogleCurrentItems() async {
+    await _loadGoogleItemsForCurrentPeriod(force: true);
+  }
+
+  Future<void> openTodoForCurrentSession() async {
+    await _openTodoService(_currentSessionStartMinutes);
+  }
+
   void _onCustomChanged() {
     if (mounted && widget.modeId == customModeId) setState(() {});
   }
@@ -225,6 +252,67 @@ class _PlannerSectionState extends State<PlannerSection> {
         return todo.id.isNotEmpty && todo.text.isNotEmpty && todo.due != null;
       }).toList();
     });
+  }
+
+  Future<void> _loadGoogleItemsForCurrentPeriod({bool force = false}) async {
+    if (!force && !widget.showCurrentOnly) return;
+    if (_googleTasksLoading) return;
+    setState(() => _googleTasksLoading = true);
+    try {
+      final items = await GoogleCalendarService.instance.todayItems();
+      if (!mounted) return;
+      final (start, end) = _currentPeriodDateRange();
+      setState(() {
+        _googleCurrentTasks = items
+            .where((item) => _googleItemBelongsToCurrentPeriod(
+                  item,
+                  start,
+                  end,
+                ))
+            .toList();
+        _googleTasksLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _googleCurrentTasks = const <GoogleCalendarEvent>[];
+        _googleTasksLoading = false;
+      });
+    }
+  }
+
+  bool _googleItemBelongsToCurrentPeriod(
+    GoogleCalendarEvent item,
+    DateTime start,
+    DateTime end,
+  ) {
+    final itemStart = item.start;
+    final itemEnd = item.end;
+    if (item.isTask && (item.isAllDay || itemStart == null)) {
+      return true;
+    }
+    if (itemStart == null) return false;
+    if (item.isTask && _isDateOnlyGoogleTask(itemStart)) {
+      return svcDay(itemStart) == svcDay(DateTime.now());
+    }
+    final effectiveEnd = itemEnd ?? itemStart.add(const Duration(minutes: 30));
+    return itemStart.isBefore(end) && effectiveEnd.isAfter(start);
+  }
+
+  bool _isDateOnlyGoogleTask(DateTime value) {
+    return (value.hour == 0 && value.minute == 0 && value.second == 0) ||
+        value.toUtc().hour == 0 &&
+            value.toUtc().minute == 0 &&
+            value.toUtc().second == 0;
+  }
+
+  (DateTime, DateTime) _currentPeriodDateRange() {
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    return (
+      dayStart.add(Duration(minutes: _currentSessionStartMinutes)),
+      dayStart.add(Duration(minutes: _currentSessionEndMinutes)),
+    );
   }
 
   Future<void> _saveTodos() async {
@@ -373,6 +461,8 @@ class _PlannerSectionState extends State<PlannerSection> {
 
     try {
       final store = SqliteEnergyLogStore.instance;
+      final userId = ProfileStore.instance.userId.value;
+      await store.claimEnergyLogsForUser(userId);
       final today = DateTime.now();
       final best = <int, ({int score, String label})>{};
 
@@ -380,7 +470,7 @@ class _PlannerSectionState extends State<PlannerSection> {
         final day = today.subtract(Duration(days: back));
         List<EnergyLogRecord> records;
         try {
-          records = await store.recordsForDate(dateKey(day));
+          records = await store.recordsForDate(dateKey(day), userId: userId);
         } catch (_) {
           continue;
         }
@@ -436,21 +526,225 @@ class _PlannerSectionState extends State<PlannerSection> {
   }
 
   Widget _buildBody(List<ModeAdvice> adviceList, WeatherSnapshot? weather) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Expanded(child: _buildList(adviceList, weather)),
-        _PastBestFooter(
-          label: _currentIndex != -1 ? _bestFromPast[_currentIndex] : null,
-          slotLabel: _currentIndex != -1
-              ? _slots[_currentIndex].rangeLabel
-              : _isWakeCurrent
-                  ? 'Wake'
-                  : 'Sleep',
-          weather: weather,
-        ),
-      ],
+    return DefaultTextStyle.merge(
+      style: const TextStyle(fontFamily: _plannerFontFamily),
+      child: widget.showCurrentOnly
+          ? _buildCurrentOnly(adviceList, weather)
+          : _buildList(adviceList, weather),
     );
+  }
+
+  Widget _buildCurrentOnly(
+    List<ModeAdvice> adviceList,
+    WeatherSnapshot? weather,
+  ) {
+    final currentIndex = _currentIndex;
+    final child = _buildCurrentPeriodCard(adviceList, weather, currentIndex);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final colors = Theme.of(context).colorScheme;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Container(
+                  height: 42,
+                  padding: const EdgeInsets.only(left: 10, right: 4),
+                  decoration: BoxDecoration(
+                    color: colors.surface.withOpacity(0.72),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colors.outline.withOpacity(0.24),
+                    ),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.my_location_rounded,
+                        size: 18,
+                        color: colors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _currentPeriodLabel(currentIndex),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: colors.onSurface,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Show list',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: widget.onShowAll,
+                        icon: Icon(
+                          Icons.view_list_rounded,
+                          color: colors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                child,
+                _buildGoogleCurrentTasksSection(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _currentPeriodLabel(int currentIndex) {
+    if (_isWakeCurrent) return 'Wake period';
+    if (_isSleepCurrent) return 'Sleep period';
+    if (currentIndex != -1) return _slots[currentIndex].rangeLabel;
+    return 'Current period';
+  }
+
+  Widget _buildCurrentPeriodCard(
+    List<ModeAdvice> adviceList,
+    WeatherSnapshot? weather,
+    int currentIndex,
+  ) {
+    if (_isWakeCurrent || (currentIndex == -1 && !_isSleepCurrent)) {
+      return _CurrentWakeSleepCard(
+        content: WakeSleepCopy(
+          title: 'Wake up',
+          headline: wakeCardContent.headline,
+          sub: wakeCardContent.sub,
+          tip: wakeCardContent.tip,
+        ),
+        variant: _WakeSleepVariant.wake,
+        sessionDone: _sessionLogs['wake']?.isDone ?? false,
+        onToggleSessionDone: () => _toggleSessionDone(
+          sessionId: 'wake',
+          startMinutes: widget.wakeMinutes,
+          endMinutes: widget.wakeMinutes + kWakeBufferMinutes,
+          title: 'Wake up',
+        ),
+      );
+    }
+    if (_isSleepCurrent) {
+      return _CurrentWakeSleepCard(
+        content: WakeSleepCopy(
+          title: 'Sleep',
+          headline: sleepCardContent.headline,
+          sub: sleepCardContent.sub,
+          tip: sleepCardContent.tip,
+        ),
+        variant: _WakeSleepVariant.sleep,
+        sessionDone: _sessionLogs['sleep']?.isDone ?? false,
+        onToggleSessionDone: () => _toggleSessionDone(
+          sessionId: 'sleep',
+          startMinutes: widget.sleepMinutes,
+          endMinutes: _sleepCardEndMinutes,
+          title: 'Sleep',
+        ),
+      );
+    }
+
+    final slot = _slots[currentIndex];
+    final advice = adviceList[currentIndex];
+    return _CurrentModeCard(
+      slotIndex: currentIndex,
+      slot: slot,
+      advice: advice,
+      sessionDone: _sessionLogs['slot_$currentIndex']?.isDone ?? false,
+      onToggleSessionDone: () => _toggleSessionDone(
+        sessionId: 'slot_$currentIndex',
+        startMinutes: slot.startMinutes,
+        endMinutes: slot.endMinutes,
+        title: advice.tip,
+      ),
+      history: historyForPlannerSlot(currentIndex),
+    );
+  }
+
+  Widget _buildGoogleCurrentTasksSection() {
+    if (_googleTasksLoading) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 10),
+        child: LinearProgressIndicator(minHeight: 2),
+      );
+    }
+    if (_googleCurrentTasks.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: _GoogleCurrentTasksCard(tasks: _googleCurrentTasks),
+    );
+  }
+
+  void showPastBestSummary(BuildContext context) {
+    final slotLabel = _currentIndex != -1
+        ? _slots[_currentIndex].rangeLabel
+        : _isWakeCurrent
+            ? 'Wake'
+            : 'Sleep';
+    final label = _currentIndex != -1 ? _bestFromPast[_currentIndex] : null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          label == null
+              ? 'Your best · $slotLabel: start tracking an activity'
+              : 'Your best · $slotLabel: $label',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void showRainSummary(BuildContext context) {
+    final weather = widget.weatherController?.state.snapshot;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Expected rain: ${_rainSummary(weather)}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  bool _isRainy(WeatherCondition c) =>
+      c == WeatherCondition.rain ||
+      c == WeatherCondition.drizzle ||
+      c == WeatherCondition.showers ||
+      c == WeatherCondition.thunderstorm ||
+      c == WeatherCondition.freezingRain;
+
+  String _rainSummary(WeatherSnapshot? weather) {
+    if (weather == null) return 'Weather off';
+
+    final current = weather.current;
+    if (_isRainy(current.condition)) {
+      return 'Raining now';
+    }
+
+    for (final hour in weather.hourly.take(12)) {
+      final prob = hour.precipitationProbability;
+      if (_isRainy(hour.condition) || (prob != null && prob >= 30)) {
+        final label = formatMinutes(hour.time.hour * 60 + hour.time.minute);
+        return prob != null && prob > 0 ? '$label · $prob%' : label;
+      }
+    }
+
+    if (weather.daily.isNotEmpty) {
+      final today = weather.daily.first;
+      final prob = today.precipitationProbability;
+      if (_isRainy(today.condition)) {
+        return prob != null && prob > 0 ? 'Today · $prob%' : 'Today';
+      }
+      if (prob != null && prob >= 30) return 'Today · $prob%';
+    }
+
+    return 'No rain today';
   }
 
   Widget _buildList(List<ModeAdvice> adviceList, WeatherSnapshot? weather) {
@@ -461,7 +755,7 @@ class _PlannerSectionState extends State<PlannerSection> {
       children: <Widget>[
         ListView.separated(
           controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(44, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
           itemCount: _slots.length + 2,
           separatorBuilder: (_, __) => const SizedBox(height: _cardGap),
           itemBuilder: (context, index) {
@@ -560,15 +854,6 @@ class _PlannerSectionState extends State<PlannerSection> {
             );
           },
         ),
-        Positioned(
-          left: 2,
-          top: 12,
-          child: _CurrentSessionClockCard(
-            startMinutes: _currentSessionStartMinutes,
-            endMinutes: _currentSessionEndMinutes,
-            onTap: _animateToCurrent,
-          ),
-        ),
       ],
     );
   }
@@ -628,8 +913,8 @@ class _SessionListRow extends StatelessWidget {
   }
 }
 
-class _CurrentSessionClockCard extends StatelessWidget {
-  const _CurrentSessionClockCard({
+class CurrentSessionClockCard extends StatelessWidget {
+  const CurrentSessionClockCard({
     required this.startMinutes,
     required this.endMinutes,
     required this.onTap,
@@ -818,6 +1103,322 @@ class _ClockFacePainter extends CustomPainter {
   }
 }
 
+class _CurrentModeCard extends StatelessWidget {
+  const _CurrentModeCard({
+    required this.slotIndex,
+    required this.slot,
+    required this.advice,
+    required this.sessionDone,
+    required this.onToggleSessionDone,
+    required this.history,
+  });
+
+  final int slotIndex;
+  final TimeSlot slot;
+  final ModeAdvice advice;
+  final bool sessionDone;
+  final VoidCallback onToggleSessionDone;
+  final String history;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 168),
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+      decoration: BoxDecoration(
+        gradient: _slotGradient(context),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.primary.withOpacity(0.36)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(dark ? 0.28 : 0.045),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    const _NowBadge(compact: true),
+                    const SizedBox(width: 8),
+                    Flexible(child: _TimeRangeBadge(label: slot.rangeLabel)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  advice.tip,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 21,
+                    height: 1.16,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface.withOpacity(0.9),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  advice.recommendation,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.34,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface.withOpacity(0.68),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  history,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: colors.onSurface.withOpacity(0.52),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _SessionDoneButton(
+            done: sessionDone,
+            onTap: onToggleSessionDone,
+            size: 42,
+          ),
+        ],
+      ),
+    );
+  }
+
+  LinearGradient _slotGradient(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    const lightStops = <Color>[
+      Color(0xFFF4FFF7),
+      Color(0xFFFFFAEF),
+      Color(0xFFFFF8D9),
+      Color(0xFFFFF0C9),
+      Color(0xFFFFE5CF),
+      Color(0xFFFFD7BC),
+      Color(0xFFFFC6A4),
+    ];
+    const darkStops = <Color>[
+      Color(0xFF17231B),
+      Color(0xFF221F18),
+      Color(0xFF2A2415),
+      Color(0xFF2E2117),
+      Color(0xFF331E17),
+      Color(0xFF351A18),
+      Color(0xFF2A1820),
+    ];
+    final palette = dark ? darkStops : lightStops;
+    final accent = palette[slotIndex.clamp(0, palette.length - 1)];
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: <Color>[colors.surface, accent],
+    );
+  }
+}
+
+class _CurrentWakeSleepCard extends StatelessWidget {
+  const _CurrentWakeSleepCard({
+    required this.content,
+    required this.variant,
+    required this.sessionDone,
+    required this.onToggleSessionDone,
+  });
+
+  final WakeSleepCopy content;
+  final _WakeSleepVariant variant;
+  final bool sessionDone;
+  final VoidCallback onToggleSessionDone;
+
+  bool get _isWake => variant == _WakeSleepVariant.wake;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final accent = _isWake ? AppColors.primary : AppColors.bedtimeAccent;
+    final bg = _isWake ? const Color(0xFFF3FFF7) : const Color(0xFFF7F5FF);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 150),
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withOpacity(0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            _isWake ? Icons.wb_sunny_rounded : Icons.bedtime_rounded,
+            color: accent,
+            size: 24,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  content.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  content.headline,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface,
+                    fontSize: 20,
+                    height: 1.18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  content.tip,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface.withOpacity(0.64),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _SessionDoneButton(
+            done: sessionDone,
+            onTap: onToggleSessionDone,
+            size: 42,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoogleCurrentTasksCard extends StatelessWidget {
+  const _GoogleCurrentTasksCard({required this.tasks});
+
+  final List<GoogleCalendarEvent> tasks;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outline.withOpacity(0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.task_alt_rounded,
+                size: 16,
+                color: colors.primary,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'Google calendar',
+                style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final task in tasks)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    task.isTask
+                        ? task.isCompleted
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded
+                        : Icons.event_rounded,
+                    size: 15,
+                    color: task.isCompleted
+                        ? AppColors.primary
+                        : colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.onSurface.withOpacity(
+                          task.isCompleted ? 0.48 : 0.82,
+                        ),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        decoration: task.isCompleted
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _timeLabel(task),
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _timeLabel(GoogleCalendarEvent item) {
+    final start = item.start;
+    if (start == null || item.isAllDay) return 'Today';
+    if (item.isTask && start.hour == 0 && start.minute == 0) return 'Today';
+    return formatMinutes(start.hour * 60 + start.minute);
+  }
+}
+
 /// White mac-style card.
 ///
 /// Layout: 70% left column (recommendation quote, attribution, previous
@@ -842,6 +1443,7 @@ class _PlannerCard extends StatelessWidget {
     required this.onCompleteTodos,
     required this.sessionDone,
     required this.onToggleSessionDone,
+    this.allowAddTodo = true,
   });
 
   final int slotIndex;
@@ -864,6 +1466,7 @@ class _PlannerCard extends StatelessWidget {
   final ValueChanged<Iterable<_TimedTodo>> onCompleteTodos;
   final bool sessionDone;
   final VoidCallback onToggleSessionDone;
+  final bool allowAddTodo;
 
   @override
   Widget build(BuildContext context) {
@@ -925,13 +1528,12 @@ class _PlannerCard extends StatelessWidget {
           const SizedBox(height: 10),
           _CardActionRow(
             weatherLabel: _weatherActionLabel(),
-            onAddTask: onAddTodo,
             onSetAlarm: onSetAlarm,
           ),
           const SizedBox(height: 8),
           _TodoSummaryStrip(
             todos: todos,
-            onAdd: onAddTodo,
+            onAdd: allowAddTodo ? onAddTodo : null,
             onComplete: () => onCompleteTodos(
               todos.where((todo) => !todo.done),
             ),
@@ -1046,7 +1648,7 @@ class _PlannerCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 24,
               height: 1.18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: headlineColor,
             ),
           ),
@@ -1078,26 +1680,26 @@ class _PlannerCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.left,
           style: TextStyle(
-            fontSize: 20,
-            height: 1.18,
-            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            height: 1.12,
+            fontWeight: FontWeight.w700,
             color: headlineColor,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
         Text(
           advice.recommendation,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.left,
           style: TextStyle(
-            fontSize: 14.5,
-            height: 1.42,
+            fontSize: 13,
+            height: 1.24,
             fontWeight: FontWeight.w600,
             color: bodyColor,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _buildDescriptionBullets(context, compact: true),
       ],
     );
@@ -1143,12 +1745,10 @@ class _PlannerCard extends StatelessWidget {
 class _CardActionRow extends StatelessWidget {
   const _CardActionRow({
     required this.weatherLabel,
-    required this.onAddTask,
     required this.onSetAlarm,
   });
 
   final String weatherLabel;
-  final VoidCallback onAddTask;
   final VoidCallback onSetAlarm;
 
   @override
@@ -1168,14 +1768,6 @@ class _CardActionRow extends StatelessWidget {
             icon: Icons.alarm_add_rounded,
             label: 'Set alarm',
             onTap: onSetAlarm,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ActionPill(
-            icon: Icons.add_task_rounded,
-            label: 'Set task',
-            onTap: onAddTask,
           ),
         ),
       ],
@@ -1222,7 +1814,7 @@ class _ActionPill extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: colors.onSurface.withOpacity(0.82),
                   ),
                 ),
@@ -1243,7 +1835,7 @@ class _TodoSummaryStrip extends StatelessWidget {
   });
 
   final List<_TimedTodo> todos;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
   final VoidCallback onComplete;
 
   @override
@@ -1259,7 +1851,7 @@ class _TodoSummaryStrip extends StatelessWidget {
         ? open.first.text
         : todos.isNotEmpty
             ? todos.first.text
-            : 'Tap Set task to add one';
+            : 'No tasks yet';
 
     return Material(
       color: Colors.transparent,
@@ -1295,7 +1887,7 @@ class _TodoSummaryStrip extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: colors.onSurface.withOpacity(0.88),
                       ),
                     ),
@@ -1348,7 +1940,7 @@ class _SessionTodoPanel extends StatelessWidget {
   final List<_TimedTodo> todos;
   final bool compact;
   final bool dark;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
   final ValueChanged<String> onToggle;
   final VoidCallback onComplete;
 
@@ -1389,7 +1981,7 @@ class _TodoActionBox extends StatelessWidget {
   final double width;
   final double height;
   final bool dark;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
   final VoidCallback onComplete;
 
   @override
@@ -1431,7 +2023,7 @@ class _TodoActionBox extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: muted,
                           ),
                         ),
@@ -1462,22 +2054,23 @@ class _TodoActionBox extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 9,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: muted,
                               ),
                             ),
                         ],
                       ),
               ),
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Icon(
-                  Icons.add_rounded,
-                  size: 16,
-                  color: dark ? Colors.white : AppColors.primary,
+              if (onAdd != null)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 16,
+                    color: dark ? Colors.white : AppColors.primary,
+                  ),
                 ),
-              ),
               if (open.isNotEmpty)
                 Positioned(
                   right: 0,
@@ -1533,7 +2126,7 @@ class _AlarmActionChip extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 9.5,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
@@ -1647,12 +2240,17 @@ class _SessionDoneButtonState extends State<_SessionDoneButton>
 }
 
 class _NowBadge extends StatelessWidget {
-  const _NowBadge();
+  const _NowBadge({this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 3 : 4,
+      ),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
@@ -1661,19 +2259,19 @@ class _NowBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Container(
-            width: 6,
-            height: 6,
+            width: compact ? 5 : 6,
+            height: compact ? 5 : 6,
             decoration: const BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 5),
-          const Text(
+          SizedBox(width: compact ? 4 : 5),
+          Text(
             'NOW',
             style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
+              fontSize: compact ? 8 : 9,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
               letterSpacing: 0.4,
             ),
@@ -1708,218 +2306,10 @@ class _TimeRangeBadge extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 9.5,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
           color: colors.primary,
         ),
       ),
-    );
-  }
-}
-
-/// Solid info bar docked at the very bottom of the planner column.
-/// Two panels side by side: past best for the current slot (left) and
-/// today's next rain window (right). Square corners — no border radius —
-/// so it reads as a flat shelf, not a floating card.
-class _PastBestFooter extends StatelessWidget {
-  const _PastBestFooter({
-    required this.label,
-    required this.slotLabel,
-    required this.weather,
-  });
-
-  final String? label;
-  final String? slotLabel;
-  final WeatherSnapshot? weather;
-
-  bool _isRainy(WeatherCondition c) =>
-      c == WeatherCondition.rain ||
-      c == WeatherCondition.drizzle ||
-      c == WeatherCondition.showers ||
-      c == WeatherCondition.thunderstorm ||
-      c == WeatherCondition.freezingRain;
-
-  /// First rainy hourly slot later today, or today's daily rain probability.
-  /// Returns a compact display string like "3 PM · 72%" or "No rain today".
-  String _rainSummary() {
-    if (weather == null) return '—';
-    final now = DateTime.now();
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59);
-
-    for (final h in weather!.hourly) {
-      if (h.time.isBefore(now) || h.time.isAfter(todayEnd)) continue;
-      final prob = h.precipitationProbability ?? 0;
-      if (!_isRainy(h.condition) && prob < 50) continue;
-      final hr = h.time.hour;
-      final label = hr == 0
-          ? '12 AM'
-          : hr < 12
-              ? '$hr AM'
-              : hr == 12
-                  ? '12 PM'
-                  : '${hr - 12} PM';
-      return prob > 0 ? '$label · $prob%' : label;
-    }
-
-    if (weather!.daily.isNotEmpty) {
-      final today = weather!.daily.first;
-      final prob = today.precipitationProbability;
-      if (_isRainy(today.condition)) {
-        return prob != null && prob > 0 ? 'Today · $prob%' : 'Today';
-      }
-      if (prob != null && prob >= 30) return 'Today · $prob%';
-    }
-
-    return 'No rain today';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (slotLabel == null) {
-      return const SizedBox.shrink();
-    }
-
-    final colors = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final bool hasHistory = label != null;
-    final String rainText = _rainSummary();
-
-    return Material(
-      color: Colors.transparent,
-      elevation: 8,
-      shadowColor: Colors.black.withOpacity(dark ? 0.34 : 0.14),
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(22),
-        topRight: Radius.circular(22),
-      ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 11, 16, 12),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(22),
-            topRight: Radius.circular(22),
-          ),
-          border: Border.all(color: colors.outline.withOpacity(0.55)),
-        ),
-        child: SafeArea(
-          top: false,
-          minimum: EdgeInsets.zero,
-          child: Row(
-            children: <Widget>[
-              // Past best activity
-              Expanded(
-                child: _BottomSummaryItem(
-                  icon: Icons.emoji_events_rounded,
-                  iconColor: const Color(0xFFE59B18),
-                  iconBackgroundColor: const Color(0xFFFFF4D6),
-                  title: 'YOUR BEST · $slotLabel',
-                  value: hasHistory ? label! : 'Start tracking an activity',
-                  valueColor: hasHistory
-                      ? colors.onSurface.withOpacity(0.88)
-                      : colors.onSurface.withOpacity(0.56),
-                  valueWeight: hasHistory ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-
-              Container(
-                width: 1,
-                height: 38,
-                margin: const EdgeInsets.symmetric(horizontal: 14),
-                color: colors.outline.withOpacity(0.45),
-              ),
-
-              // Expected rain
-              Expanded(
-                child: _BottomSummaryItem(
-                  icon: Icons.water_drop_outlined,
-                  iconColor: const Color(0xFF3C7FD9),
-                  iconBackgroundColor: const Color(0xFFEAF3FF),
-                  title: 'EXPECTED RAIN',
-                  value: rainText,
-                  valueColor: colors.onSurface.withOpacity(0.88),
-                  valueWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomSummaryItem extends StatelessWidget {
-  const _BottomSummaryItem({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBackgroundColor,
-    required this.title,
-    required this.value,
-    required this.valueColor,
-    required this.valueWeight,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBackgroundColor;
-  final String title;
-  final String value;
-  final Color valueColor;
-  final FontWeight valueWeight;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Row(
-      children: <Widget>[
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: iconBackgroundColor,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: iconColor,
-          ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 9,
-                  height: 1.1,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: colors.onSurface.withOpacity(0.55),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.1,
-                  fontWeight: valueWeight,
-                  color: valueColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1942,6 +2332,7 @@ class _WakeSleepCard extends StatelessWidget {
     required this.sessionDone,
     required this.onToggleSessionDone,
     this.isCurrent = false,
+    this.allowAddTodo = true,
   });
 
   final WakeSleepCopy content;
@@ -1955,6 +2346,7 @@ class _WakeSleepCard extends StatelessWidget {
   final bool sessionDone;
   final VoidCallback onToggleSessionDone;
   final bool isCurrent;
+  final bool allowAddTodo;
 
   bool get _isWake => variant == _WakeSleepVariant.wake;
 
@@ -2062,7 +2454,7 @@ class _WakeSleepCard extends StatelessWidget {
                       content.title.toUpperCase(),
                       style: TextStyle(
                         fontSize: 9,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 1.2,
                         color: titleFg,
                       ),
@@ -2084,7 +2476,7 @@ class _WakeSleepCard extends StatelessWidget {
                         'NOW',
                         style: TextStyle(
                           fontSize: 8,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: 1.2,
                           color: _isWake
                               ? const Color(0xFFB86A00)
@@ -2127,7 +2519,7 @@ class _WakeSleepCard extends StatelessWidget {
                     todos: todos,
                     compact: !isCurrent,
                     dark: dark,
-                    onAdd: onAddTodo,
+                    onAdd: allowAddTodo ? onAddTodo : null,
                     onToggle: onToggleTodo,
                     onComplete: () => onCompleteTodos(
                       todos.where((todo) => !todo.done),

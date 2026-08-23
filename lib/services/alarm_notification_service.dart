@@ -36,9 +36,8 @@ class AlarmNotificationService {
       const InitializationSettings(android: android, iOS: darwin),
     );
 
-    final androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.requestNotificationsPermission();
     await androidPlugin?.requestExactAlarmsPermission();
     await androidPlugin?.requestFullScreenIntentPermission();

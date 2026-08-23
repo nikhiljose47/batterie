@@ -55,37 +55,64 @@ class DayMode {
     required this.id,
     required this.emoji,
     required this.label,
+    required this.shortLabel,
     this.isPro = false,
   });
 
   final String id;
   final String emoji;
   final String label;
+  final String shortLabel;
 
   /// Pro modes show a small PRO badge in the chip.
   final bool isPro;
 }
 
-/// Full ordered list of modes — base modes first, Student, then Pro variants.
+/// Full ordered list of goal-based modes shown to the user.
 /// Keys must match the `modeAdviceSourceMap` entries at the bottom of this file.
 const List<DayMode> allDayModes = <DayMode>[
-  DayMode(id: 'healthy', emoji: '🙂', label: 'Healthy'),
-  DayMode(id: 'athletic', emoji: '🏃', label: 'Athletic'),
-  DayMode(id: 'gym', emoji: '🏋️', label: 'Gym'),
-  DayMode(id: 'office', emoji: '💼', label: 'Office'),
-  DayMode(id: 'nicotine_free', emoji: '🚭', label: 'Nicotine Free'),
-  DayMode(id: 'student', emoji: '📚', label: 'Student'),
-  DayMode(id: 'coder_pro', emoji: '</>', label: 'Coder Pro', isPro: true),
   DayMode(
-      id: 'coder_super_plus',
-      emoji: '++',
-      label: 'Coder Super+',
-      isPro: true),
-  DayMode(id: 'healthy_pro', emoji: '🙂', label: 'Healthy Pro', isPro: true),
-  DayMode(id: 'athletic_pro', emoji: '🏃', label: 'Athletic Pro', isPro: true),
-  DayMode(id: 'gym_pro', emoji: '🏋️', label: 'Gym Pro', isPro: true),
-  DayMode(id: 'office_pro', emoji: '💼', label: 'Office Pro', isPro: true),
-  DayMode(id: 'nicotine_free_pro', emoji: '🚭', label: 'Quit Pro', isPro: true),
+    id: 'student',
+    emoji: '📚',
+    label: 'I need to Prepare for Exam',
+    shortLabel: 'Exam',
+  ),
+  DayMode(
+    id: 'office',
+    emoji: '🎯',
+    label: 'I need to Focus More Time today',
+    shortLabel: 'Focus',
+  ),
+  DayMode(
+    id: 'gym',
+    emoji: '🏋️',
+    label: 'Track and get me muscles',
+    shortLabel: 'Muscles',
+  ),
+  DayMode(
+    id: 'nicotine_free',
+    emoji: '🚭',
+    label: 'Reduce my Nicotine / Cigarettes',
+    shortLabel: 'Nicotine',
+  ),
+  DayMode(
+    id: 'language',
+    emoji: '🗣️',
+    label: 'Learn a new Language',
+    shortLabel: 'Language',
+  ),
+  DayMode(
+    id: 'healthy',
+    emoji: '🙂',
+    label: 'Stay Balanced',
+    shortLabel: 'Balance',
+  ),
+  DayMode(
+    id: 'athletic',
+    emoji: '🏃',
+    label: 'Move More',
+    shortLabel: 'Move',
+  ),
 ];
 
 /// Legacy marker id. New saved plans use `custom_1` ... `custom_5`.
@@ -93,7 +120,12 @@ const String customModeId = 'custom';
 
 List<DayMode> get customDayModes {
   return CustomModeStore.instance.plans.value
-      .map((plan) => DayMode(id: plan.id, emoji: '✨', label: plan.name))
+      .map((plan) => DayMode(
+            id: plan.id,
+            emoji: '✨',
+            label: plan.name,
+            shortLabel: plan.name,
+          ))
       .toList();
 }
 
@@ -703,6 +735,7 @@ const Map<String, List<AdviceMap>> modeAdviceSourceMap =
   'office': _office,
   'nicotine_free': _nicotineFree,
   'student': _student,
+  'language': _student,
   'coder_pro': coderProAdvice,
   'coder_super_plus': coderSuperPlusAdvice,
   'healthy_pro': _normalPro,

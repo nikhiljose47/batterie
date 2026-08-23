@@ -15,8 +15,10 @@ import '../../models/timeline_point.dart';
 import '../../repositories/energy_health_repository.dart';
 import '../../services/energy_log_store.dart';
 import '../../services/open_router_service.dart';
+import '../../services/remote_sync.dart';
 import '../../services/settings_service.dart';
 import '../../state/async_view_state.dart';
+import '../profile/profile_store.dart';
 import 'dashboard_state.dart';
 
 class DashboardController extends ChangeNotifier {
@@ -57,7 +59,12 @@ class DashboardController extends ChangeNotifier {
       // survive app restarts. Storage failure must not break the dashboard.
       List<EnergyLogRecord> saved = const <EnergyLogRecord>[];
       try {
-        saved = await _logStore.recordsForDate(dateKey(DateTime.now()));
+        final userId = ProfileStore.instance.userId.value;
+        await _logStore.claimEnergyLogsForUser(userId);
+        saved = await _logStore.recordsForDate(
+          dateKey(DateTime.now()),
+          userId: userId,
+        );
       } catch (_) {}
       if (saved.isNotEmpty) {
         _state = _state.copyWith(
@@ -221,6 +228,7 @@ class DashboardController extends ChangeNotifier {
       ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 
     final today = dateKey(DateTime.now());
+    final userId = ProfileStore.instance.userId.value;
     final records = <EnergyLogRecord>[];
     final points = <TimelinePoint>[];
     for (final item in sorted) {
@@ -232,6 +240,7 @@ class DashboardController extends ChangeNotifier {
       );
       records.add(EnergyLogRecord(
         id: item.id,
+        userId: userId,
         date: today,
         startMinutes: item.startMinutes,
         durationMinutes: item.durationMinutes,
@@ -247,7 +256,7 @@ class DashboardController extends ChangeNotifier {
       ));
     }
     unawaited(
-      _logStore.saveDay(today, records).catchError((Object _) {}),
+      _persistEnergyRecords(today, records, userId),
     );
 
     final lastActivity = sorted.isEmpty
@@ -306,6 +315,17 @@ class DashboardController extends ChangeNotifier {
               recommendedActions: _state.bodyStatus!.recommendedActions,
             ),
     );
+  }
+
+  Future<void> _persistEnergyRecords(
+    String date,
+    List<EnergyLogRecord> records,
+    String userId,
+  ) async {
+    await _logStore.saveDay(date, records, userId: userId);
+    for (final record in records) {
+      await RemoteSync.instance.upsertEnergyLog(record, userId: userId);
+    }
   }
 
   // Accepts free-text like "walked 30 min" or "gym 1h".

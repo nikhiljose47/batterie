@@ -67,12 +67,12 @@ class _NewsPageState extends State<NewsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        AppStrings.newsTitle,
+                        AppStrings.articlesTitle,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: AppSpacing.xSmall),
                       Text(
-                        AppStrings.sortedRecent,
+                        AppStrings.articlesSubtitle,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],

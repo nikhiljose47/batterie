@@ -83,7 +83,8 @@ class LocationService {
   /// Uses the Nominatim free reverse geocoding API. Throws on any failure —
   /// callers should swallow the error and treat place name as optional.
   Future<String?> reverseGeocode(UserLocation location) async {
-    final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', <String, String>{
+    final uri =
+        Uri.https('nominatim.openstreetmap.org', '/reverse', <String, String>{
       'lat': location.latitude.toString(),
       'lon': location.longitude.toString(),
       'format': 'json',
@@ -103,9 +104,9 @@ class LocationService {
     if (address == null) return null;
 
     final city = (address['city'] ??
-            address['town'] ??
-            address['village'] ??
-            address['county']) as String?;
+        address['town'] ??
+        address['village'] ??
+        address['county']) as String?;
     final country = address['country_code'] as String?;
 
     if (city == null) return null;

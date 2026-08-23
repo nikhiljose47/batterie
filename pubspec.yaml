@@ -48,6 +48,10 @@ dependencies:
   lottie: ^3.1.0
   image_picker: ^1.1.0
   flutter_bloc: ^9.1.1
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  google_sign_in: ^6.3.0
+  googleapis: ^13.2.0
   flutter_local_notifications: 17.2.4
   timezone: 0.9.4
 
@@ -76,8 +80,17 @@ flutter:
   assets:
     - .env
     - assets/audio/
+    - assets/articles/
     - assets/icons/
     - assets/lottie/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
+    - family: Kalam
+      fonts:
+        - asset: assets/fonts/Kalam-Regular.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

@@ -90,7 +90,7 @@ class CustomModeStore {
   CustomModeStore._();
   static final CustomModeStore instance = CustomModeStore._();
 
-  static const int maxPlans = 5;
+  static const int maxPlans = 4;
   static const int slotCount = 7;
   static const String defaultPlanId = 'custom_1';
 

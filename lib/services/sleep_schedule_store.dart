@@ -20,10 +20,10 @@ class SleepScheduleStore {
   SleepScheduleStore._();
   static final SleepScheduleStore instance = SleepScheduleStore._();
 
-  static const _wakeHourKey  = 'schedule.wake.hour';
-  static const _wakeMinKey   = 'schedule.wake.minute';
+  static const _wakeHourKey = 'schedule.wake.hour';
+  static const _wakeMinKey = 'schedule.wake.minute';
   static const _sleepHourKey = 'schedule.sleep.hour';
-  static const _sleepMinKey  = 'schedule.sleep.minute';
+  static const _sleepMinKey = 'schedule.sleep.minute';
 
   final ValueNotifier<TimeOfDay> wakeTime =
       ValueNotifier<TimeOfDay>(const TimeOfDay(hour: 6, minute: 0));

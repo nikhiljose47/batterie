@@ -119,7 +119,7 @@ class _MentalHealthPageState extends State<MentalHealthPage> {
                           Text('${_slider.round()}',
                               style: const TextStyle(
                                   fontSize: 20,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.primary)),
                         ],
                       ),

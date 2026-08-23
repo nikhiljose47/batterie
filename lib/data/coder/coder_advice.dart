@@ -1,4 +1,3 @@
-
 /// Practical coding planner advice.
 ///
 /// Each card represents a realistic stage of a productive development day.
@@ -80,8 +79,7 @@ const List<Map<String, Object>> coderProAdvice = <Map<String, Object>>[
 ///
 /// Designed for experienced developers handling larger features, releases,
 /// production stability, architecture, and team delivery.
-const List<Map<String, Object>> coderSuperPlusAdvice =
-    <Map<String, Object>>[
+const List<Map<String, Object>> coderSuperPlusAdvice = <Map<String, Object>>[
   <String, Object>{
     'tip': 'Define what will be delivered today',
     'recommendation':

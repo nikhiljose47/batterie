@@ -235,7 +235,7 @@ class _SleepPageState extends State<SleepPage> {
                       'MY DAILY SCHEDULE',
                       style: TextStyle(
                         fontSize: 9,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 1.3,
                         color: Color(0xFFB5B8FF),
                       ),
@@ -294,7 +294,7 @@ class _SleepPageState extends State<SleepPage> {
                               _fmtH(planned),
                               style: const TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               ),
                             ),
@@ -361,7 +361,7 @@ class _SleepPageState extends State<SleepPage> {
               _fmtTod(time),
               style: const TextStyle(
                 fontSize: 24,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: Colors.white,
                 height: 1.1,
               ),
@@ -426,7 +426,7 @@ class _SleepPageState extends State<SleepPage> {
                 'LOG LAST NIGHT',
                 style: TextStyle(
                   fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
                   color: AppColors.textMuted,
                 ),
@@ -436,7 +436,7 @@ class _SleepPageState extends State<SleepPage> {
                 _fmtH(dur),
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: ok ? const Color(0xFF2E7D32) : const Color(0xFFEF6C00),
                 ),
               ),
@@ -564,7 +564,7 @@ class _SleepPageState extends State<SleepPage> {
           Text(
             _fmtH(minutes),
             style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w800, color: accent),
+                fontSize: 13, fontWeight: FontWeight.w700, color: accent),
           ),
           const SizedBox(width: 8),
           GestureDetector(
@@ -614,7 +614,7 @@ class _StatCard extends StatelessWidget {
         children: <Widget>[
           Text(value,
               style: TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+                  fontSize: 22, fontWeight: FontWeight.w700, color: color)),
           const SizedBox(height: 3),
           Text(label,
               style:

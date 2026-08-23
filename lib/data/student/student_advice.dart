@@ -73,7 +73,6 @@ final Map<String, List<Map<String, dynamic>>> studentModes = {
       ],
     },
   ],
-
   'Student Pro': [
     {
       'time': '5:30 AM - 7:00 AM',

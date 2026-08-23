@@ -105,7 +105,7 @@ class _CyclePageState extends State<CyclePage> {
                   Text('Day $dayOfCycle',
                       style: const TextStyle(
                           fontSize: 30,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xFFC2185B))),
                   const Text('of your cycle',
                       style: TextStyle(
@@ -254,7 +254,7 @@ class _CycleStat extends StatelessWidget {
     return Column(
       children: <Widget>[
         Text('$emoji $value',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         Text(label,
             style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
         Text(sub,
@@ -296,7 +296,7 @@ class _SettingSlider extends StatelessWidget {
             Text('$value $unit',
                 style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.primary)),
           ],
         ),
@@ -466,7 +466,7 @@ class _PregnancyPageState extends State<PregnancyPage> {
                 Text('Week $week',
                     style: const TextStyle(
                         fontSize: 30,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: Color(0xFFC2185B))),
                 Text('Trimester $trimester',
                     style: const TextStyle(

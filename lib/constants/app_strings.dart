@@ -4,9 +4,10 @@ class AppStrings {
   static const String appName = 'Energy Health';
   static const String settings = 'Settings';
   static const String homeTab = 'Home';
-  static const String updatesTab = 'Updates';
+  static const String compareTab = 'Compare';
+  static const String statusTab = 'Status';
   static const String youTab = 'You';
-  static const String newsTab = 'News';
+  static const String articlesTab = 'Articles';
   static const String currentBodyStatus = 'Current body status';
   static const String potentialToday = 'Potential today';
   static const String whatYouDidEarlier = 'What you did earlier';
@@ -21,7 +22,12 @@ class AppStrings {
   static const String addPerson = 'Add person';
   static const String addPersonMessage =
       'Invite teammates, family, or patients to see their shared energy check-ins here.';
-  static const String newsTitle = 'Trends and articles';
+  static const String statusLockedTitle = 'Sign in to see statuses';
+  static const String statusLockedMessage =
+      'Log in or sign up to see others status and store yours.';
+  static const String articlesTitle = 'Articles';
+  static const String articlesSubtitle =
+      'Fresh reads for energy, focus, and recovery';
   static const String allFilter = 'All';
   static const String recoveryFilter = 'Recovery';
   static const String sleepFilter = 'Sleep';

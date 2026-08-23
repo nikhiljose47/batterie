@@ -27,7 +27,7 @@ class BodyStatusCard extends StatelessWidget {
               AppStrings.currentBodyStatus,
               style: textTheme.titleMedium?.copyWith(
                 color: AppColors.primary,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: AppSpacing.medium),

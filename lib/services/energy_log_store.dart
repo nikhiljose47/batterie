@@ -15,9 +15,17 @@ import '../models/planner_session_log.dart';
 abstract class EnergyLogStore {
   /// Replaces all records for [date] with [records] (wipe-and-write keeps
   /// edits/removals trivially consistent).
-  Future<void> saveDay(String date, List<EnergyLogRecord> records);
+  Future<void> saveDay(
+    String date,
+    List<EnergyLogRecord> records, {
+    String? userId,
+  });
 
-  Future<List<EnergyLogRecord>> recordsForDate(String date);
+  Future<List<EnergyLogRecord>> recordsForDate(String date, {String? userId});
+
+  Future<List<String>> activityDates({String? userId});
+
+  Future<void> claimEnergyLogsForUser(String userId);
 
   Future<void> savePlannerSessionLog(PlannerSessionLog log);
 
@@ -62,11 +70,12 @@ class SqliteEnergyLogStore implements EnergyLogStore {
 
     final db = await openDatabase(
       p.join(dir, 'energy_logs.db'),
-      version: 4,
+      version: 6,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE energy_logs(
             id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
             date TEXT NOT NULL,
             start_minutes INTEGER NOT NULL,
             duration_minutes INTEGER NOT NULL,
@@ -75,8 +84,9 @@ class SqliteEnergyLogStore implements EnergyLogStore {
             brain_after INTEGER NOT NULL
           )
         ''');
-        await db
-            .execute('CREATE INDEX idx_energy_logs_date ON energy_logs(date)');
+        await db.execute(
+          'CREATE INDEX idx_energy_logs_user_date ON energy_logs(user_id, date)',
+        );
         await db.execute('''
           CREATE TABLE daily_remarks(
             date TEXT PRIMARY KEY,
@@ -100,7 +110,8 @@ class SqliteEnergyLogStore implements EnergyLogStore {
             start_minutes INTEGER NOT NULL,
             end_minutes INTEGER NOT NULL,
             title TEXT NOT NULL,
-            is_done INTEGER NOT NULL
+            is_done INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'done'
           )
         ''');
         await db.execute('''
@@ -129,7 +140,8 @@ class SqliteEnergyLogStore implements EnergyLogStore {
               start_minutes INTEGER NOT NULL,
               end_minutes INTEGER NOT NULL,
               title TEXT NOT NULL,
-              is_done INTEGER NOT NULL
+              is_done INTEGER NOT NULL,
+              status TEXT NOT NULL DEFAULT 'done'
             )
           ''');
           await db.execute('''
@@ -156,6 +168,38 @@ class SqliteEnergyLogStore implements EnergyLogStore {
             ON planner_session_logs(user_id, date, session_id)
           ''');
         }
+        if (oldVersion < 5) {
+          final columns = await db.rawQuery('PRAGMA table_info(energy_logs)');
+          final hasUserId =
+              columns.any((column) => column['name'] == 'user_id');
+          if (!hasUserId) {
+            await db.execute('''
+              ALTER TABLE energy_logs
+              ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local_legacy_user'
+            ''');
+          }
+          await db.execute('DROP INDEX IF EXISTS idx_energy_logs_date');
+          await db.execute('''
+            CREATE INDEX IF NOT EXISTS idx_energy_logs_user_date
+            ON energy_logs(user_id, date)
+          ''');
+        }
+        if (oldVersion < 6) {
+          final columns = await db.rawQuery(
+            'PRAGMA table_info(planner_session_logs)',
+          );
+          final hasStatus = columns.any((column) => column['name'] == 'status');
+          if (!hasStatus) {
+            await db.execute('''
+              ALTER TABLE planner_session_logs
+              ADD COLUMN status TEXT NOT NULL DEFAULT 'done'
+            ''');
+            await db.execute('''
+              UPDATE planner_session_logs
+              SET status = CASE WHEN is_done = 1 THEN 'done' ELSE 'not_done' END
+            ''');
+          }
+        }
       },
     );
     _db = db;
@@ -163,10 +207,19 @@ class SqliteEnergyLogStore implements EnergyLogStore {
   }
 
   @override
-  Future<void> saveDay(String date, List<EnergyLogRecord> records) async {
+  Future<void> saveDay(
+    String date,
+    List<EnergyLogRecord> records, {
+    String? userId,
+  }) async {
     final db = await _database;
+    final ownerId = userId ?? (records.isEmpty ? null : records.first.userId);
     await db.transaction((txn) async {
-      await txn.delete('energy_logs', where: 'date = ?', whereArgs: [date]);
+      await txn.delete(
+        'energy_logs',
+        where: ownerId == null ? 'date = ?' : 'date = ? AND user_id = ?',
+        whereArgs: ownerId == null ? <Object?>[date] : <Object?>[date, ownerId],
+      );
       final batch = txn.batch();
       for (final record in records) {
         batch.insert('energy_logs', record.toMap());
@@ -176,15 +229,65 @@ class SqliteEnergyLogStore implements EnergyLogStore {
   }
 
   @override
-  Future<List<EnergyLogRecord>> recordsForDate(String date) async {
+  Future<List<EnergyLogRecord>> recordsForDate(
+    String date, {
+    String? userId,
+  }) async {
     final db = await _database;
+    final where = userId == null ? 'date = ?' : 'date = ? AND user_id = ?';
+    final whereArgs =
+        userId == null ? <Object?>[date] : <Object?>[date, userId];
     final rows = await db.query(
       'energy_logs',
-      where: 'date = ?',
-      whereArgs: [date],
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'start_minutes ASC',
     );
     return rows.map(EnergyLogRecord.fromMap).toList();
+  }
+
+  @override
+  Future<List<String>> activityDates({String? userId}) async {
+    final db = await _database;
+    final where = userId == null ? null : 'user_id = ?';
+    final whereArgs = userId == null ? null : <Object?>[userId];
+    final dates = <String>{};
+
+    final energyRows = await db.query(
+      'energy_logs',
+      distinct: true,
+      columns: <String>['date'],
+      where: where,
+      whereArgs: whereArgs,
+    );
+    final plannerRows = await db.query(
+      'planner_session_logs',
+      distinct: true,
+      columns: <String>['date'],
+      where: where,
+      whereArgs: whereArgs,
+    );
+
+    for (final row in <Map<String, Object?>>[
+      ...energyRows,
+      ...plannerRows,
+    ]) {
+      final date = row['date'] as String?;
+      if (date != null && date.isNotEmpty) dates.add(date);
+    }
+
+    return dates.toList()..sort();
+  }
+
+  @override
+  Future<void> claimEnergyLogsForUser(String userId) async {
+    final db = await _database;
+    await db.update(
+      'energy_logs',
+      <String, Object?>{'user_id': userId},
+      where: 'user_id = ?',
+      whereArgs: ['local_legacy_user'],
+    );
   }
 
   @override

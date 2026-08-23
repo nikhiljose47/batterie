@@ -82,6 +82,7 @@ import '../models/planner_session_log.dart';
 //   end_minutes     int  not null,
 //   title           text not null,
 //   is_done         bool not null,
+//   status          text not null default 'done',
 //   updated_at      timestamptz not null default now(),
 //   unique (user_id, date_key, session_id)
 // );
@@ -235,8 +236,14 @@ class NoOpRemoteSync implements RemoteSync {
 //     final id = _userId;
 //     if (id == null) return;
 //     await _db.from('energy_logs').upsert({
-//       ...record.toMap(),
+//       'id': record.id,
 //       'user_id': id,
+//       'date_key': record.date,
+//       'start_minutes': record.startMinutes,
+//       'duration_minutes': record.durationMinutes,
+//       'activity_id': record.activityId,
+//       'physical_after': record.physicalAfter,
+//       'brain_after': record.brainAfter,
 //       'synced_at': DateTime.now().toIso8601String(),
 //     });
 //   }
@@ -265,6 +272,7 @@ class NoOpRemoteSync implements RemoteSync {
 //       'end_minutes': log.endMinutes,
 //       'title': log.title,
 //       'is_done': log.isDone,
+//       'status': log.status,
 //       'updated_at': DateTime.now().toIso8601String(),
 //     });
 //   }

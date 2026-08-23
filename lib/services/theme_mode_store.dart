@@ -8,7 +8,7 @@ class ThemeModeStore {
   static const String _key = 'settings.theme_mode.v1';
 
   final ValueNotifier<ThemeMode> mode =
-      ValueNotifier<ThemeMode>(ThemeMode.system);
+      ValueNotifier<ThemeMode>(ThemeMode.light);
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,7 +26,7 @@ class ThemeModeStore {
     return switch (value) {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
+      _ => ThemeMode.light,
     };
   }
 

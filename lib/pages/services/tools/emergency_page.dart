@@ -104,7 +104,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                       Text('EMERGENCY NUMBERS (INDIA)',
                           style: TextStyle(
                               fontSize: 9,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: 0.8,
                               color: Color(0xFFC62828))),
                       SizedBox(height: 6),

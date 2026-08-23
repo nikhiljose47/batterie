@@ -41,6 +41,8 @@ const Map<String, String> activityEmojis = <String, String>{
   'mindfulness_meditation': '🧘',
   'power_nap_10_20_min': '😴',
   'meal_break_away_from_desk': '🍽️',
+  'drink_water_after_mild_thirst': '💧',
+  'nicotine_use': '🚬',
 };
 
 String formatMinutes(int minutes) {

@@ -392,7 +392,7 @@ class _DataInspectorPageState extends State<DataInspectorPage> {
                       entry.title,
                       style: const TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 4),

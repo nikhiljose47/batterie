@@ -123,7 +123,7 @@ class _LedgerPageState extends State<LedgerPage> {
                     children: <Widget>[
                       Text('₹${total.toStringAsFixed(0)}',
                           style: const TextStyle(
-                              fontSize: 26, fontWeight: FontWeight.w800)),
+                              fontSize: 26, fontWeight: FontWeight.w700)),
                       const Text('spent this month',
                           style: TextStyle(
                               fontSize: 10.5, color: AppColors.textMuted)),
@@ -251,7 +251,7 @@ class _LedgerPageState extends State<LedgerPage> {
                             Text(
                               '₹${((e['amount'] as num?) ?? 0).toStringAsFixed(0)}',
                               style: const TextStyle(
-                                  fontSize: 12.5, fontWeight: FontWeight.w800),
+                                  fontSize: 12.5, fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(width: 8),
                             InkWell(
@@ -374,7 +374,7 @@ class _BudgetPageState extends State<BudgetPage> {
                                   : '₹${left.toStringAsFixed(0)} left',
                               style: TextStyle(
                                 fontSize: 20,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: left < 0
                                     ? const Color(0xFFC62828)
                                     : const Color(0xFF2E7D32),
@@ -614,7 +614,7 @@ class _RecurringPageState extends State<RecurringPage> {
                         children: <Widget>[
                           Text('₹${monthlyTotal.toStringAsFixed(0)}',
                               style: const TextStyle(
-                                  fontSize: 22, fontWeight: FontWeight.w800)),
+                                  fontSize: 22, fontWeight: FontWeight.w700)),
                           Text(
                               'per month · ₹${(monthlyTotal * 12).toStringAsFixed(0)}/year',
                               style: const TextStyle(
@@ -640,9 +640,7 @@ class _RecurringPageState extends State<RecurringPage> {
                     Expanded(
                         flex: 2,
                         child: _MoneyField(
-                            controller: _day,
-                            hint: 'Day 1–31',
-                            number: true)),
+                            controller: _day, hint: 'Day 1–31', number: true)),
                     const SizedBox(width: 6),
                     InkWell(
                       onTap: _add,
@@ -728,7 +726,7 @@ class _RecurringPageState extends State<RecurringPage> {
                           Text(
                             '₹${((item['amount'] as num?) ?? 0).toStringAsFixed(0)}',
                             style: const TextStyle(
-                                fontSize: 12.5, fontWeight: FontWeight.w800),
+                                fontSize: 12.5, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(width: 8),
                           InkWell(

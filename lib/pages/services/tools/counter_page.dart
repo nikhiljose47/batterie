@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
+import '../../../services/service_energy_logger.dart';
 import 'toolkit.dart';
 
 /// Daily counter template — one number per day vs a goal.
@@ -87,6 +88,16 @@ class _CounterToolPageState extends State<CounterToolPage> {
     final next = (_today + delta).clamp(0, 99);
     setState(() => _days[key] = next);
     await ServiceStore.saveMap(_daysKey, _days);
+    if (delta > 0) {
+      await ServiceEnergyLogger.instance.addServiceLog(
+        sourceId: widget.config.id,
+        activityId: widget.config.id == 'water'
+            ? 'drink_water_after_mild_thirst'
+            : 'nicotine_use',
+        at: DateTime.now(),
+        durationMinutes: 5,
+      );
+    }
   }
 
   Future<void> _setGoal(int goal) async {
@@ -158,7 +169,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
                                     '$_today',
                                     style: TextStyle(
                                       fontSize: 34,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       color: c.accent,
                                       height: 1.0,
                                     ),
@@ -181,7 +192,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
                               '$_today',
                               style: TextStyle(
                                 fontSize: 44,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: goalMet
                                     ? const Color(0xFF2E7D32)
                                     : c.accent,
@@ -237,7 +248,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
                           children: <Widget>[
                             Text('🔥 $_streak',
                                 style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.w800)),
+                                    fontSize: 20, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 2),
                             const Text('day streak',
                                 style: TextStyle(
@@ -265,7 +276,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
                                   child: Text('$_goal',
                                       style: const TextStyle(
                                           fontSize: 20,
-                                          fontWeight: FontWeight.w800)),
+                                          fontWeight: FontWeight.w700)),
                                 ),
                                 InkWell(
                                   onTap: () => _setGoal(_goal + 1),

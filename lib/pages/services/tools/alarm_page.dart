@@ -180,7 +180,7 @@ class _AlarmPageState extends State<AlarmPage> {
                               style: TextStyle(
                                 fontSize: 34,
                                 height: 1,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 color: colors.onSurface,
                               ),
                             ),
@@ -232,18 +232,19 @@ class _AlarmPageState extends State<AlarmPage> {
                 if (_items.isEmpty)
                   const EmptyHint('No alarms yet. Add one for your next plan.')
                 else
-                  for (final item in _sortedItems()) _AlarmTile(
-                    item: item,
-                    timeLabel: _formatTime(
-                      TimeOfDay(
-                        hour: item['hour'] as int? ?? 9,
-                        minute: item['minute'] as int? ?? 0,
+                  for (final item in _sortedItems())
+                    _AlarmTile(
+                      item: item,
+                      timeLabel: _formatTime(
+                        TimeOfDay(
+                          hour: item['hour'] as int? ?? 9,
+                          minute: item['minute'] as int? ?? 0,
+                        ),
                       ),
+                      onToggle: (value) => _toggle(item, value),
+                      onEditTime: () => _editTime(item),
+                      onDelete: () => _delete(item),
                     ),
-                    onToggle: (value) => _toggle(item, value),
-                    onEditTime: () => _editTime(item),
-                    onDelete: () => _delete(item),
-                  ),
               ],
             ),
     );
@@ -252,8 +253,10 @@ class _AlarmPageState extends State<AlarmPage> {
   List<Map<String, dynamic>> _sortedItems() {
     final copy = _items.toList();
     copy.sort((a, b) {
-      final aMinutes = (a['hour'] as int? ?? 0) * 60 + (a['minute'] as int? ?? 0);
-      final bMinutes = (b['hour'] as int? ?? 0) * 60 + (b['minute'] as int? ?? 0);
+      final aMinutes =
+          (a['hour'] as int? ?? 0) * 60 + (a['minute'] as int? ?? 0);
+      final bMinutes =
+          (b['hour'] as int? ?? 0) * 60 + (b['minute'] as int? ?? 0);
       return aMinutes.compareTo(bMinutes);
     });
     return copy;
@@ -308,7 +311,7 @@ class _AlarmTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 28,
                           height: 1,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                           color: enabled
                               ? colors.onSurface
                               : colors.onSurface.withOpacity(0.45),

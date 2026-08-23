@@ -14,7 +14,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Current keys:
 //   profile.user.id    — stable local user id (String, generated once)
 //   profile.name       — display name (String, default 'You')
+//   profile.age        — user age in years (int?)
 //   profile.photo.path — absolute path to local profile photo (String?)
+//   profile.onboarded  — first-run onboarding completed (bool)
 //   user.planner.mode  — selected day mode id (String, default 'healthy')
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -28,14 +30,18 @@ class ProfileStore {
   static final ProfileStore instance = ProfileStore._();
 
   static const _nameKey = 'profile.name';
+  static const _ageKey = 'profile.age';
   static const _photoKey = 'profile.photo.path';
   static const _modeKey = 'user.planner.mode';
   static const _userIdKey = 'profile.user.id';
+  static const _onboardingCompleteKey = 'profile.onboarded';
 
   final ValueNotifier<String> userId = ValueNotifier<String>('');
   final ValueNotifier<String> name = ValueNotifier<String>('You');
+  final ValueNotifier<int?> age = ValueNotifier<int?>(null);
   final ValueNotifier<String?> photoPath = ValueNotifier<String?>(null);
   final ValueNotifier<String> plannerMode = ValueNotifier<String>('healthy');
+  final ValueNotifier<bool> onboardingComplete = ValueNotifier<bool>(false);
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -52,6 +58,9 @@ class ProfileStore {
     final storedName = prefs.getString(_nameKey);
     if (storedName != null && storedName.isNotEmpty) name.value = storedName;
 
+    final storedAge = prefs.getInt(_ageKey);
+    if (storedAge != null && storedAge > 0) age.value = storedAge;
+
     final storedMode = prefs.getString(_modeKey);
     if (storedMode != null && storedMode.isNotEmpty) {
       plannerMode.value = _normalizePlannerMode(storedMode);
@@ -59,6 +68,10 @@ class ProfileStore {
 
     final stored = prefs.getString(_photoKey);
     if (stored != null && File(stored).existsSync()) photoPath.value = stored;
+
+    final storedOnboarded = prefs.getBool(_onboardingCompleteKey);
+    onboardingComplete.value = storedOnboarded ??
+        (storedName != null && storedName.isNotEmpty && storedName != 'You');
   }
 
   Future<void> setName(String value) async {
@@ -69,6 +82,13 @@ class ProfileStore {
     name.value = trimmed;
   }
 
+  Future<void> setAge(int value) async {
+    if (value <= 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_ageKey, value);
+    age.value = value;
+  }
+
   Future<void> setPlannerMode(String modeId) async {
     final normalized = _normalizePlannerMode(modeId);
     final prefs = await SharedPreferences.getInstance();
@@ -76,10 +96,33 @@ class ProfileStore {
     plannerMode.value = normalized;
   }
 
+  Future<void> completeOnboarding({
+    required String displayName,
+    required int userAge,
+    required String modeId,
+  }) async {
+    final trimmed = displayName.trim();
+    if (trimmed.isEmpty || userAge <= 0) return;
+    final normalized = _normalizePlannerMode(modeId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_nameKey, trimmed);
+    await prefs.setInt(_ageKey, userAge);
+    await prefs.setString(_modeKey, normalized);
+    await prefs.setBool(_onboardingCompleteKey, true);
+    name.value = trimmed;
+    age.value = userAge;
+    plannerMode.value = normalized;
+    onboardingComplete.value = true;
+  }
+
   String _normalizePlannerMode(String modeId) {
     return switch (modeId) {
       'normal' => 'healthy',
-      'normal_pro' => 'healthy_pro',
+      'normal_pro' || 'healthy_pro' => 'healthy',
+      'coder_pro' || 'coder_super_plus' || 'office_pro' => 'office',
+      'athletic_pro' => 'athletic',
+      'gym_pro' => 'gym',
+      'nicotine_free_pro' => 'nicotine_free',
       _ => modeId,
     };
   }

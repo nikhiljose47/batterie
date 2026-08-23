@@ -51,7 +51,7 @@ class ServiceDetailPage extends StatelessWidget {
                         service.name,
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: accent,
                         ),
                       ),
@@ -86,7 +86,7 @@ class ServiceDetailPage extends StatelessWidget {
                   '🚧 COMING SOON',
                   style: TextStyle(
                     fontSize: 9,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
                     color: AppColors.primary,
                   ),

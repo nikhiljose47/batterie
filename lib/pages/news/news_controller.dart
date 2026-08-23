@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../constants/article_constants.dart';
 import '../../constants/app_strings.dart';
 import '../../repositories/energy_health_repository.dart';
 import '../../state/async_view_state.dart';
@@ -17,10 +18,7 @@ class NewsController extends ChangeNotifier {
   NewsState get state => _state;
 
   static const List<String> filters = <String>[
-    AppStrings.allFilter,
-    AppStrings.recoveryFilter,
-    AppStrings.sleepFilter,
-    AppStrings.focusFilter,
+    ...ArticleConstants.filters,
   ];
 
   Future<void> load() async {

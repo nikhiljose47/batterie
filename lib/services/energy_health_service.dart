@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
 import '../constants/app_colors.dart';
-import '../constants/app_images.dart';
+import '../constants/article_constants.dart';
 import '../constants/app_strings.dart';
 import '../models/battery_status.dart';
 import '../models/body_status.dart';
@@ -79,95 +83,42 @@ class EnergyHealthService {
   Future<List<NewsArticle>> fetchNewsArticles() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
+    final url = ArticleConstants.articlesApiUrl.trim();
+    if (url.isEmpty) return _sortedArticles(ArticleConstants.fallbackArticles);
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return _sortedArticles(ArticleConstants.fallbackArticles);
+      }
+
+      final decoded = jsonDecode(response.body);
+      final rawArticles = decoded is List<dynamic>
+          ? decoded
+          : decoded is Map<String, dynamic>
+              ? decoded['articles']
+              : null;
+      if (rawArticles is! List<dynamic>) {
+        return _sortedArticles(ArticleConstants.fallbackArticles);
+      }
+
+      final articles = rawArticles
+          .whereType<Map<String, dynamic>>()
+          .map(NewsArticle.fromMap)
+          .where((article) => article.id.isNotEmpty && article.title.isNotEmpty)
+          .toList(growable: false);
+      if (articles.isEmpty) {
+        return _sortedArticles(ArticleConstants.fallbackArticles);
+      }
+      return _sortedArticles(articles);
+    } catch (_) {
+      return _sortedArticles(ArticleConstants.fallbackArticles);
+    }
+  }
+
+  List<NewsArticle> _sortedArticles(List<NewsArticle> articles) {
     return <NewsArticle>[
-      NewsArticle(
-        id: 'recovery-hrv',
-        title: 'Using recovery signals without overreacting',
-        summary:
-            'A practical way to read energy, heart-rate variability, and fatigue trends together.',
-        category: AppStrings.recoveryFilter,
-        imageUrl: AppImages.recovery,
-        publishedAt: DateTime(2026, 7, 3),
-        readTimeMinutes: 4,
-        sections: const <ArticleSection>[
-          ArticleSection(
-            heading: 'What matters',
-            body:
-                'One low score is a prompt, not a verdict. Look for repeated dips across sleep, soreness, mood, and resting heart rate before changing a whole plan.',
-          ),
-          ArticleSection(
-            heading: 'How to act',
-            body:
-                'When signals are mixed, choose the smallest useful adjustment: reduce intensity, add warm-up time, or move deep work into your clearest hour.',
-          ),
-        ],
-      ),
-      NewsArticle(
-        id: 'sleep-debt',
-        title: 'Sleep debt changes more than tiredness',
-        summary:
-            'Recent wellness tracking trends show how sleep consistency affects appetite, focus, and perceived effort.',
-        category: AppStrings.sleepFilter,
-        imageUrl: AppImages.sleep,
-        publishedAt: DateTime(2026, 7, 2),
-        readTimeMinutes: 5,
-        sections: const <ArticleSection>[
-          ArticleSection(
-            heading: 'The pattern',
-            body:
-                'Short sleep often shows up the next day as higher effort for normal tasks. The body may feel capable while decision speed and patience run lower.',
-          ),
-          ArticleSection(
-            heading: 'The reset',
-            body:
-                'A consistent wake time, morning light, and a calmer final hour usually beat aggressive catch-up naps for rebuilding rhythm.',
-          ),
-        ],
-      ),
-      NewsArticle(
-        id: 'brain-battery',
-        title: 'Brain battery is becoming a daily planning metric',
-        summary:
-            'Teams and health apps are beginning to separate physical readiness from cognitive readiness.',
-        category: AppStrings.focusFilter,
-        imageUrl: AppImages.focus,
-        publishedAt: DateTime(2026, 6, 30),
-        readTimeMinutes: 3,
-        sections: const <ArticleSection>[
-          ArticleSection(
-            heading: 'Why separate it',
-            body:
-                'You can be physically rested and mentally overloaded. Separating the two makes planning kinder and more accurate.',
-          ),
-          ArticleSection(
-            heading: 'Try this',
-            body:
-                'Put complex decisions in the highest-focus window, then reserve lower-focus time for movement, admin, and recovery tasks.',
-          ),
-        ],
-      ),
-      NewsArticle(
-        id: 'hydration-recovery',
-        title: 'Hydration nudges that actually stick',
-        summary:
-            'Small environmental cues can improve energy consistency without turning hydration into another chore.',
-        category: AppStrings.recoveryFilter,
-        imageUrl: AppImages.hydration,
-        publishedAt: DateTime(2026, 6, 28),
-        readTimeMinutes: 4,
-        sections: const <ArticleSection>[
-          ArticleSection(
-            heading: 'Make it visible',
-            body:
-                'People are more consistent when water is already in the place where the next activity begins.',
-          ),
-          ArticleSection(
-            heading: 'Pair it',
-            body:
-                'Anchor hydration to routines you already do, like starting work, finishing exercise, or preparing dinner.',
-          ),
-        ],
-      ),
+      ...articles
     ]..sort((first, second) => second.publishedAt.compareTo(first.publishedAt));
   }
 }

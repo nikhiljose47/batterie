@@ -146,7 +146,7 @@ class _AirQualityPageState extends State<AirQualityPage> {
                 Text('$aqi',
                     style: TextStyle(
                         fontSize: 46,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: verdict.color,
                         height: 1.0)),
                 Text('US AQI · ${verdict.label}',
@@ -215,7 +215,7 @@ class _PollutantCard extends StatelessWidget {
           children: <Widget>[
             Text(value == null ? '—' : value!.toStringAsFixed(1),
                 style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             Text('$label µg/m³',
                 style:
                     const TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
@@ -416,14 +416,14 @@ class _NextHolidayCard extends StatelessWidget {
             days == 0 ? '🎉 TODAY!' : '🎉 NEXT · in $days days',
             style: const TextStyle(
                 fontSize: 9,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: Color(0xFFF57F17)),
           ),
           const SizedBox(height: 4),
           Text(holiday['localName'] as String? ?? '',
               style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           Text(
             d == null ? '' : svcDayLabel(svcDay(d)),
             style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
@@ -681,7 +681,7 @@ class _FoodDbPageState extends State<FoodDbPage> {
                                   Text('$kcal kcal',
                                       style: const TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w700,
                                           color: AppColors.primary)),
                                   const SizedBox(width: 6),
                                   InkWell(

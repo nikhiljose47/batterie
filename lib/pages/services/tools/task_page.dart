@@ -142,12 +142,56 @@ class _TaskToolPageState extends State<TaskToolPage> {
     await ServiceStore.saveList(_key, _items);
   }
 
+  Future<void> _saveItems() async {
+    await ServiceStore.saveList(_key, _items);
+  }
+
+  Future<void> _openEditor([Map<String, dynamic>? item]) async {
+    final result = await Navigator.of(context).push<_TaskEditResult>(
+      MaterialPageRoute<_TaskEditResult>(
+        builder: (context) => _TaskEditorPage(
+          config: widget.config,
+          item: item == null ? null : Map<String, dynamic>.from(item),
+          initialDueMinutes: widget.initialDueMinutes,
+        ),
+      ),
+    );
+    if (result == null) return;
+
+    if (result.deletedId != null) {
+      setState(() => _items.removeWhere((i) => i['id'] == result.deletedId));
+      await _saveItems();
+      return;
+    }
+
+    final edited = result.item;
+    if (edited == null) return;
+    setState(() {
+      final index = _items.indexWhere((i) => i['id'] == edited['id']);
+      if (index == -1) {
+        _items.insert(0, edited);
+      } else {
+        _items[index] = edited;
+      }
+    });
+    await _saveItems();
+  }
+
   Future<void> _toggle(String id) async {
     setState(() {
       final item = _items.firstWhere((i) => i['id'] == id);
       item['done'] = !(item['done'] as bool? ?? false);
     });
     await ServiceStore.saveList(_key, _items);
+  }
+
+  Future<void> _togglePinned(String id) async {
+    setState(() {
+      final item = _items.firstWhere((i) => i['id'] == id);
+      item['pinned'] = !(item['pinned'] as bool? ?? false);
+      item['updatedAt'] = DateTime.now().toIso8601String();
+    });
+    await _saveItems();
   }
 
   Future<void> _remove(String id) async {
@@ -169,6 +213,9 @@ class _TaskToolPageState extends State<TaskToolPage> {
     }
 
     visible.sort((a, b) {
+      final pinnedA = a['pinned'] as bool? ?? false;
+      final pinnedB = b['pinned'] as bool? ?? false;
+      if (pinnedA != pinnedB) return pinnedA ? -1 : 1;
       final doneA = a['done'] as bool? ?? false;
       final doneB = b['done'] as bool? ?? false;
       if (doneA != doneB) return doneA ? 1 : -1;
@@ -178,31 +225,64 @@ class _TaskToolPageState extends State<TaskToolPage> {
       return 0;
     });
 
-    final open = visible.where((i) => !(i['done'] as bool? ?? false)).toList();
+    final pinned = visible
+        .where((i) =>
+            (i['pinned'] as bool? ?? false) && !(i['done'] as bool? ?? false))
+        .toList();
+    final open = visible
+        .where((i) =>
+            !(i['pinned'] as bool? ?? false) && !(i['done'] as bool? ?? false))
+        .toList();
     final done = visible.where((i) => i['done'] as bool? ?? false).toList();
 
     return Scaffold(
       appBar: svcAppBar(c.title),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openEditor(),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New'),
+      ),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.large),
               children: <Widget>[
-                _buildComposer(c, open.length, done.length),
-                const SizedBox(height: 16),
-                if (open.isEmpty && done.isEmpty)
-                  const EmptyHint('Nothing here yet. Add your first note.')
+                _TaskTopBar(
+                  openCount: pinned.length + open.length,
+                  doneCount: done.length,
+                  onCreate: () => _openEditor(),
+                ),
+                const SizedBox(height: 14),
+                if (pinned.isEmpty && open.isEmpty && done.isEmpty)
+                  EmptyHint('Nothing here yet. Tap New to create a card.')
                 else ...<Widget>[
+                  if (pinned.isNotEmpty) ...<Widget>[
+                    const SectionLabel('Pinned'),
+                    _TaskGrid(
+                      items: pinned,
+                      dueLabel: _dueLabel,
+                      titleOf: _itemTitle,
+                      detailsOf: _itemDetails,
+                      onOpen: _openEditor,
+                      onToggle: _toggle,
+                      onPin: _togglePinned,
+                      onRemove: _remove,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (open.isNotEmpty) ...<Widget>[
-                    SectionLabel(c.todayOnly ? "Today's tasks" : 'Open'),
+                    SectionLabel(c.todayOnly ? "Today's cards" : 'Others'),
                     _TaskGrid(
                       items: open,
                       dueLabel: _dueLabel,
                       titleOf: _itemTitle,
                       detailsOf: _itemDetails,
+                      onOpen: _openEditor,
                       onToggle: _toggle,
+                      onPin: _togglePinned,
                       onRemove: _remove,
                     ),
+                    const SizedBox(height: 12),
                   ],
                   if (done.isNotEmpty) ...<Widget>[
                     const SectionLabel('Done'),
@@ -211,7 +291,9 @@ class _TaskToolPageState extends State<TaskToolPage> {
                       dueLabel: _dueLabel,
                       titleOf: _itemTitle,
                       detailsOf: _itemDetails,
+                      onOpen: _openEditor,
                       onToggle: _toggle,
+                      onPin: _togglePinned,
                       onRemove: _remove,
                     ),
                   ],
@@ -258,7 +340,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
             style: TextStyle(
               fontSize: 18,
               height: 1.2,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: colors.onSurface,
             ),
             decoration: _fieldDecoration(
@@ -389,7 +471,9 @@ class _TaskGrid extends StatelessWidget {
     required this.dueLabel,
     required this.titleOf,
     required this.detailsOf,
+    required this.onOpen,
     required this.onToggle,
+    required this.onPin,
     required this.onRemove,
   });
 
@@ -397,7 +481,9 @@ class _TaskGrid extends StatelessWidget {
   final String? Function(Map<String, dynamic>) dueLabel;
   final String Function(Map<String, dynamic>) titleOf;
   final String Function(Map<String, dynamic>) detailsOf;
+  final ValueChanged<Map<String, dynamic>> onOpen;
   final ValueChanged<String> onToggle;
+  final ValueChanged<String> onPin;
   final ValueChanged<String> onRemove;
 
   @override
@@ -419,7 +505,9 @@ class _TaskGrid extends StatelessWidget {
                   title: titleOf(item),
                   details: detailsOf(item),
                   dueLabel: dueLabel(item),
+                  onOpen: () => onOpen(item),
                   onToggle: () => onToggle(item['id'] as String),
+                  onPin: () => onPin(item['id'] as String),
                   onRemove: () => onRemove(item['id'] as String),
                 ),
               ),
@@ -436,7 +524,9 @@ class _TaskNoteCard extends StatelessWidget {
     required this.title,
     required this.details,
     required this.dueLabel,
+    required this.onOpen,
     required this.onToggle,
+    required this.onPin,
     required this.onRemove,
   });
 
@@ -444,18 +534,21 @@ class _TaskNoteCard extends StatelessWidget {
   final String title;
   final String details;
   final String? dueLabel;
+  final VoidCallback onOpen;
   final VoidCallback onToggle;
+  final VoidCallback onPin;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final done = item['done'] as bool? ?? false;
+    final pinned = item['pinned'] as bool? ?? false;
     return Material(
       color: colors.surface,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap: onToggle,
+        onTap: onOpen,
         borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -481,7 +574,7 @@ class _TaskNoteCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 17,
                         height: 1.22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         decoration: done ? TextDecoration.lineThrough : null,
                         color: done
                             ? colors.onSurface.withOpacity(0.42)
@@ -490,14 +583,19 @@ class _TaskNoteCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    done
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                    size: 24,
-                    color: done
-                        ? colors.primary
-                        : colors.onSurface.withOpacity(0.34),
+                  IconButton(
+                    onPressed: onToggle,
+                    visualDensity: VisualDensity.compact,
+                    tooltip: done ? 'Mark open' : 'Mark done',
+                    icon: Icon(
+                      done
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 23,
+                      color: done
+                          ? colors.primary
+                          : colors.onSurface.withOpacity(0.34),
+                    ),
                   ),
                 ],
               ),
@@ -532,11 +630,23 @@ class _TaskNoteCard extends StatelessWidget {
                         dueLabel!,
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: colors.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ),
+                  IconButton(
+                    onPressed: onPin,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                      size: 18,
+                      color: pinned
+                          ? colors.primary
+                          : colors.onSurface.withOpacity(0.46),
+                    ),
+                    tooltip: pinned ? 'Unpin' : 'Pin',
+                  ),
                   const Spacer(),
                   IconButton(
                     onPressed: onRemove,
@@ -553,6 +663,301 @@ class _TaskNoteCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TaskTopBar extends StatelessWidget {
+  const _TaskTopBar({
+    required this.openCount,
+    required this.doneCount,
+    required this.onCreate,
+  });
+
+  final int openCount;
+  final int doneCount;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onCreate,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.outline.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.search_rounded,
+                  size: 20, color: colors.onSurface.withOpacity(0.45)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Take a note...',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ),
+              _TaskStat(label: 'Open', value: openCount.toString()),
+              const SizedBox(width: 6),
+              _TaskStat(label: 'Done', value: doneCount.toString()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskEditResult {
+  const _TaskEditResult.save(this.item) : deletedId = null;
+  const _TaskEditResult.delete(this.deletedId) : item = null;
+
+  final Map<String, dynamic>? item;
+  final String? deletedId;
+}
+
+class _TaskEditorPage extends StatefulWidget {
+  const _TaskEditorPage({
+    required this.config,
+    required this.item,
+    required this.initialDueMinutes,
+  });
+
+  final TaskConfig config;
+  final Map<String, dynamic>? item;
+  final int? initialDueMinutes;
+
+  @override
+  State<_TaskEditorPage> createState() => _TaskEditorPageState();
+}
+
+class _TaskEditorPageState extends State<_TaskEditorPage> {
+  static const int _titleLimit = 72;
+  static const int _detailsLimit = 180;
+
+  late final TextEditingController _title;
+  late final TextEditingController _details;
+  late bool _done;
+  late bool _pinned;
+  DateTime? _pickedDate;
+  TimeOfDay? _pickedTime;
+
+  bool get _isNew => widget.item == null;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _title = TextEditingController(
+      text: (item?['title'] as String?) ?? (item?['text'] as String?) ?? '',
+    );
+    _details = TextEditingController(text: item?['details'] as String? ?? '');
+    _done = item?['done'] as bool? ?? false;
+    _pinned = item?['pinned'] as bool? ?? false;
+    final due = DateTime.tryParse(item?['due'] as String? ?? '');
+    if (due != null) {
+      _pickedDate = due;
+      _pickedTime = TimeOfDay(hour: due.hour, minute: due.minute);
+    } else {
+      final initial = widget.initialDueMinutes;
+      if (initial != null &&
+          (widget.config.withTime || widget.config.todayOnly)) {
+        _pickedTime =
+            TimeOfDay(hour: (initial ~/ 60) % 24, minute: initial % 60);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _details.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final title = _title.text.trim();
+    final details = _details.text.trim();
+    if (title.isEmpty && details.isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final now = DateTime.now();
+    DateTime? due;
+    if (widget.config.todayOnly ||
+        widget.config.withDate ||
+        widget.config.withTime) {
+      final existingDue =
+          DateTime.tryParse(widget.item?['due'] as String? ?? '');
+      final base =
+          widget.config.todayOnly ? now : (_pickedDate ?? existingDue ?? now);
+      final tod = _pickedTime;
+      due = DateTime(
+        base.year,
+        base.month,
+        base.day,
+        tod?.hour ?? 9,
+        tod?.minute ?? 0,
+      );
+    }
+
+    final existing = widget.item;
+    final item = <String, dynamic>{
+      ...?existing,
+      'id': existing?['id'] as String? ?? now.microsecondsSinceEpoch.toString(),
+      'title': title.isEmpty ? details : title,
+      'text': title.isEmpty ? details : title,
+      'details': details,
+      'done': _done,
+      'pinned': _pinned,
+      'createdAt': existing?['createdAt'] as String? ?? now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
+      if (due != null) 'due': due.toIso8601String(),
+    };
+    if (due == null) item.remove('due');
+    Navigator.of(context).pop(_TaskEditResult.save(item));
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _pickedDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _pickedDate = picked);
+  }
+
+  Future<void> _selectTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _pickedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null) setState(() => _pickedTime = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isNew ? 'New card' : 'Edit card'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: _pinned ? 'Unpin' : 'Pin',
+            onPressed: () => setState(() => _pinned = !_pinned),
+            icon: Icon(
+              _pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+            ),
+          ),
+          IconButton(
+            tooltip: _done ? 'Mark open' : 'Mark done',
+            onPressed: () => setState(() => _done = !_done),
+            icon: Icon(
+              _done
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Save',
+            onPressed: _save,
+            icon: const Icon(Icons.check_rounded),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        children: <Widget>[
+          TextField(
+            controller: _title,
+            maxLength: _titleLimit,
+            textInputAction: TextInputAction.next,
+            style: TextStyle(
+              fontSize: 22,
+              height: 1.15,
+              fontWeight: FontWeight.w700,
+              color: colors.onSurface,
+            ),
+            decoration: const InputDecoration(
+              hintText: 'Title',
+              border: InputBorder.none,
+            ),
+          ),
+          TextField(
+            controller: _details,
+            maxLength: _detailsLimit,
+            minLines: 8,
+            maxLines: 18,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.45,
+              color: colors.onSurface.withOpacity(0.76),
+            ),
+            decoration: const InputDecoration(
+              hintText: 'Note',
+              border: InputBorder.none,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              if (widget.config.withDate)
+                SvcChip(
+                  label: _pickedDate == null
+                      ? 'Date'
+                      : svcDayLabel(svcDay(_pickedDate!)),
+                  selected: _pickedDate != null,
+                  onTap: _selectDate,
+                ),
+              if (widget.config.withTime)
+                SvcChip(
+                  label: _pickedTime == null
+                      ? 'Time'
+                      : _pickedTime!.format(context),
+                  selected: _pickedTime != null,
+                  onTap: _selectTime,
+                ),
+              SvcChip(
+                label: _pinned ? 'Pinned' : 'Pin',
+                selected: _pinned,
+                onTap: () => setState(() => _pinned = !_pinned),
+              ),
+              SvcChip(
+                label: _done ? 'Done' : 'Open',
+                selected: _done,
+                onTap: () => setState(() => _done = !_done),
+              ),
+            ],
+          ),
+          if (!_isNew) ...<Widget>[
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop(
+                  _TaskEditResult.delete(widget.item!['id'] as String),
+                );
+              },
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Delete card'),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -580,7 +985,7 @@ class _TaskStat extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: colors.primary,
             ),
           ),
@@ -589,7 +994,7 @@ class _TaskStat extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: colors.onSurface.withOpacity(0.56),
             ),
           ),

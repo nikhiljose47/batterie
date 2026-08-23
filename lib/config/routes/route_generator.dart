@@ -4,6 +4,7 @@ import '../../constants/app_strings.dart';
 import '../../models/news_article.dart';
 import '../../pages/home/home_page.dart';
 import '../../pages/news/news_detail_page.dart';
+import '../../pages/onboarding/onboarding_page.dart';
 import 'app_routes.dart';
 
 class RouteGenerator {
@@ -14,6 +15,11 @@ class RouteGenerator {
       case AppRoutes.home:
         return MaterialPageRoute<void>(
           builder: (_) => const HomePage(),
+          settings: settings,
+        );
+      case AppRoutes.onboarding:
+        return MaterialPageRoute<void>(
+          builder: (_) => const OnboardingPage(),
           settings: settings,
         );
       case AppRoutes.newsDetail:

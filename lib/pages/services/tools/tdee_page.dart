@@ -69,7 +69,7 @@ class _TdeePageState extends State<TdeePage> {
                 Text('$tdee',
                     style: const TextStyle(
                         fontSize: 40,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.primary,
                         height: 1.0)),
                 const Text('kcal/day to maintain',
@@ -185,7 +185,7 @@ class _TdeePageState extends State<TdeePage> {
             Text('${value.round()} $unit',
                 style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.primary)),
           ],
         ),
@@ -233,7 +233,7 @@ class _TargetChip extends StatelessWidget {
             Text('$kcal',
                 style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.primary)),
             Text('$label · tap to set',
                 style:

@@ -1,11 +1,15 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'app.dart';
+import 'firebase_options.dart';
 import 'pages/profile/profile_store.dart';
 import 'services/custom_mode_store.dart';
 import 'services/alarm_notification_service.dart';
@@ -14,6 +18,13 @@ import 'services/theme_mode_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Color(0xFF07090D),
+      systemNavigationBarDividerColor: Color(0xFF07090D),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
 
   // sqflite only ships native bindings for mobile; desktop uses FFI.
   // Skip on web where dart:io is not available.
@@ -23,10 +34,20 @@ Future<void> main() async {
   }
 
   await dotenv.load();
-  await ProfileStore.instance.init();
-  await SleepScheduleStore.instance.init();
-  await CustomModeStore.instance.init();
-  await ThemeModeStore.instance.init();
-  await AlarmNotificationService.instance.init();
+  await Future.wait(<Future<void>>[
+    ProfileStore.instance.init(),
+    SleepScheduleStore.instance.init(),
+    CustomModeStore.instance.init(),
+    ThemeModeStore.instance.init(),
+  ]);
+  unawaited(_initBackgroundServices());
   runApp(const EnergyHealthApp());
+}
+
+Future<void> _initBackgroundServices() async {
+  try {
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
+    await AlarmNotificationService.instance.init();
+  } catch (_) {}
 }

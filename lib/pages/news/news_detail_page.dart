@@ -23,7 +23,10 @@ class NewsDetailPage extends StatelessWidget {
       ),
       body: ListView(
         children: <Widget>[
-          ArticleHeroImage(imageUrl: article.imageUrl),
+          ArticleHeroImage(
+            imageUrl: article.imageUrl,
+            imageTag: article.imageTag,
+          ),
           Padding(
             padding: const EdgeInsets.all(AppSpacing.large),
             child: Column(
@@ -40,7 +43,7 @@ class NewsDetailPage extends StatelessWidget {
                 Text(
                   article.title,
                   style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.medium),
@@ -60,7 +63,7 @@ class NewsDetailPage extends StatelessWidget {
                           TextSpan(
                             text: '${section.heading}\n',
                             style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           TextSpan(
