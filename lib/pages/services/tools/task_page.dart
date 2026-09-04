@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../constants/app_spacing.dart';
 import 'toolkit.dart';
 
 class TaskConfig {
@@ -56,26 +55,15 @@ class TaskToolPage extends StatefulWidget {
 }
 
 class _TaskToolPageState extends State<TaskToolPage> {
-  static const int _titleLimit = 72;
-  static const int _detailsLimit = 180;
-
-  final TextEditingController _title = TextEditingController();
-  final TextEditingController _details = TextEditingController();
   List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
-  DateTime? _pickedDate;
-  TimeOfDay? _pickedTime;
   bool _loaded = false;
+  final Set<String> _selectedIds = <String>{};
 
   String get _key => 'svc.${widget.config.id}.items';
 
   @override
   void initState() {
     super.initState();
-    final initial = widget.initialDueMinutes;
-    if (initial != null &&
-        (widget.config.withTime || widget.config.todayOnly)) {
-      _pickedTime = TimeOfDay(hour: (initial ~/ 60) % 24, minute: initial % 60);
-    }
     ServiceStore.loadList(_key).then((list) {
       if (!mounted) return;
       setState(() {
@@ -87,8 +75,6 @@ class _TaskToolPageState extends State<TaskToolPage> {
 
   @override
   void dispose() {
-    _title.dispose();
-    _details.dispose();
     super.dispose();
   }
 
@@ -103,43 +89,6 @@ class _TaskToolPageState extends State<TaskToolPage> {
 
   String _itemDetails(Map<String, dynamic> item) {
     return item['details'] as String? ?? '';
-  }
-
-  Future<void> _add() async {
-    final c = widget.config;
-    final title = _title.text.trim();
-    final details = _details.text.trim();
-    if (title.isEmpty && details.isEmpty) return;
-
-    DateTime? due;
-    if (c.todayOnly || c.withDate || c.withTime) {
-      final base =
-          c.todayOnly ? DateTime.now() : (_pickedDate ?? DateTime.now());
-      final tod = _pickedTime;
-      due = DateTime(
-        base.year,
-        base.month,
-        base.day,
-        tod?.hour ?? 9,
-        tod?.minute ?? 0,
-      );
-    }
-
-    setState(() {
-      _items.add(<String, dynamic>{
-        'id': DateTime.now().microsecondsSinceEpoch.toString(),
-        'title': title.isEmpty ? details : title,
-        'text': title.isEmpty ? details : title,
-        'details': details,
-        'done': false,
-        if (due != null) 'due': due.toIso8601String(),
-      });
-      _title.clear();
-      _details.clear();
-      _pickedDate = null;
-      _pickedTime = null;
-    });
-    await ServiceStore.saveList(_key, _items);
   }
 
   Future<void> _saveItems() async {
@@ -199,10 +148,45 @@ class _TaskToolPageState extends State<TaskToolPage> {
     await ServiceStore.saveList(_key, _items);
   }
 
+  void _toggleSelected(String id) {
+    setState(() {
+      if (!_selectedIds.add(id)) _selectedIds.remove(id);
+    });
+  }
+
+  void _clearSelection() {
+    if (_selectedIds.isEmpty) return;
+    setState(_selectedIds.clear);
+  }
+
+  Future<void> _pinSelected() async {
+    if (_selectedIds.isEmpty) return;
+    setState(() {
+      for (final item in _items) {
+        if (_selectedIds.contains(item['id'])) {
+          item['pinned'] = true;
+          item['updatedAt'] = DateTime.now().toIso8601String();
+        }
+      }
+      _selectedIds.clear();
+    });
+    await _saveItems();
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) return;
+    setState(() {
+      _items.removeWhere((i) => _selectedIds.contains(i['id']));
+      _selectedIds.clear();
+    });
+    await _saveItems();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.config;
     final today = svcDay(DateTime.now());
+    final colors = Theme.of(context).colorScheme;
 
     var visible = _items.toList();
     if (c.todayOnly) {
@@ -236,16 +220,45 @@ class _TaskToolPageState extends State<TaskToolPage> {
     final done = visible.where((i) => i['done'] as bool? ?? false).toList();
 
     return Scaffold(
-      appBar: svcAppBar(c.title),
-      floatingActionButton: FloatingActionButton.extended(
+      backgroundColor: colors.surface,
+      appBar: _selectedIds.isEmpty
+          ? svcAppBar(c.title)
+          : AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _clearSelection,
+              ),
+              title: Text(_selectedIds.length.toString()),
+              actions: <Widget>[
+                IconButton(
+                  tooltip: 'Pin',
+                  onPressed: _pinSelected,
+                  icon: const Icon(Icons.push_pin_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Delete',
+                  onPressed: _deleteSelected,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+                IconButton(
+                  tooltip: 'More',
+                  onPressed: _clearSelection,
+                  icon: const Icon(Icons.more_vert_rounded),
+                ),
+              ],
+            ),
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _openEditor(),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New'),
+        backgroundColor: colors.primaryContainer,
+        foregroundColor: colors.onPrimaryContainer,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        elevation: 8,
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(AppSpacing.large),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
               children: <Widget>[
                 _TaskTopBar(
                   openCount: pinned.length + open.length,
@@ -254,7 +267,7 @@ class _TaskToolPageState extends State<TaskToolPage> {
                 ),
                 const SizedBox(height: 14),
                 if (pinned.isEmpty && open.isEmpty && done.isEmpty)
-                  EmptyHint('Nothing here yet. Tap New to create a card.')
+                  const EmptyHint('Nothing here yet. Tap New to create a card.')
                 else ...<Widget>[
                   if (pinned.isNotEmpty) ...<Widget>[
                     const SectionLabel('Pinned'),
@@ -264,6 +277,8 @@ class _TaskToolPageState extends State<TaskToolPage> {
                       titleOf: _itemTitle,
                       detailsOf: _itemDetails,
                       onOpen: _openEditor,
+                      selectedIds: _selectedIds,
+                      onSelect: _toggleSelected,
                       onToggle: _toggle,
                       onPin: _togglePinned,
                       onRemove: _remove,
@@ -278,6 +293,8 @@ class _TaskToolPageState extends State<TaskToolPage> {
                       titleOf: _itemTitle,
                       detailsOf: _itemDetails,
                       onOpen: _openEditor,
+                      selectedIds: _selectedIds,
+                      onSelect: _toggleSelected,
                       onToggle: _toggle,
                       onPin: _togglePinned,
                       onRemove: _remove,
@@ -292,6 +309,8 @@ class _TaskToolPageState extends State<TaskToolPage> {
                       titleOf: _itemTitle,
                       detailsOf: _itemDetails,
                       onOpen: _openEditor,
+                      selectedIds: _selectedIds,
+                      onSelect: _toggleSelected,
                       onToggle: _toggle,
                       onPin: _togglePinned,
                       onRemove: _remove,
@@ -301,157 +320,6 @@ class _TaskToolPageState extends State<TaskToolPage> {
               ],
             ),
     );
-  }
-
-  Widget _buildComposer(TaskConfig c, int openCount, int doneCount) {
-    final colors = Theme.of(context).colorScheme;
-    return WhiteCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              _TaskStat(label: 'Open', value: openCount.toString()),
-              const SizedBox(width: 8),
-              _TaskStat(label: 'Done', value: doneCount.toString()),
-              const Spacer(),
-              Icon(Icons.lightbulb_outline_rounded,
-                  size: 20, color: colors.primary),
-            ],
-          ),
-          if (c.note != null) ...<Widget>[
-            const SizedBox(height: 10),
-            Text(
-              c.note!,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                color: colors.onSurface.withOpacity(0.55),
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          TextField(
-            controller: _title,
-            maxLength: _titleLimit,
-            textInputAction: TextInputAction.next,
-            style: TextStyle(
-              fontSize: 18,
-              height: 1.2,
-              fontWeight: FontWeight.w700,
-              color: colors.onSurface,
-            ),
-            decoration: _fieldDecoration(
-              context,
-              hint: c.addHint,
-              counter: '${_title.text.length}/$_titleLimit',
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _details,
-            maxLength: _detailsLimit,
-            maxLines: 5,
-            minLines: 3,
-            style: TextStyle(
-              fontSize: 14.5,
-              height: 1.42,
-              fontWeight: FontWeight.w600,
-              color: colors.onSurface.withOpacity(0.78),
-            ),
-            decoration: _fieldDecoration(
-              context,
-              hint: 'Add details',
-              counter: '${_details.text.length}/$_detailsLimit',
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          if (c.withDate || c.withTime) ...<Widget>[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                if (c.withDate)
-                  SvcChip(
-                    label: _pickedDate == null
-                        ? 'Date'
-                        : svcDayLabel(svcDay(_pickedDate!)),
-                    selected: _pickedDate != null,
-                    onTap: _selectDate,
-                  ),
-                if (c.withTime)
-                  SvcChip(
-                    label: _pickedTime == null
-                        ? 'Time'
-                        : _pickedTime!.format(context),
-                    selected: _pickedTime != null,
-                    onTap: _selectTime,
-                  ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: FilledButton.icon(
-              onPressed: _add,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add task'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _fieldDecoration(
-    BuildContext context, {
-    required String hint,
-    required String counter,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-    return InputDecoration(
-      counterText: counter,
-      hintText: hint,
-      hintStyle: TextStyle(
-        color: colors.onSurface.withOpacity(0.38),
-        fontWeight: FontWeight.w700,
-      ),
-      filled: true,
-      fillColor: colors.surfaceTint.withOpacity(0.55),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: colors.outline.withOpacity(0.5)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: colors.primary, width: 1.4),
-      ),
-    );
-  }
-
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _pickedDate ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) setState(() => _pickedDate = picked);
-  }
-
-  Future<void> _selectTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _pickedTime ?? TimeOfDay.now(),
-    );
-    if (picked != null) setState(() => _pickedTime = picked);
   }
 
   String? _dueLabel(Map<String, dynamic> item) {
@@ -472,6 +340,8 @@ class _TaskGrid extends StatelessWidget {
     required this.titleOf,
     required this.detailsOf,
     required this.onOpen,
+    required this.selectedIds,
+    required this.onSelect,
     required this.onToggle,
     required this.onPin,
     required this.onRemove,
@@ -482,6 +352,8 @@ class _TaskGrid extends StatelessWidget {
   final String Function(Map<String, dynamic>) titleOf;
   final String Function(Map<String, dynamic>) detailsOf;
   final ValueChanged<Map<String, dynamic>> onOpen;
+  final Set<String> selectedIds;
+  final ValueChanged<String> onSelect;
   final ValueChanged<String> onToggle;
   final ValueChanged<String> onPin;
   final ValueChanged<String> onRemove;
@@ -490,7 +362,7 @@ class _TaskGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final twoColumns = constraints.maxWidth >= 620;
+        final twoColumns = constraints.maxWidth >= 320;
         return Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -506,6 +378,9 @@ class _TaskGrid extends StatelessWidget {
                   details: detailsOf(item),
                   dueLabel: dueLabel(item),
                   onOpen: () => onOpen(item),
+                  selected: selectedIds.contains(item['id']),
+                  selectionMode: selectedIds.isNotEmpty,
+                  onSelect: () => onSelect(item['id'] as String),
                   onToggle: () => onToggle(item['id'] as String),
                   onPin: () => onPin(item['id'] as String),
                   onRemove: () => onRemove(item['id'] as String),
@@ -525,6 +400,9 @@ class _TaskNoteCard extends StatelessWidget {
     required this.details,
     required this.dueLabel,
     required this.onOpen,
+    required this.selected,
+    required this.selectionMode,
+    required this.onSelect,
     required this.onToggle,
     required this.onPin,
     required this.onRemove,
@@ -535,6 +413,9 @@ class _TaskNoteCard extends StatelessWidget {
   final String details;
   final String? dueLabel;
   final VoidCallback onOpen;
+  final bool selected;
+  final bool selectionMode;
+  final VoidCallback onSelect;
   final VoidCallback onToggle;
   final VoidCallback onPin;
   final VoidCallback onRemove;
@@ -545,19 +426,20 @@ class _TaskNoteCard extends StatelessWidget {
     final done = item['done'] as bool? ?? false;
     final pinned = item['pinned'] as bool? ?? false;
     return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(18),
+      color: selected ? colors.primaryContainer : colors.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(18),
+        onTap: selectionMode ? onSelect : onOpen,
+        onLongPress: onSelect,
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(12, 14, 10, 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: done
-                  ? colors.outline.withOpacity(0.52)
-                  : colors.primary.withOpacity(0.28),
+              color:
+                  selected ? colors.primary : colors.outline.withOpacity(0.42),
+              width: selected ? 2.2 : 1,
             ),
           ),
           child: Column(
@@ -572,9 +454,9 @@ class _TaskNoteCard extends StatelessWidget {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
                         height: 1.22,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         decoration: done ? TextDecoration.lineThrough : null,
                         color: done
                             ? colors.onSurface.withOpacity(0.42)
@@ -586,12 +468,17 @@ class _TaskNoteCard extends StatelessWidget {
                   IconButton(
                     onPressed: onToggle,
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 30,
+                      height: 30,
+                    ),
                     tooltip: done ? 'Mark open' : 'Mark done',
                     icon: Icon(
                       done
                           ? Icons.check_circle_rounded
                           : Icons.radio_button_unchecked_rounded,
-                      size: 23,
+                      size: 18,
                       color: done
                           ? colors.primary
                           : colors.onSurface.withOpacity(0.34),
@@ -603,57 +490,62 @@ class _TaskNoteCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   details,
-                  maxLines: 5,
+                  maxLines: 8,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13.5,
-                    height: 1.4,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13.2,
+                    height: 1.34,
+                    fontWeight: FontWeight.w400,
                     color: colors.onSurface.withOpacity(done ? 0.38 : 0.62),
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Row(
                 children: <Widget>[
                   if (dueLabel != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceTint.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    Expanded(
                       child: Text(
                         dueLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: colors.onSurface.withOpacity(0.7),
+                          fontSize: 12.2,
+                          fontWeight: FontWeight.w500,
+                          color: colors.onSurface.withOpacity(0.58),
                         ),
                       ),
-                    ),
+                    )
+                  else
+                    const Spacer(),
                   IconButton(
                     onPressed: onPin,
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 28,
+                      height: 28,
+                    ),
                     icon: Icon(
                       pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                      size: 18,
+                      size: 16,
                       color: pinned
                           ? colors.primary
                           : colors.onSurface.withOpacity(0.46),
                     ),
                     tooltip: pinned ? 'Unpin' : 'Pin',
                   ),
-                  const Spacer(),
                   IconButton(
                     onPressed: onRemove,
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 28,
+                      height: 28,
+                    ),
                     icon: Icon(
                       Icons.delete_outline_rounded,
-                      size: 19,
+                      size: 17,
                       color: colors.onSurface.withOpacity(0.48),
                     ),
                     tooltip: 'Delete',
@@ -683,35 +575,54 @@ class _TaskTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(18),
+      color: colors.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(13),
       child: InkWell(
         onTap: onCreate,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(13),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(13, 11, 10, 11),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colors.outline.withOpacity(0.2)),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: colors.outline.withOpacity(0.28)),
           ),
           child: Row(
             children: <Widget>[
-              Icon(Icons.search_rounded,
-                  size: 20, color: colors.onSurface.withOpacity(0.45)),
-              const SizedBox(width: 10),
+              Icon(
+                Icons.check_box_outlined,
+                size: 17,
+                color: colors.onSurface.withOpacity(0.46),
+              ),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(
                   'Take a note...',
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: colors.onSurface.withOpacity(0.5),
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface.withOpacity(0.52),
                   ),
                 ),
               ),
-              _TaskStat(label: 'Open', value: openCount.toString()),
-              const SizedBox(width: 6),
-              _TaskStat(label: 'Done', value: doneCount.toString()),
+              Text(
+                '$openCount open',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface.withOpacity(0.48),
+                ),
+              ),
+              if (doneCount > 0) ...<Widget>[
+                const SizedBox(width: 8),
+                Text(
+                  '$doneCount done',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface.withOpacity(0.48),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -853,6 +764,7 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: colors.surface,
       appBar: AppBar(
         title: Text(_isNew ? 'New card' : 'Edit card'),
         actions: <Widget>[
@@ -880,7 +792,7 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.large),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
         children: <Widget>[
           TextField(
             controller: _title,
@@ -889,7 +801,7 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
             style: TextStyle(
               fontSize: 22,
               height: 1.15,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: colors.onSurface,
             ),
             decoration: const InputDecoration(
@@ -905,6 +817,7 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
             style: TextStyle(
               fontSize: 15,
               height: 1.45,
+              fontWeight: FontWeight.w400,
               color: colors.onSurface.withOpacity(0.76),
             ),
             decoration: const InputDecoration(
@@ -957,47 +870,6 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
               label: const Text('Delete card'),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TaskStat extends StatelessWidget {
-  const _TaskStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors.surfaceTint.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: colors.primary,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: colors.onSurface.withOpacity(0.56),
-            ),
-          ),
         ],
       ),
     );

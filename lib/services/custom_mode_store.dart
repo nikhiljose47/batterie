@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../constants/goal_plan_constants.dart';
+
 class CustomSlot {
   const CustomSlot({
     this.recommendation = '',
@@ -54,29 +56,36 @@ class CustomPlan {
     required this.id,
     required this.name,
     required this.slots,
+    this.tag = GoalPlanConstants.defaultTag,
   });
 
   final String id;
   final String name;
   final List<CustomSlot> slots;
+  final String tag;
 
-  CustomPlan copyWith({String? name, List<CustomSlot>? slots}) {
+  CustomPlan copyWith({String? name, List<CustomSlot>? slots, String? tag}) {
     return CustomPlan(
       id: id,
       name: name ?? this.name,
       slots: slots ?? this.slots,
+      tag: GoalPlanConstants.normalizeTag(tag ?? this.tag),
     );
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'name': name,
+        'tag': tag,
         'slots': slots.map((slot) => slot.toJson()).toList(),
       };
 
   factory CustomPlan.fromJson(Map<String, dynamic> j) => CustomPlan(
         id: (j['id'] as String?) ?? '',
         name: (j['name'] as String?) ?? 'Custom plan',
+        tag: GoalPlanConstants.normalizeTag(
+          (j['tag'] as String?) ?? GoalPlanConstants.defaultTag,
+        ),
         slots: CustomModeStore.normalizeSlots(
           ((j['slots'] as List<dynamic>?) ?? const <dynamic>[])
               .whereType<Map<String, dynamic>>()
@@ -185,6 +194,15 @@ class CustomModeStore {
         orElse: () => list.first);
   }
 
+  bool hasPlanNamed(String name, {String? exceptId}) {
+    final normalized = name.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+    return plans.value.any(
+      (plan) =>
+          plan.id != exceptId && plan.name.trim().toLowerCase() == normalized,
+    );
+  }
+
   Future<CustomPlan?> addPlan() async {
     if (plans.value.length >= maxPlans) return null;
     final used = plans.value.map((plan) => plan.id).toSet();
@@ -198,6 +216,23 @@ class CustomModeStore {
     _syncSlots();
     await _save();
     return plan;
+  }
+
+  Future<CustomPlan?> addPlanFrom({
+    required String name,
+    required List<CustomSlot> slots,
+    String tag = GoalPlanConstants.defaultTag,
+  }) async {
+    if (hasPlanNamed(name)) return null;
+    final plan = await addPlan();
+    if (plan == null) return null;
+    final imported = plan.copyWith(
+      name: name.trim().isEmpty ? plan.name : name.trim(),
+      slots: normalizeSlots(slots),
+      tag: tag,
+    );
+    await savePlan(imported);
+    return imported;
   }
 
   Future<void> savePlan(CustomPlan plan) async {
@@ -214,11 +249,9 @@ class CustomModeStore {
   }
 
   Future<void> deletePlan(String id) async {
-    if (plans.value.length <= 1) return;
     final next = plans.value.where((plan) => plan.id != id).toList();
-    if (next.isEmpty) return;
     _setPlans(next);
-    activePlanId.value = next.first.id;
+    activePlanId.value = next.isEmpty ? defaultPlanId : next.first.id;
     _syncSlots();
     await _save();
   }

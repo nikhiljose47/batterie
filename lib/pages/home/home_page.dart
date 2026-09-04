@@ -8,18 +8,14 @@ import '../../constants/article_constants.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
 import '../../repositories/energy_health_repository.dart';
+import '../../shared/widgets/energy_score_pill.dart';
 import '../../shared/widgets/profile_avatar.dart';
 import '../auth/auth_page.dart';
-import '../dashboard/dashboard_controller.dart';
-import '../dashboard/dashboard_page.dart';
 import '../dev/data_inspector_page.dart';
 import '../home_tab/home_tab_page.dart';
 import '../news/news_page.dart';
 import '../others/others_page.dart';
 import '../profile/profile_page.dart';
-import '../profile/templates_page.dart';
-import '../settings/settings_page.dart';
-import '../services/services_page.dart';
 import '../weather/weather_controller.dart';
 import 'home_controller.dart';
 
@@ -33,10 +29,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late final HomeController _controller;
-  late final DashboardController _dashboardController;
   late final TabController _tabController;
   Timer? _articlePreloadTimer;
+  int _homeRefreshToken = 0;
   int _othersRefreshToken = 0;
+  int _energyScore = 0;
+  Offset? _swipeStart;
+  Offset? _swipeLatest;
 
   /// Shared with the Home tab so the top-bar location chip and the planner
   /// weather read from the same snapshot.
@@ -46,18 +45,20 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     _controller = HomeController();
-    _dashboardController = DashboardController()..load();
     _weatherController = WeatherController()..load();
-    final initialIndex = _controller.state.selectedIndex.clamp(0, 3) as int;
+    final initialIndex = _controller.state.selectedIndex.clamp(0, 2) as int;
     _tabController = TabController(
-      length: 4,
+      length: 3,
       vsync: this,
       initialIndex: initialIndex,
     );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         _controller.updateSelectedIndex(_tabController.index);
-        if (_tabController.index == 1 && mounted) {
+        if (!mounted) return;
+        if (_tabController.index == 0) {
+          setState(() => _homeRefreshToken++);
+        } else if (_tabController.index == 1) {
           setState(() => _othersRefreshToken++);
         }
       }
@@ -72,7 +73,6 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     _articlePreloadTimer?.cancel();
     _tabController.dispose();
-    _dashboardController.dispose();
     _weatherController.dispose();
     _controller.dispose();
     super.dispose();
@@ -112,26 +112,6 @@ class _HomePageState extends State<HomePage>
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         actions: <Widget>[
-          // Services hub — all the mini-apps (trackers, calculators…).
-          InkWell(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const ServicesPage()),
-            ),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Icon(
-                Icons.widgets_outlined,
-                size: 19,
-                color: colors.onSurface.withOpacity(0.58),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Location chip — "Location off" until we have a fix, then the
-          // short lat,lon code. Tapping re-requests / refreshes.
-          _LocationChip(controller: _weatherController),
-          const SizedBox(width: 6),
           // Test-tube: pick a data store, land on the inspector page.
           PopupMenuButton<InspectorSource>(
             tooltip: 'Inspect app data',
@@ -179,37 +159,11 @@ class _HomePageState extends State<HomePage>
             },
           ),
           const SizedBox(width: 4),
-          PopupMenuButton<_ProfileMenuAction>(
-            tooltip: 'Profile',
-            offset: const Offset(0, 36),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-            ),
-            onSelected: _handleProfileMenu,
-            itemBuilder: (context) =>
-                const <PopupMenuEntry<_ProfileMenuAction>>[
-              PopupMenuItem<_ProfileMenuAction>(
-                value: _ProfileMenuAction.profile,
-                child: _ProfileMenuItem(
-                  icon: Icons.person_outline_rounded,
-                  label: 'Profile',
-                ),
-              ),
-              PopupMenuItem<_ProfileMenuAction>(
-                value: _ProfileMenuAction.templates,
-                child: _ProfileMenuItem(
-                  icon: Icons.view_list_outlined,
-                  label: 'Templates',
-                ),
-              ),
-              PopupMenuItem<_ProfileMenuAction>(
-                value: _ProfileMenuAction.settings,
-                child: _ProfileMenuItem(
-                  icon: Icons.settings_outlined,
-                  label: 'Settings',
-                ),
-              ),
-            ],
+          _EnergyScoreChip(score: _energyScore),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: _openProfilePage,
+            borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.only(right: AppSpacing.medium),
               child: ProfileAvatar(
@@ -242,7 +196,6 @@ class _HomePageState extends State<HomePage>
                   icon: Icons.stacked_line_chart_rounded,
                   label: AppStrings.statusTab,
                 ),
-                _ThinTab(icon: Icons.bolt_outlined, label: AppStrings.youTab),
                 _ThinTab(
                   icon: Icons.article_outlined,
                   label: AppStrings.articlesTab,
@@ -252,16 +205,57 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: <Widget>[
-          HomeTabPage(weatherController: _weatherController),
-          OthersPage(refreshToken: _othersRefreshToken),
-          DashboardPage(controller: _dashboardController),
-          const NewsPage(),
-        ],
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (event) {
+          _swipeStart = event.position;
+          _swipeLatest = event.position;
+        },
+        onPointerMove: (event) => _swipeLatest = event.position,
+        onPointerUp: (_) => _handleBodySwipe(),
+        onPointerCancel: (_) {
+          _swipeStart = null;
+          _swipeLatest = null;
+        },
+        child: TabBarView(
+          controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
+          children: <Widget>[
+            HomeTabPage(
+              weatherController: _weatherController,
+              refreshToken: _homeRefreshToken,
+              onEnergyScoreChanged: (score) {
+                if (!mounted || score == _energyScore) return;
+                setState(() => _energyScore = score);
+              },
+            ),
+            OthersPage(refreshToken: _othersRefreshToken),
+            const NewsPage(),
+          ],
+        ),
       ),
     );
+  }
+
+  void _handleBodySwipe() {
+    final start = _swipeStart;
+    final end = _swipeLatest;
+    _swipeStart = null;
+    _swipeLatest = null;
+    if (start == null || end == null) return;
+
+    final delta = end - start;
+    final dx = delta.dx;
+    final dy = delta.dy;
+    const minHorizontalDistance = 72.0;
+    const maxVerticalToHorizontalRatio = 1.43; // about +/-55 degrees
+    if (dx.abs() < minHorizontalDistance) return;
+    if (dy.abs() / dx.abs() > maxVerticalToHorizontalRatio) return;
+
+    final nextIndex =
+        dx < 0 ? _tabController.index + 1 : _tabController.index - 1;
+    if (nextIndex < 0 || nextIndex >= _tabController.length) return;
+    _tabController.animateTo(nextIndex);
   }
 
   Stream<User?> _authStateChanges() {
@@ -269,17 +263,10 @@ class _HomePageState extends State<HomePage>
     return FirebaseAuth.instance.authStateChanges();
   }
 
-  void _handleProfileMenu(_ProfileMenuAction action) {
-    final page = switch (action) {
-      _ProfileMenuAction.profile => const ProfilePage(),
-      _ProfileMenuAction.templates =>
-        TemplatesPage(controller: _dashboardController),
-      _ProfileMenuAction.settings => const SettingsPage(),
-    };
-
+  void _openProfilePage() {
     Navigator.of(context).push(
       PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) => page,
+        pageBuilder: (_, __, ___) => const ProfilePage(),
         transitionsBuilder: (_, animation, __, child) {
           final offset = Tween<Offset>(
             begin: const Offset(1, 0),
@@ -296,10 +283,15 @@ class _HomePageState extends State<HomePage>
   }
 }
 
-enum _ProfileMenuAction {
-  profile,
-  templates,
-  settings,
+class _EnergyScoreChip extends StatelessWidget {
+  const _EnergyScoreChip({required this.score});
+
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    return EnergyScorePill(score: score, height: 26, compact: true);
+  }
 }
 
 class _ProfileMenuItem extends StatelessWidget {

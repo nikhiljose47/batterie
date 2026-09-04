@@ -13,6 +13,9 @@ import 'firebase_options.dart';
 import 'pages/profile/profile_store.dart';
 import 'services/custom_mode_store.dart';
 import 'services/alarm_notification_service.dart';
+import 'services/daily_progress_sync_service.dart';
+import 'services/firestore_remote_sync.dart';
+import 'services/remote_sync.dart';
 import 'services/sleep_schedule_store.dart';
 import 'services/theme_mode_store.dart';
 
@@ -40,14 +43,22 @@ Future<void> main() async {
     CustomModeStore.instance.init(),
     ThemeModeStore.instance.init(),
   ]);
+  unawaited(_initFirebaseSync());
   unawaited(_initBackgroundServices());
   runApp(const EnergyHealthApp());
 }
 
-Future<void> _initBackgroundServices() async {
+Future<void> _initFirebaseSync() async {
   try {
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
+    RemoteSync.use(FirestoreRemoteSync());
+    DailyProgressSyncService.instance.startBackgroundTopScoreRefresh();
+  } catch (_) {}
+}
+
+Future<void> _initBackgroundServices() async {
+  try {
     await AlarmNotificationService.instance.init();
   } catch (_) {}
 }

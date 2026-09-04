@@ -19,10 +19,9 @@ SleepScheduleStore get _scheduleStore => SleepScheduleStore.instance;
 //   • Sleep 22:00  → 10 PM until 6 AM = 8 h of sleep
 //
 // How the planner reads this file:
-//   1. It renders the wake card (see `wakeCardContent`) at the very top.
-//   2. Then, one card per entry in `plannerSlots`, using the per-mode text
-//      from the map for the currently selected mode.
-//   3. Then the sleep card (see `sleepCardContent`) at the very bottom.
+//   1. Wake and sleep time define the user's active day.
+//   2. `plannerSlots` divides that active day into seven editable phases.
+//   3. Each phase uses the per-mode text from the map for the selected goal.
 //
 // ─── How to edit ─────────────────────────────────────────────────────────
 //
@@ -33,7 +32,7 @@ SleepScheduleStore get _scheduleStore => SleepScheduleStore.instance;
 //  • Add a new mode:
 //       1. Copy `_normal` to a new const, e.g. `_studying`.
 //       2. Rewrite each entry's text.
-//       3. Add `'studying': _studying,` to `modeAdviceSourceMap` at the bottom.
+//       3. Add it to `presetGoalContentLibrary` below.
 //       4. Add it to the mode dropdown in `home_tab_page.dart` (`_dayModes`).
 //
 //  • Add a new time slot:
@@ -42,7 +41,7 @@ SleepScheduleStore get _scheduleStore => SleepScheduleStore.instance;
 //          match `plannerSlots`. Miss one and the analyzer will flag it
 //          via a length mismatch when `debugAssertModeData()` runs.
 //
-//  • Adjust wake / sleep card copy: edit `wakeCardContent` / `sleepCardContent`.
+//  • Adjust phase names: edit `kDayPhaseBlueprints`.
 //
 // Nothing else in this file is worth touching by hand.
 
@@ -69,7 +68,7 @@ class DayMode {
 }
 
 /// Full ordered list of goal-based modes shown to the user.
-/// Keys must match the `modeAdviceSourceMap` entries at the bottom of this file.
+/// Keys must match the preset content entries at the bottom of this file.
 const List<DayMode> allDayModes = <DayMode>[
   DayMode(
     id: 'student',
@@ -177,6 +176,81 @@ class TimeSlot {
   }
 }
 
+class DayPhase {
+  const DayPhase({
+    required this.id,
+    required this.label,
+    required this.energyLabel,
+    required this.foundationLabel,
+    required this.slot,
+  });
+
+  final String id;
+  final String label;
+  final String energyLabel;
+  final String foundationLabel;
+  final TimeSlot slot;
+}
+
+class DayPhaseBlueprint {
+  const DayPhaseBlueprint({
+    required this.id,
+    required this.label,
+    required this.energyLabel,
+    required this.weight,
+  });
+
+  final String id;
+  final String label;
+  final String energyLabel;
+  final double weight;
+}
+
+const List<DayPhaseBlueprint> kDayPhaseBlueprints = <DayPhaseBlueprint>[
+  DayPhaseBlueprint(
+    id: 'wake_activate',
+    label: 'Wake & Activate',
+    energyLabel: 'Gentle start',
+    weight: 0.11,
+  ),
+  DayPhaseBlueprint(
+    id: 'focus_window',
+    label: 'Focus Window',
+    energyLabel: 'Best clarity',
+    weight: 0.19,
+  ),
+  DayPhaseBlueprint(
+    id: 'maintain',
+    label: 'Maintain',
+    energyLabel: 'Steady work',
+    weight: 0.15,
+  ),
+  DayPhaseBlueprint(
+    id: 'recovery',
+    label: 'Recovery',
+    energyLabel: 'Reset energy',
+    weight: 0.13,
+  ),
+  DayPhaseBlueprint(
+    id: 'flexible',
+    label: 'Flexible',
+    energyLabel: 'Useful buffer',
+    weight: 0.16,
+  ),
+  DayPhaseBlueprint(
+    id: 'downshift',
+    label: 'Downshift',
+    energyLabel: 'Lower friction',
+    weight: 0.13,
+  ),
+  DayPhaseBlueprint(
+    id: 'wind_down',
+    label: 'Wind Down',
+    energyLabel: 'Protect sleep',
+    weight: 0.13,
+  ),
+];
+
 /// What we tell the user about a single (mode, slot) pair.
 class ModeAdvice {
   const ModeAdvice({
@@ -197,6 +271,47 @@ class ModeAdvice {
 
 typedef AdviceMap = Map<String, Object>;
 
+class PresetGoalContent {
+  const PresetGoalContent({
+    required this.modeId,
+    required this.cards,
+  });
+
+  final String modeId;
+  final List<AdviceMap> cards;
+}
+
+const List<PresetGoalContent> presetGoalContentLibrary = <PresetGoalContent>[
+  PresetGoalContent(modeId: 'healthy', cards: _normal),
+  PresetGoalContent(modeId: 'athletic', cards: _athletic),
+  PresetGoalContent(modeId: 'gym', cards: _gym),
+  PresetGoalContent(modeId: 'office', cards: _office),
+  PresetGoalContent(modeId: 'nicotine_free', cards: _nicotineFree),
+  PresetGoalContent(modeId: 'student', cards: _student),
+  PresetGoalContent(modeId: 'language', cards: _student),
+  PresetGoalContent(modeId: 'coder_pro', cards: coderProAdvice),
+  PresetGoalContent(modeId: 'coder_super_plus', cards: coderSuperPlusAdvice),
+  PresetGoalContent(modeId: 'healthy_pro', cards: _normalPro),
+  PresetGoalContent(modeId: 'athletic_pro', cards: _athleticPro),
+  PresetGoalContent(modeId: 'gym_pro', cards: _gymPro),
+  PresetGoalContent(modeId: 'office_pro', cards: _officePro),
+  PresetGoalContent(modeId: 'nicotine_free_pro', cards: _nicotineFreePro),
+];
+
+List<AdviceMap> presetGoalCardsFor(String modeId) {
+  final normalizedModeId = switch (modeId) {
+    'normal' => 'healthy',
+    'normal_pro' => 'healthy_pro',
+    _ => modeId,
+  };
+  return presetGoalContentLibrary
+      .firstWhere(
+        (preset) => preset.modeId == normalizedModeId,
+        orElse: () => presetGoalContentLibrary.first,
+      )
+      .cards;
+}
+
 ModeAdvice _modeAdviceFromMap(AdviceMap source) {
   final descriptions =
       (source['descriptions'] as List<Object>? ?? const <Object>[])
@@ -213,16 +328,11 @@ ModeAdvice _modeAdviceFromMap(AdviceMap source) {
 
 ModeAdvice _customAdviceFromSlot({
   required CustomSlot slot,
-  required ModeAdvice fallback,
 }) {
   return ModeAdvice(
-    recommendation: slot.recommendation.isNotEmpty
-        ? slot.recommendation
-        : fallback.recommendation,
-    tip: slot.tip.isNotEmpty ? slot.tip : fallback.tip,
-    descriptions: slot.descriptions.isNotEmpty
-        ? slot.descriptions
-        : fallback.descriptions,
+    recommendation: slot.recommendation,
+    tip: slot.tip,
+    descriptions: slot.descriptions,
   );
 }
 
@@ -286,8 +396,8 @@ const WakeSleepCopy sleepCardContent = WakeSleepCopy(
 const int kSlotCount = 7;
 const int kDayMinutes = 24 * 60;
 
-/// Minutes reserved after wake for the "wake" card (breakfast, sunlight,
-/// morning routine). The first planner slot begins at [wake + this].
+/// Legacy duration kept for older code paths. New phase generation uses the
+/// full wake-to-sleep window instead of a fixed wake buffer.
 const int kWakeBufferMinutes = 120;
 
 /// True when [nowMinutes] falls inside the wake-card window
@@ -297,10 +407,11 @@ bool isWakeWindow(num nowMinutes) {
 }
 
 bool isWakeWindowFor(num nowMinutes, {required int wakeMinutes}) {
-  return TimeSlot(
-    startMinutes: wakeMinutes,
-    endMinutes: wakeMinutes + kWakeBufferMinutes,
-  ).contains(nowMinutes.floor());
+  final phases = dayPhasesFor(
+    wakeMinutes: wakeMinutes,
+    sleepMinutes: homeDaySleepMinutes,
+  );
+  return phases.isNotEmpty && phases.first.slot.contains(nowMinutes.floor());
 }
 
 /// True when [nowMinutes] is either before wake (previous night still
@@ -318,7 +429,7 @@ bool isSleepWindowFor(
   required int wakeMinutes,
   required int sleepMinutes,
 }) {
-  final sleepEnd = _sleepEndForDay(
+  final phases = dayPhasesFor(
     wakeMinutes: wakeMinutes,
     sleepMinutes: sleepMinutes,
   );
@@ -326,13 +437,14 @@ bool isSleepWindowFor(
   while (candidate < wakeMinutes) {
     candidate += kDayMinutes;
   }
-  return candidate >= sleepEnd;
+  if (phases.isEmpty) return false;
+  final last = phases.last.slot;
+  return last.contains(candidate) || candidate >= last.endMinutes;
 }
 
-/// Live-computed planner slots — divides the current
-/// [wake + kWakeBufferMinutes → sleep] window evenly into [kSlotCount]
-/// pieces, rounded to 15-minute boundaries so labels stay tidy. The last
-/// slot absorbs any rounding remainder so it always ends exactly at sleep.
+/// Live-computed planner slots — the user's wake-to-sleep day split into
+/// science-informed phases. The split is deliberately heuristic: it reflects
+/// common sleep-wake rhythm patterns, not a medical or diagnostic claim.
 List<TimeSlot> get plannerSlots => plannerSlotsFor(
       wakeMinutes: homeDayWakeMinutes,
       sleepMinutes: homeDaySleepMinutes,
@@ -342,29 +454,52 @@ List<TimeSlot> plannerSlotsFor({
   required int wakeMinutes,
   required int sleepMinutes,
 }) {
+  return dayPhasesFor(
+    wakeMinutes: wakeMinutes,
+    sleepMinutes: sleepMinutes,
+  ).map((phase) => phase.slot).toList(growable: false);
+}
+
+List<DayPhase> get dayPhases => dayPhasesFor(
+      wakeMinutes: homeDayWakeMinutes,
+      sleepMinutes: homeDaySleepMinutes,
+    );
+
+List<DayPhase> dayPhasesFor({
+  required int wakeMinutes,
+  required int sleepMinutes,
+}) {
   final wake = _normalizeMinuteOfDay(wakeMinutes);
   final sleep = _sleepEndForDay(
     wakeMinutes: wake,
     sleepMinutes: sleepMinutes,
   );
-  final start = wake + kWakeBufferMinutes;
-  final total = sleep > start ? sleep - start : 60 * 12; // sane fallback
+  final total = sleep > wake ? sleep - wake : 60 * 16;
   const step = 15;
-  final rawSlot = total ~/ kSlotCount;
-  final slotMinutes = (rawSlot ~/ step) * step;
-  final base = slotMinutes < step ? step : slotMinutes;
-
-  final slots = <TimeSlot>[];
-  var cursor = start;
-  for (var i = 0; i < kSlotCount - 1; i++) {
-    slots.add(TimeSlot(
-      startMinutes: cursor,
-      endMinutes: cursor + base,
+  final phases = <DayPhase>[];
+  var cursor = wake;
+  var used = 0;
+  for (var i = 0; i < kDayPhaseBlueprints.length; i++) {
+    final blueprint = kDayPhaseBlueprints[i];
+    final isLast = i == kDayPhaseBlueprints.length - 1;
+    final raw = isLast ? total - used : (total * blueprint.weight).round();
+    final rounded = isLast ? raw : ((raw / step).round() * step);
+    final duration = rounded < step ? step : rounded;
+    final end = isLast ? sleep : cursor + duration;
+    used += end - cursor;
+    phases.add(DayPhase(
+      id: blueprint.id,
+      label: blueprint.label,
+      energyLabel: blueprint.energyLabel,
+      foundationLabel: 'Sleep-wake rhythm informed',
+      slot: TimeSlot(
+        startMinutes: cursor,
+        endMinutes: end,
+      ),
     ));
-    cursor += base;
+    cursor = end;
   }
-  slots.add(TimeSlot(startMinutes: cursor, endMinutes: sleep));
-  return slots;
+  return phases;
 }
 
 int _normalizeMinuteOfDay(num minutes) {
@@ -725,26 +860,6 @@ const List<AdviceMap> _nicotineFreePro = <AdviceMap>[
 //                       Register all modes here
 // ═════════════════════════════════════════════════════════════════════════
 //
-// One line per mode. Keys must match DayMode.id values in `allDayModes`.
-
-const Map<String, List<AdviceMap>> modeAdviceSourceMap =
-    <String, List<AdviceMap>>{
-  'healthy': _normal,
-  'athletic': _athletic,
-  'gym': _gym,
-  'office': _office,
-  'nicotine_free': _nicotineFree,
-  'student': _student,
-  'language': _student,
-  'coder_pro': coderProAdvice,
-  'coder_super_plus': coderSuperPlusAdvice,
-  'healthy_pro': _normalPro,
-  'athletic_pro': _athleticPro,
-  'gym_pro': _gymPro,
-  'office_pro': _officePro,
-  'nicotine_free_pro': _nicotineFreePro,
-};
-
 /// Safe lookup: falls back to 'healthy' if a mode id has no curated data
 /// yet, so a new dropdown entry can never crash the planner.
 /// For the special [customModeId], reads live from [CustomModeStore] and
@@ -756,20 +871,16 @@ List<ModeAdvice> adviceForMode(String modeId) {
     _ => modeId,
   };
   final healthy =
-      modeAdviceSourceMap['healthy']!.map(_modeAdviceFromMap).toList();
+      presetGoalCardsFor('healthy').map(_modeAdviceFromMap).toList();
   if (CustomModeStore.isCustomModeId(modeId)) {
     final plan = CustomModeStore.instance.planForModeId(modeId);
     final slots = plan.slots;
     return List<ModeAdvice>.generate(healthy.length, (i) {
       final s = i < slots.length ? slots[i] : const CustomSlot();
-      return _customAdviceFromSlot(
-        slot: s,
-        fallback: healthy[i],
-      );
+      return _customAdviceFromSlot(slot: s);
     });
   }
-  final source =
-      modeAdviceSourceMap[normalizedModeId] ?? modeAdviceSourceMap['healthy']!;
+  final source = presetGoalCardsFor(normalizedModeId);
   return source.map(_modeAdviceFromMap).toList();
 }
 
@@ -777,10 +888,10 @@ List<ModeAdvice> adviceForMode(String modeId) {
 /// catch a mode list that got out of sync with `plannerSlots`.
 bool debugAssertModeData() {
   final expected = plannerSlots.length;
-  for (final entry in modeAdviceSourceMap.entries) {
+  for (final entry in presetGoalContentLibrary) {
     assert(
-      entry.value.length == expected,
-      'Mode "${entry.key}" has ${entry.value.length} entries, '
+      entry.cards.length == expected,
+      'Mode "${entry.modeId}" has ${entry.cards.length} entries, '
       'expected $expected (one per slot in plannerSlots).',
     );
   }

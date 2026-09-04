@@ -5,6 +5,7 @@ import 'config/routes/app_routes.dart';
 import 'config/routes/route_generator.dart';
 import 'config/theme/app_theme.dart';
 import 'constants/app_strings.dart';
+import 'constants/app_typography.dart';
 import 'pages/profile/profile_bloc.dart';
 import 'pages/profile/profile_store.dart';
 import 'services/theme_mode_store.dart';
@@ -51,17 +52,23 @@ class _SystemNavigationShield extends StatelessWidget {
     final media = MediaQuery.of(context);
     final bottomInset = media.viewInsets.bottom;
     final bottomPadding = bottomInset > 0 ? 0.0 : media.viewPadding.bottom;
+    final scaledMedia = media.copyWith(
+      textScaler: const TextScaler.linear(AppTypography.appTextScale),
+    );
 
-    return Column(
-      children: <Widget>[
-        Expanded(child: child),
-        if (bottomPadding > 0)
-          SizedBox(
-            height: bottomPadding,
-            width: double.infinity,
-            child: const ColoredBox(color: _barColor),
-          ),
-      ],
+    return MediaQuery(
+      data: scaledMedia,
+      child: Column(
+        children: <Widget>[
+          Expanded(child: child),
+          if (bottomPadding > 0)
+            SizedBox(
+              height: bottomPadding,
+              width: double.infinity,
+              child: const ColoredBox(color: _barColor),
+            ),
+        ],
+      ),
     );
   }
 }

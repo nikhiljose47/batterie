@@ -1,18 +1,20 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/app_colors.dart';
+import '../../constants/daily_score_rules.dart';
 import '../../data/world_today/world_today_repository.dart';
 import '../../models/energy_log_record.dart';
 import '../../models/planner_session_log.dart';
 import '../../models/weather.dart';
 import '../../shared/widgets/profile_avatar.dart';
 import '../../services/custom_mode_store.dart';
+import '../../services/daily_progress_sync_service.dart';
 import '../../services/energy_log_store.dart';
 import '../../services/google_calendar_service.dart';
 import '../compare/compare_page.dart';
@@ -20,6 +22,7 @@ import '../profile/profile_bloc.dart';
 import '../profile/profile_store.dart';
 import '../services/data/service_catalog.dart';
 import '../services/services_page.dart';
+import '../services/tools/change_goal_page.dart';
 import '../services/tools/toolkit.dart';
 import '../weather/weather_controller.dart';
 import 'bloc/home_schedule_bloc.dart';
@@ -29,17 +32,28 @@ import 'widgets/planner_section.dart';
 /// Fresh home tab: unified, color-coded day tube showing energy flow from
 /// wake (soft morning green) through warm noon through evening dusk to sleep (night).
 class HomeTabPage extends StatefulWidget {
-  const HomeTabPage({super.key, this.weatherController});
+  const HomeTabPage({
+    super.key,
+    this.weatherController,
+    this.refreshToken = 0,
+    this.onEnergyScoreChanged,
+  });
 
   /// Optional shared controller (e.g. owned by the top bar's location
   /// button). When null the tab owns its own.
   final WeatherController? weatherController;
+  final int refreshToken;
+  final ValueChanged<int>? onEnergyScoreChanged;
 
   @override
   State<HomeTabPage> createState() => _HomeTabPageState();
 }
 
-class _HomeTabPageState extends State<HomeTabPage> {
+class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
+  static bool _cachedGoogleSignedIn = false;
+  static List<GoogleCalendarEvent> _cachedUpcomingGoogleItems =
+      const <GoogleCalendarEvent>[];
+
   late String _modeId;
   late final HomeScheduleBloc _scheduleBloc;
   late final WeatherController _weatherController;
@@ -51,19 +65,25 @@ class _HomeTabPageState extends State<HomeTabPage> {
   bool _showCalendarTimeline = false;
   bool _showCurrentOnlyPlanner = false;
   bool _calendarLoading = false;
-  bool _hasTodayEntry = false;
   int _todayTodoCount = 0;
+  int _todayAppUseMinutes = 0;
+  int _storedAppUseMinutes = 0;
   int _todayFocusMinutes = 0;
+  int _todayServiceActionCount = 0;
   int _todayPlanDoneCount = 0;
+  int _todayPlanTotalCount = kSlotCount;
   _BodyMetrics? _bodyMetrics;
   bool _googleUpcomingLoading = false;
-  bool _googleSignedIn = false;
-  List<String> _recentServiceIds = const <String>[];
+  bool _googleUpcomingSyncing = false;
+  bool _googleSignedIn = _cachedGoogleSignedIn;
   List<GoogleCalendarEvent> _calendarEvents = const <GoogleCalendarEvent>[];
-  List<GoogleCalendarEvent> _upcomingGoogleItems =
-      const <GoogleCalendarEvent>[];
+  List<GoogleCalendarEvent> _upcomingGoogleItems = _cachedUpcomingGoogleItems;
   final WorldTodayRepository _worldTodayRepository =
       const WorldTodayRepository();
+  Timer? _appUseTimer;
+  Timer? _googleUpcomingSyncTimer;
+  DateTime _appUseSessionStartedAt = DateTime.now();
+  int _googleUpcomingSyncDelayMinutes = 1;
   static const String _todoKey = 'svc.todo.items';
   static const String _bodyMetricsKey = 'svc.body.metrics';
   static const String _focusSessionsKey = 'svc.focus.sessions';
@@ -71,21 +91,106 @@ class _HomeTabPageState extends State<HomeTabPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _modeId = ProfileStore.instance.plannerMode.value;
     _scheduleBloc = HomeScheduleBloc();
     _ownsWeatherController = widget.weatherController == null;
     _weatherController = widget.weatherController ?? WeatherController();
     if (_ownsWeatherController) _weatherController.load();
-    _loadHomeInfo();
-    _loadHomeShortcuts();
-    _loadGoogleUpcoming();
+    _refreshHome();
+    _startGoogleUpcomingBackoff();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshHome();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeTabPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _refreshHome();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _appUseTimer?.cancel();
+    _googleUpcomingSyncTimer?.cancel();
     _scheduleBloc.close();
     if (_ownsWeatherController) _weatherController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      unawaited(
+        DailyProgressSyncService.instance.saveTodayAppUseMinutes(
+          _todayAppUseMinutes,
+        ),
+      );
+      unawaited(DailyProgressSyncService.instance.syncToday());
+      _appUseTimer?.cancel();
+      _appUseTimer = null;
+      return;
+    }
+    if (state != AppLifecycleState.resumed) return;
+    _appUseSessionStartedAt = DateTime.now();
+    _syncAppUseTimer();
+    _refreshHome();
+  }
+
+  void _refreshHome() {
+    _scheduleBloc.add(const HomeScheduleStarted());
+    _weatherController.load();
+    _loadHomeInfo();
+  }
+
+  void _startGoogleUpcomingBackoff() {
+    _googleUpcomingSyncTimer?.cancel();
+    _googleUpcomingSyncDelayMinutes = 1;
+    _scheduleGoogleUpcomingSync(Duration.zero);
+  }
+
+  void _scheduleGoogleUpcomingSync(Duration delay) {
+    _googleUpcomingSyncTimer = Timer(delay, () async {
+      await _loadGoogleUpcoming();
+      if (!mounted) return;
+      final nextDelay = _googleUpcomingSyncDelayMinutes;
+      _googleUpcomingSyncDelayMinutes =
+          math.min(_googleUpcomingSyncDelayMinutes * 2, 60);
+      _scheduleGoogleUpcomingSync(Duration(minutes: nextDelay));
+    });
+  }
+
+  Future<void> _manualRefreshGoogleUpcoming() async {
+    _googleUpcomingSyncDelayMinutes = 1;
+    await _loadGoogleUpcoming(showLoading: true);
+  }
+
+  int get _liveAppUseMinutes {
+    final liveMinutes = DateTime.now()
+        .difference(_appUseSessionStartedAt)
+        .inMinutes
+        .clamp(0, 1440);
+    return math.min(_storedAppUseMinutes + liveMinutes, 1440);
+  }
+
+  void _syncAppUseTimer() {
+    _appUseTimer?.cancel();
+    _appUseTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      final next = _liveAppUseMinutes;
+      if (next != _todayAppUseMinutes) {
+        setState(() => _todayAppUseMinutes = next);
+        _notifyEnergyScore();
+        unawaited(
+          DailyProgressSyncService.instance.saveTodayAppUseMinutes(next),
+        );
+      }
+    });
   }
 
   Future<void> _openDayCardEditor() async {
@@ -108,7 +213,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
       _plannerRefreshToken++;
     });
     _scheduleBloc.add(const HomeScheduleStarted());
-    await _loadHomeShortcuts();
+    await _loadHomeInfo();
   }
 
   static const List<String> _weekdayAbbr = <String>[
@@ -161,29 +266,11 @@ class _HomeTabPageState extends State<HomeTabPage> {
             // Fixed day card at the top; only the planner list below scrolls.
             return Container(
               color: Theme.of(context).scaffoldBackgroundColor,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   _buildDayCard(context, schedule),
-                  const SizedBox(height: 10),
-                  AnimatedBuilder(
-                    animation: _weatherController,
-                    builder: (context, _) => _HomeInfoCard(
-                      mode: allSelectableDayModes.firstWhere(
-                        (mode) => mode.id == _modeId,
-                        orElse: () => allSelectableDayModes.first,
-                      ),
-                      hasTodayEntry: _hasTodayEntry,
-                      rainLabel: _rainSummary(
-                        _weatherController.state.snapshot,
-                      ),
-                      todoCount: _todayTodoCount,
-                      focusMinutes: _todayFocusMinutes,
-                      planDoneCount: _todayPlanDoneCount,
-                      bodyMetrics: _bodyMetrics,
-                    ),
-                  ),
                   const SizedBox(height: 18),
                   _HomeSectionTitle(
                     title: 'Quick actions',
@@ -193,20 +280,13 @@ class _HomeTabPageState extends State<HomeTabPage> {
                       onTap: _openServicesHub,
                     ),
                   ),
-                  const SizedBox(height: 9),
+                  const SizedBox(height: 7),
                   _HomeShortcutSection(
                     services: _homeShortcutServices,
-                    currentModeLabel: allSelectableDayModes
-                        .firstWhere(
-                          (mode) => mode.id == _modeId,
-                          orElse: () => allSelectableDayModes.first,
-                        )
-                        .shortLabel,
-                    onModeEdit: _openModeCompare,
                     onTodo: _openTodoService,
                     onService: _openServiceShortcut,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: _NowUpcomingSection(
                       current: _currentPlanData(schedule),
@@ -214,14 +294,16 @@ class _HomeTabPageState extends State<HomeTabPage> {
                       googleSignedIn: _googleSignedIn,
                       loading: _googleUpcomingLoading,
                       onConnect: _connectGoogleCalendar,
-                      onRefresh: _loadGoogleUpcoming,
+                      onRefresh: _manualRefreshGoogleUpcoming,
+                      onChangeGoal: _openChangeGoal,
+                      onTrackGoal: _openModeCompare,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   _DidYouKnowTodayCard(
                     fact: _worldTodayRepository.factFor(DateTime.now()),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                 ],
               ),
             );
@@ -242,46 +324,26 @@ class _HomeTabPageState extends State<HomeTabPage> {
       (mode) => mode.id == _modeId,
       orElse: () => allSelectableDayModes.first,
     );
-    final slots = plannerSlotsFor(
+    final phases = dayPhasesFor(
       wakeMinutes: schedule.wakeMinutes,
       sleepMinutes: schedule.sleepMinutes,
     );
+    final slots = phases.map((phase) => phase.slot).toList(growable: false);
     final currentIndex = slots.indexWhere((slot) => slot.contains(now));
 
-    if (isWakeWindowFor(now, wakeMinutes: schedule.wakeMinutes)) {
-      return _CurrentPlanData(
-        sourceLabel: mode.shortLabel,
-        range: 'Wake period',
-        suggestion:
-            'Start gently with water, light movement, and one clear intention.',
-        cue: 'Gentle start',
-        accent: const Color(0xFFFFB74D),
-      );
-    }
-
-    if (isSleepWindowFor(
-      now,
-      wakeMinutes: schedule.wakeMinutes,
-      sleepMinutes: schedule.sleepMinutes,
-    )) {
-      return _CurrentPlanData(
-        sourceLabel: mode.shortLabel,
-        range: 'Sleep period',
-        suggestion: 'Let the day close quietly and protect your sleep window.',
-        cue: 'Wind down',
-        accent: const Color(0xFF6C7EE1),
-      );
-    }
-
     final adviceList = adviceForMode(_modeId);
-    final safeIndex = currentIndex.clamp(0, adviceList.length - 1);
+    final safeIndex = currentIndex == -1
+        ? adviceList.length - 1
+        : currentIndex.clamp(0, adviceList.length - 1);
     final advice = adviceList[safeIndex];
-    final slot = currentIndex == -1 ? null : slots[currentIndex];
+    final phase = currentIndex == -1 ? phases.last : phases[currentIndex];
+    final slot = phase.slot;
     return _CurrentPlanData(
       sourceLabel: mode.shortLabel,
-      range: slot?.rangeLabel ?? 'Current period',
+      range: slot.rangeLabel,
       suggestion: _modeSuggestion(mode, advice),
       cue: _modeCue(advice),
+      rhythmNote: '${phase.label} · ${phase.foundationLabel}',
       accent: AppColors.primary,
     );
   }
@@ -312,18 +374,17 @@ class _HomeTabPageState extends State<HomeTabPage> {
     return words.join(' ');
   }
 
-  Future<void> _loadGoogleUpcoming() async {
-    if (_googleUpcomingLoading) return;
-    setState(() => _googleUpcomingLoading = true);
+  Future<void> _loadGoogleUpcoming({bool showLoading = false}) async {
+    if (_googleUpcomingSyncing) return;
+    _googleUpcomingSyncing = true;
+    if (showLoading) {
+      setState(() => _googleUpcomingLoading = true);
+    }
     try {
       final signedIn = await GoogleCalendarService.instance.isSignedIn();
       if (!mounted) return;
       if (!signedIn) {
-        setState(() {
-          _googleSignedIn = false;
-          _upcomingGoogleItems = const <GoogleCalendarEvent>[];
-          _googleUpcomingLoading = false;
-        });
+        setState(() => _googleUpcomingLoading = false);
         return;
       }
 
@@ -335,13 +396,13 @@ class _HomeTabPageState extends State<HomeTabPage> {
         _upcomingGoogleItems = upcoming;
         _googleUpcomingLoading = false;
       });
+      _cachedGoogleSignedIn = true;
+      _cachedUpcomingGoogleItems = upcoming;
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _googleSignedIn = false;
-        _upcomingGoogleItems = const <GoogleCalendarEvent>[];
-        _googleUpcomingLoading = false;
-      });
+      setState(() => _googleUpcomingLoading = false);
+    } finally {
+      _googleUpcomingSyncing = false;
     }
   }
 
@@ -363,7 +424,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await GoogleCalendarService.instance.signIn();
-      await _loadGoogleUpcoming();
+      await _manualRefreshGoogleUpcoming();
     } catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
@@ -375,6 +436,9 @@ class _HomeTabPageState extends State<HomeTabPage> {
   Future<void> _loadHomeInfo() async {
     try {
       final today = DateTime.now();
+      await DailyProgressSyncService.instance.saveTodayAppUseMinutes(
+        _liveAppUseMinutes,
+      );
       final userId = ProfileStore.instance.userId.value;
       final store = SqliteEnergyLogStore.instance;
       await store.claimEnergyLogsForUser(userId);
@@ -386,6 +450,10 @@ class _HomeTabPageState extends State<HomeTabPage> {
         dateKey(today),
         userId: userId,
       );
+      final planTotal = plannerSlotsFor(
+        wakeMinutes: _scheduleBloc.state.wakeMinutes,
+        sleepMinutes: _scheduleBloc.state.sleepMinutes,
+      ).length;
       final todos = await ServiceStore.loadList(_todoKey);
       final focusSessions = await ServiceStore.loadList(_focusSessionsKey);
       final bodyMetrics = await _loadBodyMetrics();
@@ -399,23 +467,53 @@ class _HomeTabPageState extends State<HomeTabPage> {
             svcDay(due) == svcDay(today);
       }).length;
       if (!mounted) return;
+      final storedAppUseMinutes =
+          await DailyProgressSyncService.instance.appUseMinutesForDay(today);
+      _appUseSessionStartedAt = DateTime.now();
       setState(() {
-        _hasTodayEntry = records.isNotEmpty;
         _todayTodoCount = todoCount;
+        _storedAppUseMinutes = storedAppUseMinutes;
+        _todayAppUseMinutes = storedAppUseMinutes;
         _todayFocusMinutes = _focusMinutesForToday(focusSessions, today);
+        _todayServiceActionCount = records.length;
         _todayPlanDoneCount = plannerLogs.where((log) => log.isDone).length;
+        _todayPlanTotalCount = planTotal;
         _bodyMetrics = bodyMetrics;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _hasTodayEntry = false;
         _todayTodoCount = 0;
+        _todayAppUseMinutes = 0;
+        _storedAppUseMinutes = 0;
         _todayFocusMinutes = 0;
+        _todayServiceActionCount = 0;
         _todayPlanDoneCount = 0;
+        _todayPlanTotalCount = kSlotCount;
         _bodyMetrics = null;
       });
     }
+    _syncAppUseTimer();
+    _notifyEnergyScore();
+    unawaited(
+      DailyProgressSyncService.instance.saveTodayAppUseMinutes(
+        _todayAppUseMinutes,
+      ),
+    );
+    unawaited(DailyProgressSyncService.instance.syncToday());
+  }
+
+  int get _energyScorePercent {
+    return DailyScoreRules.appUsePoints(_todayAppUseMinutes) +
+        DailyScoreRules.serviceLogPoints(_todayServiceActionCount) +
+        DailyScoreRules.dayTrackPoints(
+          loggedCount: _sessionLogs.length,
+          totalCount: _todayPlanTotalCount,
+        );
+  }
+
+  void _notifyEnergyScore() {
+    widget.onEnergyScoreChanged?.call(_energyScorePercent);
   }
 
   int _focusMinutesForToday(
@@ -440,34 +538,15 @@ class _HomeTabPageState extends State<HomeTabPage> {
   }
 
   List<AppService> get _homeShortcutServices {
-    final recent = <AppService>[
-      for (final id in _recentServiceIds)
-        for (final service in serviceCatalog)
-          if (service.id == id &&
-              service.id != 'todo' &&
-              service.id != 'day_mode')
-            service,
+    const shortcutIds = <String>[
+      'focus',
+      'breathing',
+      'air_quality',
     ];
-    final seen = <String>{
-      'todo',
-      'day_mode',
-      for (final service in recent) service.id,
-    };
-    final filled = <AppService>[
-      ...recent,
-      for (final service in serviceCatalog)
-        if (seen.add(service.id)) service,
+    return <AppService>[
+      for (final id in shortcutIds)
+        if (serviceById(id) case final service?) service,
     ];
-    return filled.take(4).toList(growable: false);
-  }
-
-  Future<void> _loadHomeShortcuts() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    setState(() {
-      _recentServiceIds =
-          prefs.getStringList(serviceRecentIdsPrefsKey) ?? const <String>[];
-    });
   }
 
   Future<void> _openModeCompare() async {
@@ -476,7 +555,15 @@ class _HomeTabPageState extends State<HomeTabPage> {
     );
     if (!mounted) return;
     await _loadHomeInfo();
-    await _loadHomeShortcuts();
+  }
+
+  Future<void> _openChangeGoal() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ChangeGoalPage()),
+    );
+    if (!mounted) return;
+    setState(() => _modeId = ProfileStore.instance.plannerMode.value);
+    await _loadHomeInfo();
   }
 
   Future<void> _openTodoService() async {
@@ -490,7 +577,20 @@ class _HomeTabPageState extends State<HomeTabPage> {
     );
     if (!mounted) return;
     await _loadHomeInfo();
-    await _loadHomeShortcuts();
+  }
+
+  Future<void> _openSleepTrackerService() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const ServicesPage(
+          autoOpenServiceId: 'sleep_tracker',
+          closeOnAutoOpenReturn: true,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _scheduleBloc.add(const HomeScheduleStarted());
+    await _loadHomeInfo();
   }
 
   Future<void> _openServicesHub() async {
@@ -499,7 +599,6 @@ class _HomeTabPageState extends State<HomeTabPage> {
     );
     if (!mounted) return;
     await _loadHomeInfo();
-    await _loadHomeShortcuts();
   }
 
   Future<void> _openServiceShortcut(AppService service) async {
@@ -513,7 +612,6 @@ class _HomeTabPageState extends State<HomeTabPage> {
     );
     if (!mounted) return;
     await _loadHomeInfo();
-    await _loadHomeShortcuts();
   }
 
   void _showCurrentPlannerCard() {
@@ -622,11 +720,11 @@ class _HomeTabPageState extends State<HomeTabPage> {
       }
       await _refreshGoogleCalendarTimeline();
       await _plannerKey.currentState?.refreshGoogleCurrentItems();
-      await _loadGoogleUpcoming();
+      await _manualRefreshGoogleUpcoming();
     } catch (error) {
       await _refreshGoogleCalendarTimeline();
       await _plannerKey.currentState?.refreshGoogleCurrentItems();
-      await _loadGoogleUpcoming();
+      await _manualRefreshGoogleUpcoming();
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(content: Text('Google move failed: $error')),
@@ -669,7 +767,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
       await _refreshGoogleCalendarTimeline(showLoading: true);
       await _plannerKey.currentState?.refreshGoogleCurrentItems();
       await _loadHomeInfo();
-      await _loadGoogleUpcoming();
+      await _manualRefreshGoogleUpcoming();
     } catch (error) {
       messenger.showSnackBar(
         SnackBar(content: Text('Google add failed: $error')),
@@ -686,7 +784,8 @@ class _HomeTabPageState extends State<HomeTabPage> {
 
   String _rainSummary(WeatherSnapshot? weather) {
     if (weather == null) return 'Weather off';
-    if (_isRainy(weather.current.condition)) return 'Raining now';
+    if (_isRainy(weather.current.condition))
+      return '${_weatherLocation(weather)} now';
 
     final now = DateTime.now();
     final todayEnd = DateTime(now.year, now.month, now.day, 23, 59);
@@ -694,8 +793,8 @@ class _HomeTabPageState extends State<HomeTabPage> {
       if (hour.time.isBefore(now) || hour.time.isAfter(todayEnd)) continue;
       final probability = hour.precipitationProbability;
       if (_isRainy(hour.condition) ||
-          (probability != null && probability >= 30)) {
-        return 'Rain ${svcClock(hour.time)}';
+          (probability != null && probability >= 70)) {
+        return '${_weatherLocation(weather)} ${svcClock(hour.time)}';
       }
     }
 
@@ -703,18 +802,26 @@ class _HomeTabPageState extends State<HomeTabPage> {
       final today = weather.daily.first;
       final probability = today.precipitationProbability;
       if (_isRainy(today.condition) ||
-          (probability != null && probability >= 30)) {
-        return probability == null ? 'Rain today' : 'Rain $probability%';
+          (probability != null && probability >= 70)) {
+        return probability == null
+            ? '${_weatherLocation(weather)} today'
+            : '${_weatherLocation(weather)} $probability%';
       }
     }
 
     return 'No rain / clear';
   }
 
+  String _weatherLocation(WeatherSnapshot weather) {
+    final place = weather.location.placeLabel?.split(',').first.trim();
+    if (place != null && place.isNotEmpty) return place;
+    return '${weather.location.latitude.toStringAsFixed(1)},${weather.location.longitude.toStringAsFixed(1)}';
+  }
+
   Widget _buildDayCard(BuildContext context, HomeScheduleState schedule) {
     final colors = Theme.of(context).colorScheme;
     return _HomeSurfaceCard(
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -738,14 +845,15 @@ class _HomeTabPageState extends State<HomeTabPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _DayCardTimeText(
-                    dateLabel: _todayLabel,
+                  _WakeEditAction(
+                    label: timeOfDayLabel(schedule.wake),
+                    onTap: _openSleepTrackerService,
                   ),
                 ],
               );
             },
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
@@ -753,49 +861,54 @@ class _HomeTabPageState extends State<HomeTabPage> {
                 flex: 22,
                 child: _DayCardClockToggle(
                   minutes: schedule.nowMinutes.floor(),
+                  dateLabel: _todayLabel,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 flex: 78,
                 child: SizedBox(
-                  height: 84,
+                  height: 72,
                   child: _DayTube(
                     nowMinutes: schedule.nowMinutes,
                     wakeMinutes: schedule.wakeMinutes,
                     sleepMinutes: schedule.sleepMinutes,
-                    sessionLogs: _sessionLogs,
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: colors.outline.withOpacity(0.18),
+          ),
+          const SizedBox(height: 6),
+          AnimatedBuilder(
+            animation: _weatherController,
+            builder: (context, _) {
+              final mode = allSelectableDayModes.firstWhere(
+                (mode) => mode.id == _modeId,
+                orElse: () => allSelectableDayModes.first,
+              );
+              return _HomeInfoCard(
+                goalLabel: mode.shortLabel,
+                rainLabel: _rainSummary(
+                  _weatherController.state.snapshot,
+                ),
+                weatherState: _weatherController.state,
+                onEnableWeather: _weatherController.requestPermissionAndLoad,
+                todoCount: _todayTodoCount,
+                appUseMinutes: _todayAppUseMinutes,
+                focusMinutes: _todayFocusMinutes,
+                planDoneCount: _todayPlanDoneCount,
+                planTotalCount: _todayPlanTotalCount,
+                bodyMetrics: _bodyMetrics,
+              );
+            },
+          ),
         ],
-      ),
-    );
-  }
-}
-
-class _DayCardTimeText extends StatelessWidget {
-  const _DayCardTimeText({
-    required this.dateLabel,
-  });
-
-  final String dateLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Text(
-      dateLabel,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: TextAlign.right,
-      style: TextStyle(
-        fontSize: 11,
-        height: 1,
-        fontWeight: FontWeight.w700,
-        color: colors.onSurface.withOpacity(0.48),
       ),
     );
   }
@@ -873,12 +986,67 @@ class _HomeTitleAction extends StatelessWidget {
   }
 }
 
+class _WakeEditAction extends StatelessWidget {
+  const _WakeEditAction({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 26,
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest.withOpacity(0.42),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.outline.withOpacity(0.22)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.wb_twilight_rounded,
+              size: 12,
+              color: colors.onSurface.withOpacity(0.52),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1,
+                fontWeight: FontWeight.w700,
+                color: colors.onSurface.withOpacity(0.66),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.edit_rounded,
+              size: 11,
+              color: colors.primary.withOpacity(0.72),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CurrentPlanData {
   const _CurrentPlanData({
     required this.sourceLabel,
     required this.range,
     required this.suggestion,
     required this.cue,
+    required this.rhythmNote,
     required this.accent,
   });
 
@@ -886,6 +1054,7 @@ class _CurrentPlanData {
   final String range;
   final String suggestion;
   final String cue;
+  final String rhythmNote;
   final Color accent;
 }
 
@@ -912,6 +1081,8 @@ class _NowUpcomingSection extends StatelessWidget {
     required this.loading,
     required this.onConnect,
     required this.onRefresh,
+    required this.onChangeGoal,
+    required this.onTrackGoal,
   });
 
   final _CurrentPlanData current;
@@ -920,40 +1091,149 @@ class _NowUpcomingSection extends StatelessWidget {
   final bool loading;
   final VoidCallback onConnect;
   final VoidCallback onRefresh;
+  final VoidCallback onChangeGoal;
+  final VoidCallback onTrackGoal;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const _HomeSectionTitle(title: 'Calendar'),
+        _HomeSectionTitle(
+          title: 'Goal',
+          action: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _HomeTitleAction(
+                icon: Icons.edit_note_rounded,
+                label: 'Change',
+                onTap: onChangeGoal,
+              ),
+              const SizedBox(width: 2),
+              _HomeTitleAction(
+                icon: Icons.flag_rounded,
+                label: 'Track',
+                onTap: onTrackGoal,
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 8),
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final googleHeight = math.max(92.0, constraints.maxHeight - 68);
-              return ListView(
-                padding: EdgeInsets.zero,
-                physics: const BouncingScrollPhysics(),
-                children: <Widget>[
-                  _CurrentPlanCard(data: current),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: googleHeight,
-                    child: _UpcomingCalendarCard(
-                      events: upcoming,
-                      signedIn: googleSignedIn,
-                      loading: loading,
-                      onConnect: onConnect,
-                      onRefresh: onRefresh,
-                    ),
-                  ),
-                ],
-              );
-            },
+          child: _DayScheduleList(
+            current: current,
+            events: upcoming,
+            signedIn: googleSignedIn,
+            loading: loading,
+            onConnect: onConnect,
+            onRefresh: onRefresh,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DayScheduleList extends StatelessWidget {
+  const _DayScheduleList({
+    required this.current,
+    required this.events,
+    required this.signedIn,
+    required this.loading,
+    required this.onConnect,
+    required this.onRefresh,
+  });
+
+  final _CurrentPlanData current;
+  final List<GoogleCalendarEvent> events;
+  final bool signedIn;
+  final bool loading;
+  final VoidCallback onConnect;
+  final VoidCallback onRefresh;
+
+  String _eventTimeLabel(GoogleCalendarEvent item) {
+    if (item.start == null) return 'Any time today';
+    final end = item.end;
+    if (end == null || end.isAtSameMomentAs(item.start!)) {
+      return svcClock(item.start!);
+    }
+    return '${svcClock(item.start!)} - ${svcClock(end)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showExistingCalendar = signedIn || events.isNotEmpty;
+    final rows = <Widget>[
+      _CurrentPlanCard(data: current),
+      if (loading && events.isEmpty)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 14),
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        )
+      else if (!showExistingCalendar)
+        _CalendarAgendaRow(
+          icon: Icons.calendar_month_rounded,
+          color: const Color(0xFF4285F4),
+          child: _GoogleConnectPrompt(onConnect: onConnect),
+        )
+      else ...<Widget>[
+        if (events.isEmpty)
+          const _CalendarEmptyRow()
+        else
+          for (final event in events)
+            _CalendarAgendaRow(
+              icon: event.isTask
+                  ? Icons.task_alt_rounded
+                  : Icons.event_available_rounded,
+              color: const Color(0xFF4285F4),
+              child: _UpcomingCalendarListItem(
+                event: event,
+                timeLabel: _eventTimeLabel(event),
+              ),
+            ),
+      ],
+    ];
+
+    return ListView.separated(
+      padding: EdgeInsets.zero,
+      physics: const BouncingScrollPhysics(),
+      itemCount: rows.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) => rows[index],
+    );
+  }
+}
+
+class _CalendarEmptyRow extends StatelessWidget {
+  const _CalendarEmptyRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return _CalendarAgendaRow(
+      icon: Icons.calendar_month_rounded,
+      color: const Color(0xFF4285F4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Text(
+          'No upcoming Google Calendar items today.',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.22,
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface.withOpacity(0.58),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -966,51 +1246,116 @@ class _CurrentPlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return _CalendarSourceRow(
-      source: _CalendarSourceBadge(
-        icon: Icons.auto_awesome_rounded,
-        label: data.sourceLabel,
-        color: data.accent,
-      ),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return _CalendarAgendaRow(
+      icon: Icons.flag_circle_rounded,
+      color: data.accent,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(14, 11, 14, 10),
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
         decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: data.accent.withOpacity(0.28), width: 1.3),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              data.suggestion,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.12,
-                fontFamily: 'Kalam',
-                fontFamilyFallback: const <String>['Inter'],
-                fontWeight: FontWeight.w400,
-                color: colors.onSurface.withOpacity(0.84),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: <Widget>[
-                Expanded(child: _CalendarTimeLabel(data.range)),
-                const SizedBox(width: 8),
-                _CalendarCueBadge(
-                  label: data.cue,
-                  color: data.accent,
-                ),
-              ],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              colors.surface,
+              data.accent.withOpacity(dark ? 0.18 : 0.10),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: data.accent.withOpacity(0.34), width: 1),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: data.accent.withOpacity(dark ? 0.16 : 0.10),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            Container(
+              width: 26,
+              height: 26,
+              margin: const EdgeInsets.only(right: 10, bottom: 1),
+              decoration: BoxDecoration(
+                color: data.accent.withOpacity(dark ? 0.22 : 0.14),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(
+                Icons.track_changes_rounded,
+                size: 15,
+                color: data.accent,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                data.suggestion,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14.6,
+                  height: 1.12,
+                  fontFamily: 'Kalam',
+                  fontFamilyFallback: const <String>['Inter'],
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface.withOpacity(0.9),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            _CalendarTimeLabel(data.range),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _CalendarAgendaRow extends StatelessWidget {
+  const _CalendarAgendaRow({
+    required this.icon,
+    required this.color,
+    required this.child,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(
+          width: 20,
+          child: Column(
+            children: <Widget>[
+              Container(
+                width: 19,
+                height: 19,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color.withOpacity(0.22)),
+                ),
+                child: Icon(icon, size: 11, color: color),
+              ),
+              Container(
+                width: 1,
+                height: 54,
+                color: colors.outline.withOpacity(0.18),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: child),
+      ],
     );
   }
 }
@@ -1079,38 +1424,6 @@ class _CalendarSourceBadge extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CalendarCueBadge extends StatelessWidget {
-  const _CalendarCueBadge({
-    required this.label,
-    required this.color,
-  });
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 9.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
       ),
     );
   }
@@ -1408,71 +1721,113 @@ class _UpcomingCalendarListItem extends StatelessWidget {
 
 class _HomeInfoCard extends StatelessWidget {
   const _HomeInfoCard({
-    required this.mode,
-    required this.hasTodayEntry,
+    required this.goalLabel,
     required this.rainLabel,
+    required this.weatherState,
+    required this.onEnableWeather,
     required this.todoCount,
+    required this.appUseMinutes,
     required this.focusMinutes,
     required this.planDoneCount,
+    required this.planTotalCount,
     required this.bodyMetrics,
   });
 
-  final DayMode mode;
-  final bool hasTodayEntry;
+  final String goalLabel;
   final String rainLabel;
+  final WeatherState weatherState;
+  final VoidCallback onEnableWeather;
   final int todoCount;
+  final int appUseMinutes;
   final int focusMinutes;
   final int planDoneCount;
+  final int planTotalCount;
   final _BodyMetrics? bodyMetrics;
 
   bool get _expectsRain =>
-      rainLabel.startsWith('Rain') || rainLabel == 'Raining now';
+      rainLabel != 'Weather off' &&
+      rainLabel != 'Location off' &&
+      rainLabel != 'No rain / clear' &&
+      rainLabel != 'Checking...';
+
+  bool get _needsWeatherAction =>
+      weatherState.snapshot == null &&
+      (weatherState.status == WeatherStatus.permissionDenied ||
+          weatherState.status == WeatherStatus.permissionDeniedForever ||
+          weatherState.status == WeatherStatus.serviceDisabled ||
+          weatherState.status == WeatherStatus.error);
+
+  bool get _weatherLoading =>
+      weatherState.status == WeatherStatus.loading ||
+      weatherState.status == WeatherStatus.refreshing;
+
+  String get _weatherPlace {
+    final snapshot = weatherState.snapshot;
+    if (snapshot == null) return '';
+    final place = snapshot.location.placeLabel?.split(',').first.trim();
+    if (place != null && place.isNotEmpty) return place;
+    return '${snapshot.location.latitude.toStringAsFixed(1)},${snapshot.location.longitude.toStringAsFixed(1)}';
+  }
+
+  String get _weatherTimeLabel {
+    if (_weatherLoading) return 'Checking...';
+    if (_needsWeatherAction) return 'Location off';
+    if (rainLabel == 'Weather off' || rainLabel == 'No rain / clear') {
+      return rainLabel;
+    }
+    final place = _weatherPlace;
+    var text = place.isNotEmpty && rainLabel.startsWith(place)
+        ? rainLabel.substring(place.length).trim()
+        : rainLabel;
+    if (text == 'now') return 'Now';
+    if (text == 'today') return 'Today';
+    if (text.endsWith('%')) return '$text chance';
+    return text;
+  }
+
+  String get _regainValue {
+    if (focusMinutes <= 0) return _blankInfoValue;
+    if (focusMinutes < 60) return '$focusMinutes min';
+    final hours = focusMinutes ~/ 60;
+    final minutes = focusMinutes % 60;
+    if (minutes == 0) return '${hours}h';
+    return '${hours}h ${minutes}m';
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.outline.withOpacity(0.18)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
       child: Column(
         children: <Widget>[
           Row(
             children: <Widget>[
               Expanded(
                 child: _HomeInfoItem(
-                  icon: Icons.tune_rounded,
-                  label: 'Goal',
-                  value: mode.shortLabel,
-                  accent: colors.primary,
+                  icon: Icons.flag_rounded,
+                  label: 'Goal: $goalLabel',
+                  value:
+                      '${math.min(planDoneCount, planTotalCount)}/$planTotalCount done',
+                  accent: AppColors.success,
                 ),
               ),
               _InfoDivider(color: colors.outline),
               Expanded(
-                child: _HomeInfoItem(
-                  icon: hasTodayEntry
-                      ? Icons.check_circle_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  label: 'Today log',
-                  value: hasTodayEntry ? 'Logged today' : 'No log yet',
-                  accent: hasTodayEntry
-                      ? AppColors.primary
-                      : colors.onSurfaceVariant,
-                ),
-              ),
-              _InfoDivider(color: colors.outline),
-              Expanded(
-                child: _HomeInfoItem(
+                child: _WeatherInfoItem(
                   icon: _expectsRain
                       ? Icons.water_drop_rounded
                       : Icons.wb_sunny_rounded,
-                  label: 'Rain',
-                  value: rainLabel,
+                  value: _weatherLoading
+                      ? 'Checking...'
+                      : _needsWeatherAction
+                          ? 'Location off'
+                          : _weatherTimeLabel,
+                  detail: _weatherPlace,
                   accent:
                       _expectsRain ? AppColors.info : const Color(0xFFE0A224),
+                  onSync: _weatherLoading ? null : onEnableWeather,
+                  loading: _weatherLoading,
                 ),
               ),
               _InfoDivider(color: colors.outline),
@@ -1486,47 +1841,35 @@ class _HomeInfoCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
           Row(
             children: <Widget>[
               Expanded(
                 child: _HomeInfoItem(
                   icon: Icons.monitor_weight_outlined,
-                  label: 'Ht / Wt',
+                  label: 'BMI',
                   value: bodyMetrics == null
-                      ? 'Add in BMI'
-                      : '${bodyMetrics!.heightCm.round()} cm\n${bodyMetrics!.weightKg.round()} kg',
+                      ? _blankInfoValue
+                      : bodyMetrics!.bmi.toStringAsFixed(1),
                   accent: const Color(0xFF7B61FF),
                 ),
               ),
               _InfoDivider(color: colors.outline),
               Expanded(
                 child: _HomeInfoItem(
-                  icon: Icons.favorite_border_rounded,
-                  label: 'BMI',
-                  value: bodyMetrics == null
-                      ? 'Need data'
-                      : bodyMetrics!.bmi.toStringAsFixed(1),
-                  accent: const Color(0xFFE05A47),
-                ),
-              ),
-              _InfoDivider(color: colors.outline),
-              Expanded(
-                child: _HomeInfoItem(
-                  icon: Icons.fact_check_rounded,
-                  label: 'Plan done',
-                  value: '$planDoneCount done',
-                  accent: AppColors.success,
+                  icon: Icons.bolt_rounded,
+                  label: 'App use',
+                  value: '$appUseMinutes min',
+                  accent: const Color(0xFF5F6F89),
                 ),
               ),
               _InfoDivider(color: colors.outline),
               Expanded(
                 child: _HomeInfoItem(
                   icon: Icons.timer_outlined,
-                  label: 'Focus',
-                  value:
-                      focusMinutes == 0 ? 'No focus yet' : '${focusMinutes}m',
-                  accent: const Color(0xFF4F7FE5),
+                  label: 'Regain',
+                  value: _regainValue,
+                  accent: AppColors.info,
                 ),
               ),
             ],
@@ -1537,6 +1880,8 @@ class _HomeInfoCard extends StatelessWidget {
   }
 }
 
+const String _blankInfoValue = ' \n ';
+
 class _InfoDivider extends StatelessWidget {
   const _InfoDivider({required this.color});
 
@@ -1546,9 +1891,130 @@ class _InfoDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: 38,
+      height: 44,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       color: color.withOpacity(0.24),
+    );
+  }
+}
+
+class _WeatherInfoItem extends StatelessWidget {
+  const _WeatherInfoItem({
+    required this.icon,
+    required this.value,
+    required this.detail,
+    required this.accent,
+    required this.loading,
+    required this.onSync,
+  });
+
+  final IconData icon;
+  final String value;
+  final String detail;
+  final Color accent;
+  final bool loading;
+  final VoidCallback? onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 18,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(icon, size: 15, color: accent),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Expected rain',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.onSurface.withOpacity(0.46),
+                          fontSize: 9,
+                          height: 1,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 13,
+                      height: 13,
+                      child: ClipRect(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: loading ? null : onSync,
+                          child: Icon(
+                            Icons.sync_rounded,
+                            size: 11,
+                            color: loading
+                                ? colors.onSurface.withOpacity(0.28)
+                                : AppColors.info,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: <Widget>[
+                    if (loading) ...<Widget>[
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.onSurface.withOpacity(0.86),
+                          fontSize: 10.5,
+                          height: 1.08,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (detail.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Text(
+                    '($detail)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurface.withOpacity(0.58),
+                      fontSize: 8.5,
+                      height: 1.05,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1559,56 +2025,126 @@ class _HomeInfoItem extends StatelessWidget {
     required this.label,
     required this.value,
     required this.accent,
+    this.actionLabel,
+    this.onAction,
+    this.onInfoTap,
+    this.loading = false,
+    this.valueLines = 2,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color accent;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final VoidCallback? onInfoTap;
+  final bool loading;
+  final int valueLines;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.only(top: 1),
-          child: Icon(icon, size: 16, color: accent),
-        ),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.onSurface.withOpacity(0.46),
-                  fontSize: 9,
-                  height: 1,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.onSurface.withOpacity(0.86),
-                  fontSize: 10.5,
-                  height: 1.08,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 18,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(icon, size: 15, color: accent),
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.onSurface.withOpacity(0.46),
+                          fontSize: 9,
+                          height: 1,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (onInfoTap != null)
+                      SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onInfoTap,
+                          child: Icon(
+                            Icons.info_outline_rounded,
+                            size: 11,
+                            color: colors.onSurface.withOpacity(0.45),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 5,
+                  runSpacing: 2,
+                  children: <Widget>[
+                    if (loading)
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                    Text(
+                      value,
+                      maxLines: valueLines,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.onSurface.withOpacity(0.86),
+                        fontSize: 10.5,
+                        height: 1.08,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (actionLabel != null && onAction != null)
+                      InkWell(
+                        onTap: loading ? null : onAction,
+                        borderRadius: BorderRadius.circular(999),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 2,
+                            vertical: 1,
+                          ),
+                          child: Text(
+                            actionLabel!,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: AppColors.info,
+                              fontSize: 10,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1616,15 +2152,11 @@ class _HomeInfoItem extends StatelessWidget {
 class _HomeShortcutSection extends StatelessWidget {
   const _HomeShortcutSection({
     required this.services,
-    required this.currentModeLabel,
-    required this.onModeEdit,
     required this.onTodo,
     required this.onService,
   });
 
   final List<AppService> services;
-  final String currentModeLabel;
-  final VoidCallback onModeEdit;
   final VoidCallback onTodo;
   final ValueChanged<AppService> onService;
 
@@ -1632,13 +2164,6 @@ class _HomeShortcutSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final tiles = <Widget>[
-      _HomeShortcutTile(
-        icon: Icons.view_timeline_rounded,
-        label: 'Day Mode',
-        subtitle: currentModeLabel,
-        tint: const Color(0xFF4F7FE5),
-        onTap: onModeEdit,
-      ),
       _HomeShortcutTile(
         icon: Icons.task_alt_rounded,
         label: 'Todo',
@@ -1652,18 +2177,19 @@ class _HomeShortcutSection extends StatelessWidget {
           tint: colors.primary,
           onTap: () => onService(service),
         ),
-    ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tileWidth = (constraints.maxWidth - 16) / 3;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            for (final tile in tiles) SizedBox(width: tileWidth, child: tile),
-          ],
-        );
-      },
+    ].take(6).toList(growable: false);
+    return SizedBox(
+      height: 50,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: tiles.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) => SizedBox(
+          width: 106,
+          child: tiles[index],
+        ),
+      ),
     );
   }
 }
@@ -1694,8 +2220,8 @@ class _HomeShortcutTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          height: 54,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: BorderRadius.circular(12),
@@ -1711,8 +2237,8 @@ class _HomeShortcutTile extends StatelessWidget {
           child: Row(
             children: <Widget>[
               Container(
-                width: 30,
-                height: 30,
+                width: 28,
+                height: 28,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: tint.withOpacity(0.11),
@@ -1726,7 +2252,7 @@ class _HomeShortcutTile extends StatelessWidget {
                       )
                     : Icon(icon, size: 17, color: tint),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1738,7 +2264,7 @@ class _HomeShortcutTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.onSurface.withOpacity(0.88),
-                        fontSize: 11,
+                        fontSize: 10.5,
                         height: 1.05,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1812,7 +2338,7 @@ class _DidYouKnowTodayCard extends StatelessWidget {
                   children: <Widget>[
                     Expanded(
                       child: Text(
-                        'Did you know today',
+                        'Did you know today?',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1847,9 +2373,13 @@ class _DidYouKnowTodayCard extends StatelessWidget {
 }
 
 class _DayCardClockToggle extends StatefulWidget {
-  const _DayCardClockToggle({required this.minutes});
+  const _DayCardClockToggle({
+    required this.minutes,
+    required this.dateLabel,
+  });
 
   final int minutes;
+  final String dateLabel;
 
   @override
   State<_DayCardClockToggle> createState() => _DayCardClockToggleState();
@@ -1869,91 +2399,115 @@ class _DayCardClockToggleState extends State<_DayCardClockToggle> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Semantics(
-      button: true,
-      label: 'Toggle clock display',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => setState(() => _showDigital = !_showDigital),
-          borderRadius: BorderRadius.circular(14),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            height: 84,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _showDigital = !_showDigital),
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          height: 84,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: _showDigital
+                ? const Color(0xFF1F2937)
+                : colors.surfaceContainerHighest.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
               color: _showDigital
-                  ? const Color(0xFF1F2937)
-                  : colors.surfaceContainerHighest.withOpacity(0.45),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: _showDigital
-                    ? const Color(0xFF8FB8FF).withOpacity(0.42)
-                    : colors.outline.withOpacity(0.22),
-              ),
-              boxShadow: _showDigital
-                  ? <BoxShadow>[
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 12,
-                        offset: const Offset(0, 5),
-                      ),
-                    ]
-                  : null,
+                  ? const Color(0xFF8FB8FF).withOpacity(0.42)
+                  : colors.outline.withOpacity(0.22),
             ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: _showDigital
-                  ? FittedBox(
-                      key: const ValueKey<String>('digital'),
-                      fit: BoxFit.scaleDown,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.12),
-                          ),
-                        ),
-                        child: Text(
-                          _digitalLabel(),
-                          maxLines: 1,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            height: 1,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.4,
-                            color: Color(0xFFEAF2FF),
-                          ),
-                        ),
-                      ),
-                    )
-                  : CustomPaint(
-                      key: const ValueKey<String>('analog'),
-                      size: const Size.square(56),
-                      painter: _MiniAnalogClockPainter(
-                        minutes: widget.minutes,
-                        faceColor: colors.surface,
-                        tickColor: colors.onSurface.withOpacity(0.42),
-                        hourColor: colors.onSurface.withOpacity(0.82),
-                        minuteColor: colors.primary,
-                        accentColor: AppColors.primary,
-                        shadowColor: Colors.black.withOpacity(0.08),
-                      ),
+            boxShadow: _showDigital
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     ),
+                  ]
+                : null,
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: Column(
+              key: ValueKey<String>(_showDigital ? 'digital' : 'analog'),
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  child: Center(
+                    child: _showDigital
+                        ? FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.12),
+                                ),
+                              ),
+                              child: Text(
+                                _digitalLabel(),
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                  color: Color(0xFFEAF2FF),
+                                ),
+                              ),
+                            ),
+                          )
+                        : CustomPaint(
+                            size: const Size.square(48),
+                            painter: _MiniAnalogClockPainter(
+                              minutes: widget.minutes,
+                              faceColor: colors.surface,
+                              tickColor: colors.onSurface.withOpacity(0.42),
+                              hourColor: colors.onSurface.withOpacity(0.82),
+                              minuteColor: colors.primary,
+                              accentColor: AppColors.primary,
+                              shadowColor: Colors.black.withOpacity(0.08),
+                            ),
+                          ),
+                  ),
+                ),
+                Text(
+                  _shortDate(widget.dateLabel),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    height: 1,
+                    fontWeight: FontWeight.w600,
+                    color: (_showDigital ? Colors.white : colors.onSurface)
+                        .withOpacity(0.54),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  String _shortDate(String label) {
+    final parts = label.split(',');
+    if (parts.length < 2) return label;
+    final date = parts[1].trim().split(' ');
+    if (date.length < 2) return parts[1].trim();
+    return '${date[0]} ${date[1]}';
   }
 }
 
@@ -1987,64 +2541,58 @@ class _MiniAnalogClockPainter extends CustomPainter {
       faceRadius,
       Paint()..color = shadowColor,
     );
-    canvas.drawCircle(center, faceRadius, Paint()..color = faceColor);
+    canvas.drawCircle(
+      center,
+      faceRadius,
+      Paint()..color = faceColor,
+    );
     canvas.drawCircle(
       center,
       faceRadius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = accentColor.withOpacity(0.22),
+        ..strokeWidth = 1.2
+        ..color = tickColor.withOpacity(0.3),
     );
 
     for (var i = 0; i < 12; i++) {
-      final angle = (i * math.pi / 6) - math.pi / 2;
-      final outer = Offset(
-        center.dx + math.cos(angle) * (faceRadius - 4),
-        center.dy + math.sin(angle) * (faceRadius - 4),
-      );
-      final inner = Offset(
-        center.dx + math.cos(angle) * (faceRadius - (i % 3 == 0 ? 10 : 7)),
-        center.dy + math.sin(angle) * (faceRadius - (i % 3 == 0 ? 10 : 7)),
-      );
+      final angle = (i / 12) * 2 * math.pi - math.pi / 2;
+      final tickStart =
+          center + Offset(math.cos(angle), math.sin(angle)) * (faceRadius - 5);
+      final tickEnd = center +
+          Offset(math.cos(angle), math.sin(angle)) * (faceRadius - 2.4);
       canvas.drawLine(
-        inner,
-        outer,
+        tickStart,
+        tickEnd,
         Paint()
-          ..color = tickColor
-          ..strokeWidth = i % 3 == 0 ? 1.6 : 1
-          ..strokeCap = StrokeCap.round,
+          ..strokeWidth = i % 3 == 0 ? 1.35 : 0.8
+          ..strokeCap = StrokeCap.round
+          ..color = tickColor.withOpacity(i % 3 == 0 ? 0.68 : 0.36),
       );
     }
 
     final hour = (minutes ~/ 60) % 12;
     final minute = minutes % 60;
-    final hourAngle = ((hour + minute / 60) * math.pi / 6) - math.pi / 2;
-    final minuteAngle = (minute * math.pi / 30) - math.pi / 2;
+    final hourAngle = ((hour + minute / 60) / 12) * 2 * math.pi - math.pi / 2;
+    final minuteAngle = (minute / 60) * 2 * math.pi - math.pi / 2;
 
     canvas.drawLine(
       center,
-      Offset(
-        center.dx + math.cos(hourAngle) * (faceRadius * 0.42),
-        center.dy + math.sin(hourAngle) * (faceRadius * 0.42),
-      ),
+      center + Offset(math.cos(hourAngle), math.sin(hourAngle)) * 13,
       Paint()
-        ..color = hourColor
-        ..strokeWidth = 3.2
-        ..strokeCap = StrokeCap.round,
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round
+        ..color = hourColor,
     );
     canvas.drawLine(
       center,
-      Offset(
-        center.dx + math.cos(minuteAngle) * (faceRadius * 0.66),
-        center.dy + math.sin(minuteAngle) * (faceRadius * 0.66),
-      ),
+      center + Offset(math.cos(minuteAngle), math.sin(minuteAngle)) * 18,
       Paint()
-        ..color = minuteColor
-        ..strokeWidth = 2.2
-        ..strokeCap = StrokeCap.round,
+        ..strokeWidth = 1.7
+        ..strokeCap = StrokeCap.round
+        ..color = minuteColor,
     );
-    canvas.drawCircle(center, 3.2, Paint()..color = accentColor);
+    canvas.drawCircle(center, 2.6, Paint()..color = accentColor);
   }
 
   @override
@@ -2832,8 +3380,8 @@ class _HomeSurfaceCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: dark
-            ? colors.surface.withOpacity(0.72)
-            : colors.surface.withOpacity(0.58),
+            ? colors.surfaceContainerHighest.withOpacity(0.34)
+            : const Color(0xFFF6F9FC),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: colors.outline.withOpacity(dark ? 0.22 : 0.18),
@@ -3060,47 +3608,16 @@ Path _buildTubePath(Size size) {
     ..lineTo(startX, bottomY);
 }
 
-Path _buildDoneLanePath(Size size) {
-  final sourcePath = _buildTubePath(size);
-  final metric = sourcePath.computeMetrics().first;
-  const laneOffset = _DayTubePainter._tubeWidth * 0.42;
-  const sampleCount = 90;
-
-  final lane = Path();
-  for (var i = 0; i <= sampleCount; i++) {
-    final offset = metric.length * i / sampleCount;
-    final tangent = metric.getTangentForOffset(offset);
-    if (tangent == null) continue;
-    final normal = Offset(tangent.vector.dy, -tangent.vector.dx);
-    final p = tangent.position + normal * laneOffset;
-    if (i == 0) {
-      lane.moveTo(p.dx, p.dy);
-    } else {
-      lane.lineTo(p.dx, p.dy);
-    }
-  }
-  return lane;
-}
-
-class _TubeDoneSegment {
-  const _TubeDoneSegment({required this.start, required this.end});
-
-  final double start;
-  final double end;
-}
-
 class _DayTube extends StatefulWidget {
   const _DayTube({
     required this.nowMinutes,
     required this.wakeMinutes,
     required this.sleepMinutes,
-    required this.sessionLogs,
   });
 
   final double nowMinutes;
   final int wakeMinutes;
   final int sleepMinutes;
-  final List<PlannerSessionLog> sessionLogs;
 
   @override
   State<_DayTube> createState() => _DayTubeState();
@@ -3159,49 +3676,6 @@ class _DayTubeState extends State<_DayTube>
         sleepMinutes: widget.sleepMinutes,
       );
 
-  List<_TubeDoneSegment> get _doneSegments {
-    final wake = widget.wakeMinutes;
-    var dayEnd = widget.sleepMinutes;
-    if (dayEnd <= wake) dayEnd += kDayMinutes;
-    final total = dayEnd - wake;
-    if (total <= 0) return const <_TubeDoneSegment>[];
-
-    final segments = <_TubeDoneSegment>[];
-    for (final log in widget.sessionLogs) {
-      if (!log.isDone) continue;
-
-      if (log.sessionId == 'sleep') {
-        segments.add(const _TubeDoneSegment(start: 0.965, end: 1.0));
-        continue;
-      }
-
-      var start = log.startMinutes;
-      var end = log.endMinutes;
-      while (start < wake) {
-        start += kDayMinutes;
-      }
-      while (end <= start) {
-        end += kDayMinutes;
-      }
-
-      final clippedStart = start.clamp(wake, dayEnd);
-      final clippedEnd = end.clamp(wake, dayEnd);
-      if (clippedEnd <= clippedStart) continue;
-
-      var startT = (clippedStart - wake) / total;
-      var endT = (clippedEnd - wake) / total;
-      if (log.sessionId == 'wake') {
-        startT = 0;
-        endT = math.max(endT, 0.035);
-      }
-      segments.add(_TubeDoneSegment(
-        start: startT.clamp(0.0, 1.0),
-        end: endT.clamp(0.0, 1.0),
-      ));
-    }
-    return segments;
-  }
-
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
@@ -3234,7 +3708,6 @@ class _DayTubeState extends State<_DayTube>
                       flowPhase: _flow.value,
                       wakeMinutes: widget.wakeMinutes,
                       sleepMinutes: widget.sleepMinutes,
-                      doneSegments: _doneSegments,
                     ),
                   ),
                 ),
@@ -3341,14 +3814,12 @@ class _DayTubePainter extends CustomPainter {
     required this.flowPhase,
     required this.wakeMinutes,
     required this.sleepMinutes,
-    required this.doneSegments,
   });
 
   final double progress;
   final double flowPhase;
   final int wakeMinutes;
   final int sleepMinutes;
-  final List<_TubeDoneSegment> doneSegments;
 
   static const double _tubeWidth = 32;
 
@@ -3436,33 +3907,6 @@ class _DayTubePainter extends CustomPainter {
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
-    }
-
-    // Completed-card marker: a light-blue trace just outside the tube. It
-    // follows the same curve and marks Today Plan card time ranges.
-    final doneLane = _buildDoneLanePath(size);
-    final doneMetric = doneLane.computeMetrics().first;
-    final doneLaneTrack = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..color = const Color(0xFF90CAF9).withOpacity(0.22);
-    canvas.drawPath(doneLane, doneLaneTrack);
-
-    final donePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..color = AppColors.info.withOpacity(0.96);
-
-    for (final segment in doneSegments) {
-      final start =
-          (doneMetric.length * segment.start).clamp(0.0, doneMetric.length);
-      final end = (doneMetric.length * segment.end)
-          .clamp(start + 0.1, doneMetric.length);
-      canvas.drawPath(doneMetric.extractPath(start, end), donePaint);
     }
 
     // ── Timeline markers inside the tube — cute capsule labels ─────────
@@ -3640,8 +4084,7 @@ class _DayTubePainter extends CustomPainter {
       oldDelegate.progress != progress ||
       oldDelegate.flowPhase != flowPhase ||
       oldDelegate.wakeMinutes != wakeMinutes ||
-      oldDelegate.sleepMinutes != sleepMinutes ||
-      oldDelegate.doneSegments != doneSegments;
+      oldDelegate.sleepMinutes != sleepMinutes;
 }
 
 /// A small square box anchored at [left],[top] that sits at the tube's

@@ -30,6 +30,8 @@ class NewsArticleCard extends StatelessWidget {
             ArticleHeroImage(
               imageUrl: article.imageUrl,
               imageTag: article.imageTag,
+              searchText:
+                  '${article.title} ${article.summary} ${article.category}',
               height: AppSpacing.newsImageHeight,
             ),
             Padding(

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../services/remote_sync.dart';
 
 // ─── Storage contract ────────────────────────────────────────────────────────
 // All user profile fields are persisted to SharedPreferences under the
@@ -80,6 +83,7 @@ class ProfileStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_nameKey, trimmed);
     name.value = trimmed;
+    _syncProfile();
   }
 
   Future<void> setAge(int value) async {
@@ -94,6 +98,7 @@ class ProfileStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_modeKey, normalized);
     plannerMode.value = normalized;
+    _syncProfile();
   }
 
   Future<void> completeOnboarding({
@@ -113,6 +118,18 @@ class ProfileStore {
     age.value = userAge;
     plannerMode.value = normalized;
     onboardingComplete.value = true;
+    _syncProfile();
+  }
+
+  void _syncProfile() {
+    unawaited(
+      RemoteSync.instance.upsertProfile(
+        userId: userId.value,
+        name: name.value,
+        plannerMode: plannerMode.value,
+        photoUrl: null,
+      ),
+    );
   }
 
   String _normalizePlannerMode(String modeId) {

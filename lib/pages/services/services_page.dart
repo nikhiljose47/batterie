@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../compare/compare_page.dart';
+import '../dashboard/dashboard_page.dart';
 import 'data/service_catalog.dart';
 import 'service_detail_page.dart';
 import 'tools/api_pages.dart';
@@ -119,10 +120,7 @@ class _ServicesPageState extends State<ServicesPage> {
     if (autoId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        final match = serviceCatalog.firstWhere(
-          (s) => s.id == autoId,
-          orElse: () => serviceCatalog.first,
-        );
+        final match = serviceById(autoId) ?? serviceCatalog.first;
         await _openService(match);
         if (widget.closeOnAutoOpenReturn && mounted) {
           Navigator.of(context).pop();
@@ -153,8 +151,7 @@ class _ServicesPageState extends State<ServicesPage> {
     if (ids == null || ids.isEmpty) return serviceCatalog;
     return <AppService>[
       for (final id in ids)
-        for (final service in serviceCatalog)
-          if (service.id == id) service,
+        if (serviceById(id) case final service?) service,
     ];
   }
 
@@ -233,6 +230,10 @@ class _ServicesPageState extends State<ServicesPage> {
       'todo' => TaskToolPage(
           config: todoConfig,
           initialDueMinutes: widget.initialTodoMinutes,
+        ),
+      'you' => Scaffold(
+          appBar: AppBar(title: const Text('You')),
+          body: const DashboardPage(),
         ),
       'daily_planner' => const DailyPlannerPage(),
       'day_mode' => const ComparePage(),
@@ -682,15 +683,33 @@ class _ServiceTile extends StatelessWidget {
                       Text(service.emoji, style: const TextStyle(fontSize: 15)),
                 ),
                 const Spacer(),
-                Text(
-                  service.category.label.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 7.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                    color: accent.withOpacity(0.8),
+                if (service.contributesToScore)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      '+ eScore',
+                      style: TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.info,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    service.category.label.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      color: accent.withOpacity(0.8),
+                    ),
                   ),
-                ),
               ],
             ),
             const Spacer(),

@@ -193,7 +193,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
             valueLabel: '${_weightKg.round()} kg',
             value: _weightKg,
             min: 30,
-            max: 160,
+            max: 220,
             onChanged: (v) {
               setState(() => _weightKg = v);
               _saveMetrics();
@@ -276,7 +276,7 @@ class _SliderCard extends StatelessWidget {
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
             ),
             child: Slider(
-              value: value,
+              value: value.clamp(min, max).toDouble(),
               min: min,
               max: max,
               activeColor: AppColors.primary,

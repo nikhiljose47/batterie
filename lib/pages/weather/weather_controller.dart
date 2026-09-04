@@ -49,6 +49,7 @@ class WeatherController extends ChangeNotifier {
       : _repository = repository ?? WeatherRepository();
 
   final WeatherRepository _repository;
+  bool _busy = false;
 
   WeatherState _state = const WeatherState();
   WeatherState get state => _state;
@@ -96,13 +97,21 @@ class WeatherController extends ChangeNotifier {
   /// Called when the user taps the location chip while permission is denied.
   /// Shows the OS dialog first; only fetches if permission is granted.
   Future<void> requestPermissionAndLoad() async {
+    if (_busy) return;
+    _busy = true;
     _emit(_state.copyWith(status: WeatherStatus.loading, clearError: true));
     try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        await Geolocator.openLocationSettings();
+        _emit(_state.copyWith(status: WeatherStatus.serviceDisabled));
+        return;
+      }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever) {
+        await Geolocator.openAppSettings();
         _emit(_state.copyWith(status: WeatherStatus.permissionDeniedForever));
         return;
       }
@@ -112,10 +121,9 @@ class WeatherController extends ChangeNotifier {
       }
       await _fetch();
     } catch (e) {
-      _emit(_state.copyWith(
-        status: WeatherStatus.error,
-        errorMessage: e.toString(),
-      ));
+      await _fetch();
+    } finally {
+      _busy = false;
     }
   }
 

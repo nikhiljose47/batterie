@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
+import '../../../services/service_energy_logger.dart';
+import '../../../shared/widgets/service_energy_score_app_bar.dart';
 import 'toolkit.dart';
 
 /// Breathing Exercises — an animated breathe-along circle.
@@ -34,6 +36,7 @@ class _BreathingPageState extends State<BreathingPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   int _patternIndex = 0;
+  int _scoreRefreshToken = 0;
   bool _running = false;
 
   _Pattern get _pattern => _patterns[_patternIndex];
@@ -53,14 +56,22 @@ class _BreathingPageState extends State<BreathingPage>
     super.dispose();
   }
 
-  void _toggle() {
+  Future<void> _toggle() async {
+    final wasRunning = _running;
     setState(() => _running = !_running);
-    if (_running) {
+    if (!wasRunning) {
       _controller.duration = Duration(seconds: _pattern.total);
       _controller.repeat();
     } else {
       _controller.stop();
       _controller.reset();
+      await ServiceEnergyLogger.instance.addServiceLog(
+        sourceId: 'breathing',
+        activityId: 'slow_breathing_exercise',
+        at: DateTime.now(),
+        durationMinutes: 5,
+      );
+      if (mounted) setState(() => _scoreRefreshToken++);
     }
   }
 
@@ -84,7 +95,10 @@ class _BreathingPageState extends State<BreathingPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: svcAppBar('🌬️ Breathing'),
+      appBar: ServiceEnergyScoreAppBar(
+        title: '🌬️ Deep Breath',
+        refreshToken: _scoreRefreshToken,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.large),
         children: <Widget>[

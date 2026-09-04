@@ -79,7 +79,7 @@ class LocationService {
     }
   }
 
-  /// Returns a friendly label like "Bangalore, IN" for a lat/lon pair.
+  /// Returns a friendly label like "Marathahalli, IN" for a lat/lon pair.
   /// Uses the Nominatim free reverse geocoding API. Throws on any failure —
   /// callers should swallow the error and treat place name as optional.
   Future<String?> reverseGeocode(UserLocation location) async {
@@ -88,7 +88,7 @@ class LocationService {
       'lat': location.latitude.toString(),
       'lon': location.longitude.toString(),
       'format': 'json',
-      'zoom': '10', // city-level resolution
+      'zoom': '16', // neighbourhood-level resolution
       'addressdetails': '1',
     });
 
@@ -103,14 +103,18 @@ class LocationService {
     final address = data['address'] as Map<String, dynamic>?;
     if (address == null) return null;
 
-    final city = (address['city'] ??
+    final place = (address['suburb'] ??
+        address['neighbourhood'] ??
+        address['quarter'] ??
+        address['city_district'] ??
+        address['city'] ??
         address['town'] ??
         address['village'] ??
         address['county']) as String?;
     final country = address['country_code'] as String?;
 
-    if (city == null) return null;
-    if (country == null) return city;
-    return '$city, ${country.toUpperCase()}';
+    if (place == null) return null;
+    if (country == null) return place;
+    return '$place, ${country.toUpperCase()}';
   }
 }

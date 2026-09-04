@@ -33,7 +33,7 @@ class ArticleConstants {
   static const String stressTag = 'Stress';
   static const String habitsTag = 'Habits';
   static const String planningTag = 'Planning';
-  static const String defaultImageTag = 'energy';
+  static const String defaultImageTag = 'hydration';
   static const int recentArticleWindowDays = 2;
   static const int preloadArticleCount = 4;
   static const double webImageCacheScale = 0.5;
@@ -61,34 +61,45 @@ class ArticleConstants {
     'water': AppImages.hydration,
   };
 
-  // Local fallback images. Put the image file in assets/articles/, register
-  // assets/articles/ in pubspec.yaml, then map the API imageTag to that file.
+  // Local fallback images. Put new image files in assets/articles/.
+  // The article image widget also checks article words against file names, so
+  // names like "sleep-rest.jpg" can match articles about sleep or rest.
+  // Keep exact tag mappings here only when you want to force a specific image.
   // Example API values:
   //   "imageUrl": ""            -> app uses localImageByTag[imageTag]
   //   "imageTag": "deep_work"   -> assets/articles/deep_work.svg
   // If imageUrl is a valid https URL, that remote image is shown first.
   // If the URL is missing or fails, this local tag image is used.
   static const Map<String, String> localImageByTag = <String, String>{
-    'recovery': 'assets/articles/recovery.svg',
-    'sleep': 'assets/articles/sleep.svg',
-    'focus': 'assets/articles/focus.svg',
-    'hydration': 'assets/articles/hydration.svg',
-    'nutrition': 'assets/articles/nutrition.svg',
-    'movement': 'assets/articles/movement.svg',
-    'stress': 'assets/articles/stress.svg',
-    'habits': 'assets/articles/habits.svg',
-    'planning': 'assets/articles/planning.svg',
-    'energy': 'assets/articles/energy.svg',
-    'morning': 'assets/articles/morning.svg',
-    'evening': 'assets/articles/evening.svg',
-    'breathing': 'assets/articles/breathing.svg',
-    'walk': 'assets/articles/walk.svg',
+    'recovery': 'assets/articles/breathing-and-workout.jpg',
+    'fitness': 'assets/articles/breathing-and-workout.jpg',
+    'sleep': 'assets/articles/sleep-rest.jpg',
+    'morning_light': 'assets/articles/sleep-rest.jpg',
+    'screen_time': 'assets/articles/sleep-rest.jpg',
+    'focus': 'assets/articles/stress.jpg',
+    'hydration': 'assets/articles/hydration.jpg',
+    'nutrition': 'assets/articles/fruit-breakfast-bowl.jpg',
+    'healthy_meal': 'assets/articles/fruit-breakfast-bowl.jpg',
+    'protein': 'assets/articles/fruit-breakfast-bowl.jpg',
+    'movement': 'assets/articles/breathing-and-workout.jpg',
+    'movement_break': 'assets/articles/breathing-and-workout.jpg',
+    'walking': 'assets/articles/breathing-and-workout.jpg',
+    'stress': 'assets/articles/stress.jpg',
+    'wellbeing': 'assets/articles/stress.jpg',
+    'relaxation': 'assets/articles/stress.jpg',
+    'habits': 'assets/articles/water.svg',
+    'planning': 'assets/articles/water.svg',
+    'energy': 'assets/articles/hydration.jpg',
+    'morning': 'assets/articles/sleep-rest.jpg',
+    'evening': 'assets/articles/sleep-rest.jpg',
+    'breathing': 'assets/articles/breathing-and-workout.jpg',
+    'walk': 'assets/articles/breathing-and-workout.jpg',
     'water': 'assets/articles/water.svg',
-    'meal': 'assets/articles/meal.svg',
-    'deep_work': 'assets/articles/deep_work.svg',
-    'rest': 'assets/articles/rest.svg',
-    'calendar': 'assets/articles/calendar.svg',
-    'mind': 'assets/articles/mind.svg',
+    'meal': 'assets/articles/fruit-breakfast-bowl.jpg',
+    'deep_work': 'assets/articles/stress.jpg',
+    'rest': 'assets/articles/sleep-rest.jpg',
+    'calendar': 'assets/articles/water.svg',
+    'mind': 'assets/articles/stress.jpg',
   };
 
   static String assetForTag(String tag) {

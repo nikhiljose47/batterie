@@ -5,6 +5,11 @@ class PersonStatus {
     required this.energyPercent,
     required this.brainPercent,
     required this.note,
+    this.scorePercent,
+    this.goalDoneCount,
+    this.goalTotalCount,
+    this.appUseMinutes,
+    this.focusMinutes,
   });
 
   final String name;
@@ -12,4 +17,9 @@ class PersonStatus {
   final double energyPercent;
   final double brainPercent;
   final String note;
+  final int? scorePercent;
+  final int? goalDoneCount;
+  final int? goalTotalCount;
+  final int? appUseMinutes;
+  final int? focusMinutes;
 }

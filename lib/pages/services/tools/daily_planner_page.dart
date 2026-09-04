@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
+import '../../../constants/goal_plan_constants.dart';
 import '../../../services/custom_mode_store.dart';
 import '../../../services/sleep_schedule_store.dart';
 import '../../home_tab/data/mode_advice.dart'
-    show allDayModes, adviceForMode, plannerSlots, timeOfDayLabel;
+    show allDayModes, adviceForMode, dayPhases, plannerSlots, timeOfDayLabel;
 import '../../profile/profile_store.dart';
 import 'toolkit.dart';
 
 class DailyPlannerPage extends StatefulWidget {
-  const DailyPlannerPage({super.key});
+  const DailyPlannerPage({super.key, this.embedded = false, this.onSaved});
+
+  final bool embedded;
+  final VoidCallback? onSaved;
 
   @override
   State<DailyPlannerPage> createState() => _DailyPlannerPageState();
@@ -25,6 +29,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
   late final TextEditingController _detailCtl;
 
   late List<CustomSlot> _draftSlots;
+  late String _tag;
   int _step = 0;
   bool _saving = false;
 
@@ -33,6 +38,12 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
   bool get _isScheduleStep => _step == 0;
   bool get _isSaveStep => _step == _saveStep;
   int get _slotIndex => (_step - 1).clamp(0, _slotCount - 1);
+  String get _phaseTitle {
+    final phases = dayPhases;
+    if (_slotIndex >= phases.length) return 'Day card';
+    final phase = phases[_slotIndex];
+    return '${phase.label} · ${phase.slot.rangeLabel}';
+  }
 
   @override
   void initState() {
@@ -41,6 +52,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
     _headlineCtl = TextEditingController();
     _detailCtl = TextEditingController();
     _draftSlots = _seedSlots();
+    _tag = _initialPlanTag();
     _syncSlotControllers();
     SleepScheduleStore.instance.wakeTime.addListener(_onScheduleChanged);
     SleepScheduleStore.instance.sleepTime.addListener(_onScheduleChanged);
@@ -66,6 +78,14 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
       orElse: () => allDayModes.first,
     );
     return '${mode.shortLabel} plan';
+  }
+
+  String _initialPlanTag() {
+    final modeId = ProfileStore.instance.plannerMode.value;
+    if (CustomModeStore.isCustomModeId(modeId)) {
+      return CustomModeStore.instance.planForModeId(modeId).tag;
+    }
+    return GoalPlanConstants.defaultTag;
   }
 
   List<CustomSlot> _seedSlots() {
@@ -210,24 +230,39 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
     setState(() => _saving = true);
     final name =
         _nameCtl.text.trim().isEmpty ? 'My Plan' : _nameCtl.text.trim();
+    final currentModeId = ProfileStore.instance.plannerMode.value;
+    final currentPlanId =
+        CustomModeStore.isCustomModeId(currentModeId) ? currentModeId : null;
+    if (CustomModeStore.instance.hasPlanNamed(name, exceptId: currentPlanId)) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A plan with this name already exists')),
+      );
+      return;
+    }
     final base = await _targetPlan();
     final plan = base.copyWith(
       name: name,
       slots: CustomModeStore.normalizeSlots(_draftSlots),
+      tag: _tag,
     );
     await CustomModeStore.instance.savePlan(plan);
     await ProfileStore.instance.setPlannerMode(plan.id);
     if (!mounted) return;
     setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$name saved and set as your day mode')),
-    );
-    Navigator.of(context).pop(true);
+    if (!widget.embedded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$name saved and set as your day mode')),
+      );
+      Navigator.of(context).pop(true);
+    } else {
+      widget.onSaved?.call();
+    }
   }
 
   String _stepTitle() {
     if (_isScheduleStep) return 'Confirm your day times';
-    if (_isSaveStep) return 'Sleep card and save';
+    if (_isSaveStep) return 'Save your goal';
     return 'Card ${_slotIndex + 1} of $_slotCount';
   }
 
@@ -236,7 +271,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
       return 'First, make sure your wake-up and sleep time are right.';
     }
     if (_isSaveStep) {
-      return 'Your sleep card starts at ${timeOfDayLabel(SleepScheduleStore.instance.sleepTime.value)}. Name the plan and save it.';
+      return 'Name the full plan and set it as your current goal.';
     }
     return plannerSlots[_slotIndex].rangeLabel;
   }
@@ -245,96 +280,103 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final progress = (_step + 1) / (_saveStep + 1);
-    return Scaffold(
-      appBar: svcAppBar('Change Mode'),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              _GuideHeader(
-                title: _stepTitle(),
-                subtitle: _stepSubtitle(),
-                progress: progress,
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: _isScheduleStep
-                      ? _ScheduleStepCard(
-                          key: const ValueKey<String>('schedule'),
-                          onWake: _pickWakeTime,
-                          onSleep: _pickSleepTime,
+    final content = Padding(
+      padding: EdgeInsets.fromLTRB(14, widget.embedded ? 0 : 12, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _GuideHeader(
+            title: _stepTitle(),
+            subtitle: _stepSubtitle(),
+            progress: progress,
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _isScheduleStep
+                  ? _ScheduleStepCard(
+                      key: const ValueKey<String>('schedule'),
+                      nameController: _nameCtl,
+                      nameLimit: _nameLimit,
+                      onWake: _pickWakeTime,
+                      onSleep: _pickSleepTime,
+                    )
+                  : _isSaveStep
+                      ? _SaveStepCard(
+                          key: const ValueKey<String>('save'),
+                          controller: _nameCtl,
+                          nameLimit: _nameLimit,
+                          tag: _tag,
+                          onTagChanged: (value) => setState(() {
+                            _tag = GoalPlanConstants.normalizeTag(value);
+                          }),
                         )
-                      : _isSaveStep
-                          ? _SaveStepCard(
-                              key: const ValueKey<String>('save'),
-                              controller: _nameCtl,
-                              nameLimit: _nameLimit,
-                            )
-                          : _TimeCardStep(
-                              key: ValueKey<int>(_slotIndex),
-                              slotLabel: plannerSlots[_slotIndex].rangeLabel,
-                              headlineController: _headlineCtl,
-                              detailController: _detailCtl,
-                              headlineLimit: _headlineLimit,
-                              detailLimit: _detailLimit,
-                            ),
+                      : _TimeCardStep(
+                          key: ValueKey<int>(_slotIndex),
+                          slotLabel: _phaseTitle,
+                          headlineController: _headlineCtl,
+                          detailController: _detailCtl,
+                          headlineLimit: _headlineLimit,
+                          detailLimit: _detailLimit,
+                        ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _goBack,
+                  icon: Icon(
+                    _step == 0
+                        ? Icons.close_rounded
+                        : Icons.chevron_left_rounded,
+                  ),
+                  label: Text(_step == 0 ? 'Cancel' : 'Back'),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _saving ? null : _goBack,
-                      icon: Icon(
-                        _step == 0
-                            ? Icons.close_rounded
-                            : Icons.chevron_left_rounded,
-                      ),
-                      label: Text(_step == 0 ? 'Cancel' : 'Back'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: _saving ? null : _goNext,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(_isSaveStep
-                              ? Icons.check_circle_rounded
-                              : Icons.chevron_right_rounded),
-                      label: Text(_isSaveStep
-                          ? (_saving ? 'Saving...' : 'Save plan')
-                          : 'Continue'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Step ${_step + 1} of ${_saveStep + 1}',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: colors.onSurface.withOpacity(0.46),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: _saving ? null : _goNext,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(_isSaveStep
+                          ? Icons.check_circle_rounded
+                          : Icons.chevron_right_rounded),
+                  label: Text(_isSaveStep
+                      ? (_saving ? 'Saving...' : 'Save plan')
+                      : 'Continue'),
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            'Step ${_step + 1} of ${_saveStep + 1}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: colors.onSurface.withOpacity(0.46),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
+    );
+    if (widget.embedded) return content;
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: svcAppBar('Change Mode'),
+      body: SafeArea(child: content),
     );
   }
 }
@@ -432,10 +474,14 @@ class _GuideHeader extends StatelessWidget {
 class _ScheduleStepCard extends StatelessWidget {
   const _ScheduleStepCard({
     super.key,
+    required this.nameController,
+    required this.nameLimit,
     required this.onWake,
     required this.onSleep,
   });
 
+  final TextEditingController nameController;
+  final int nameLimit;
   final VoidCallback onWake;
   final VoidCallback onSleep;
 
@@ -453,11 +499,21 @@ class _ScheduleStepCard extends StatelessWidget {
                 children: <Widget>[
                   const _FriendlyPrompt(
                     icon: Icons.bedtime_rounded,
-                    title: 'Let us frame your day first.',
-                    text:
-                        'These times decide where every card starts and where the sleep card lands.',
+                    title: 'Name and time your goal',
+                    text: '',
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameController,
+                    maxLength: nameLimit,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Goal name',
+                      hintText: 'Exam focus',
+                      counterText: '',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _TimePickRow(
                     icon: Icons.wb_sunny_rounded,
                     label: 'Wake up',
@@ -470,18 +526,6 @@ class _ScheduleStepCard extends StatelessWidget {
                     label: 'Sleep',
                     value: timeOfDayLabel(sleep),
                     onTap: onSleep,
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Looks right? Continue and I will guide you through each card one by one.',
-                    style: TextStyle(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.52),
-                      fontSize: 12,
-                      height: 1.25,
-                    ),
                   ),
                 ],
               ),
@@ -517,9 +561,8 @@ class _TimeCardStep extends StatelessWidget {
         children: <Widget>[
           _FriendlyPrompt(
             icon: Icons.edit_note_rounded,
-            title: 'What should this card guide you to do?',
-            text:
-                'Keep it short and useful. This is what you will see on the home calendar.',
+            title: 'Card text',
+            text: '',
             trailing: slotLabel,
           ),
           const SizedBox(height: 16),
@@ -559,10 +602,14 @@ class _SaveStepCard extends StatelessWidget {
     super.key,
     required this.controller,
     required this.nameLimit,
+    required this.tag,
+    required this.onTagChanged,
   });
 
   final TextEditingController controller;
   final int nameLimit;
+  final String tag;
+  final ValueChanged<String> onTagChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -572,9 +619,8 @@ class _SaveStepCard extends StatelessWidget {
         children: <Widget>[
           const _FriendlyPrompt(
             icon: Icons.hotel_rounded,
-            title: 'Last card is sleep.',
-            text:
-                'The sleep card is fixed from your sleep time. Now name this full day plan.',
+            title: 'Save goal',
+            text: '',
           ),
           const SizedBox(height: 16),
           TextField(
@@ -587,27 +633,23 @@ class _SaveStepCard extends StatelessWidget {
               counterText: '',
             ),
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: tag,
+            decoration: const InputDecoration(
+              labelText: 'Plan tag',
+              counterText: '',
             ),
-            child: const Row(
-              children: <Widget>[
-                Icon(Icons.check_circle_outline_rounded,
-                    color: AppColors.primary),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Saving will set this as your current Day Mode.',
-                    style: TextStyle(fontSize: 12, height: 1.25),
-                  ),
+            items: <DropdownMenuItem<String>>[
+              for (final item in GoalPlanConstants.tags)
+                DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(GoalPlanConstants.labelFor(item)),
                 ),
-              ],
-            ),
+            ],
+            onChanged: (value) {
+              if (value != null) onTagChanged(value);
+            },
           ),
         ],
       ),
@@ -695,16 +737,18 @@ class _FriendlyPrompt extends StatelessWidget {
                   ],
                 ],
               ),
-              const SizedBox(height: 5),
-              Text(
-                text,
-                style: TextStyle(
-                  color: colors.onSurface.withOpacity(0.58),
-                  fontSize: 12,
-                  height: 1.22,
-                  fontWeight: FontWeight.w500,
+              if (text.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 5),
+                Text(
+                  text,
+                  style: TextStyle(
+                    color: colors.onSurface.withOpacity(0.58),
+                    fontSize: 12,
+                    height: 1.22,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

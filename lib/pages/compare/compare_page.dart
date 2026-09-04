@@ -4,12 +4,13 @@ import '../../constants/app_colors.dart';
 import '../../models/energy_log_record.dart';
 import '../../models/planner_session_log.dart';
 import '../../services/custom_mode_store.dart';
+import '../../services/daily_progress_sync_service.dart';
 import '../../services/energy_log_store.dart';
 import '../../services/remote_sync.dart';
+import '../../services/shared_goal_plan_service.dart';
 import '../../services/sleep_schedule_store.dart';
 import '../home_tab/data/mode_advice.dart';
 import '../profile/profile_store.dart';
-import '../services/tools/daily_planner_page.dart';
 import '../services/tools/toolkit.dart';
 
 class ComparePage extends StatefulWidget {
@@ -24,6 +25,7 @@ class ComparePage extends StatefulWidget {
 class _ComparePageState extends State<ComparePage> {
   List<PlannerSessionLog> _sessionLogs = const <PlannerSessionLog>[];
   bool _loading = true;
+  int? _usingNowCount;
 
   @override
   void initState() {
@@ -39,11 +41,15 @@ class _ComparePageState extends State<ComparePage> {
   }
 
   void _reloadForMode() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _loadUsingNowCount();
+    }
   }
 
   Future<void> _loadLogs() async {
     setState(() => _loading = true);
+    _loadUsingNowCount();
     try {
       final userId = ProfileStore.instance.userId.value;
       final store = SqliteEnergyLogStore.instance;
@@ -66,41 +72,36 @@ class _ComparePageState extends State<ComparePage> {
     }
   }
 
-  Future<void> _openChangeMode() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const DailyPlannerPage()),
+  Future<void> _loadUsingNowCount() async {
+    final modeId = ProfileStore.instance.plannerMode.value;
+    final selectedMode = allSelectableDayModes.firstWhere(
+      (mode) => mode.id == modeId,
+      orElse: () => allSelectableDayModes.first,
     );
-    if (!mounted) return;
-    await _loadLogs();
-    setState(() {});
-  }
-
-  Future<void> _selectCustomPlan(String id) async {
-    await CustomModeStore.instance.setActivePlan(id);
-    await ProfileStore.instance.setPlannerMode(id);
-    if (!mounted) return;
-    await _loadLogs();
-    setState(() {});
-  }
-
-  Future<void> _selectBuiltInMode(String id) async {
-    await ProfileStore.instance.setPlannerMode(id);
-    if (!mounted) return;
-    await _loadLogs();
-    setState(() {});
-  }
-
-  Future<void> _createCustomPlan() async {
-    final plan = await CustomModeStore.instance.addPlan();
-    if (plan == null) return;
-    await ProfileStore.instance.setPlannerMode(plan.id);
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const DailyPlannerPage()),
-    );
-    if (!mounted) return;
-    await _loadLogs();
-    setState(() {});
+    final currentPlan = CustomModeStore.isCustomModeId(modeId)
+        ? CustomModeStore.instance.planForModeId(modeId)
+        : null;
+    try {
+      final plans = await SharedGoalPlanService.instance.trendingPlans(
+        limit: 50,
+      );
+      SharedGoalPlan? matched;
+      for (final plan in plans) {
+        if (plan.id.endsWith('_$modeId') ||
+            plan.name.trim().toLowerCase() ==
+                selectedMode.label.trim().toLowerCase() ||
+            plan.name.trim().toLowerCase() ==
+                currentPlan?.name.trim().toLowerCase()) {
+          matched = plan;
+          break;
+        }
+      }
+      if (!mounted) return;
+      setState(() => _usingNowCount = matched?.displayUsedCount ?? 0);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _usingNowCount = 0);
+    }
   }
 
   @override
@@ -110,10 +111,11 @@ class _ComparePageState extends State<ComparePage> {
       (mode) => mode.id == modeId,
       orElse: () => allSelectableDayModes.first,
     );
-    final slots = plannerSlotsFor(
+    final phases = dayPhasesFor(
       wakeMinutes: SleepScheduleStore.instance.wakeMinutes,
       sleepMinutes: SleepScheduleStore.instance.sleepMinutes,
     );
+    final slots = phases.map((phase) => phase.slot).toList(growable: false);
     final advice = adviceForMode(modeId);
     final now = DateTime.now();
     final nowMinutes = _adjustedMinuteForToday(
@@ -125,6 +127,7 @@ class _ComparePageState extends State<ComparePage> {
         _CompareRow(
           sessionId: 'slot_$i',
           time: slots[i].rangeLabel,
+          phaseLabel: phases[i].label,
           startMinutes: slots[i].startMinutes,
           endMinutes: slots[i].endMinutes,
           planTitle: advice[i].tip,
@@ -134,7 +137,6 @@ class _ComparePageState extends State<ComparePage> {
           canMark: slots[i].startMinutes <= nowMinutes,
         ),
     ];
-
     final content = Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
@@ -143,16 +145,12 @@ class _ComparePageState extends State<ComparePage> {
         children: <Widget>[
           _DayModeHeader(
             modeLabel: selectedMode.label,
-            loading: _loading,
-            onChange: _openChangeMode,
-            onBuiltInSelected: _selectBuiltInMode,
-            onCustomSelected: _selectCustomPlan,
-            onCreatePlan: _createCustomPlan,
+            usingNowCount: _usingNowCount,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           Expanded(
             child: _JoinedCompareColumns(
-              modeLabel: selectedMode.shortLabel,
+              modeLabel: selectedMode.label,
               rows: rows,
               onStatusChanged: _setSessionStatus,
             ),
@@ -162,7 +160,8 @@ class _ComparePageState extends State<ComparePage> {
     );
     if (widget.embedded) return content;
     return Scaffold(
-      appBar: svcAppBar('Day Mode'),
+      resizeToAvoidBottomInset: false,
+      appBar: svcAppBar('Track Goal'),
       body: content,
     );
   }
@@ -228,6 +227,7 @@ class _ComparePageState extends State<ComparePage> {
     try {
       await SqliteEnergyLogStore.instance.savePlannerSessionLog(log);
       await RemoteSync.instance.upsertPlannerSessionLog(log, userId: userId);
+      await DailyProgressSyncService.instance.syncToday();
     } catch (_) {}
   }
 }
@@ -235,19 +235,11 @@ class _ComparePageState extends State<ComparePage> {
 class _DayModeHeader extends StatelessWidget {
   const _DayModeHeader({
     required this.modeLabel,
-    required this.loading,
-    required this.onChange,
-    required this.onBuiltInSelected,
-    required this.onCustomSelected,
-    required this.onCreatePlan,
+    required this.usingNowCount,
   });
 
   final String modeLabel;
-  final bool loading;
-  final VoidCallback onChange;
-  final ValueChanged<String> onBuiltInSelected;
-  final ValueChanged<String> onCustomSelected;
-  final VoidCallback onCreatePlan;
+  final int? usingNowCount;
 
   @override
   Widget build(BuildContext context) {
@@ -255,101 +247,65 @@ class _DayModeHeader extends StatelessWidget {
     return ValueListenableBuilder<List<CustomPlan>>(
       valueListenable: CustomModeStore.instance.plans,
       builder: (context, plans, _) {
-        final activeMode = ProfileStore.instance.plannerMode.value;
         return Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+          padding: const EdgeInsets.fromLTRB(11, 8, 11, 8),
           decoration: BoxDecoration(
             color: colors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.success.withOpacity(0.18)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.success.withOpacity(0.22)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Container(
-                    width: 34,
-                    height: 34,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.13),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.view_timeline_rounded,
-                      size: 18,
-                      color: AppColors.success,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          'Day mode',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.onSurface.withOpacity(0.5),
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          modeLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (loading)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    FilledButton.tonalIcon(
-                      onPressed: onChange,
-                      icon: const Icon(Icons.tune_rounded, size: 16),
-                      label: const Text('Change'),
-                    ),
-                ],
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(
+                  Icons.flag_rounded,
+                  size: 13,
+                  color: AppColors.success,
+                ),
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: <Widget>[
-                  for (final mode in allDayModes)
-                    ChoiceChip(
-                      selected: activeMode == mode.id,
-                      label: Text(mode.shortLabel),
-                      onSelected: (_) => onBuiltInSelected(mode.id),
-                    ),
-                  for (final plan in plans)
-                    ChoiceChip(
-                      selected: activeMode == plan.id,
-                      label: Text(plan.name),
-                      onSelected: (_) => onCustomSelected(plan.id),
-                    ),
-                  ActionChip(
-                    avatar: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('New plan'),
-                    onPressed: onCreatePlan,
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  modeLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface,
+                    fontSize: 12,
+                    height: 1.05,
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                height: 22,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppColors.success.withOpacity(0.2)),
+                ),
+                child: Text(
+                  usingNowCount == null
+                      ? 'Loading'
+                      : '$usingNowCount using now',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.success,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
@@ -363,6 +319,7 @@ class _CompareRow {
   const _CompareRow({
     required this.sessionId,
     required this.time,
+    required this.phaseLabel,
     required this.startMinutes,
     required this.endMinutes,
     required this.planTitle,
@@ -374,6 +331,7 @@ class _CompareRow {
 
   final String sessionId;
   final String time;
+  final String phaseLabel;
   final int startMinutes;
   final int endMinutes;
   final String planTitle;
@@ -406,136 +364,17 @@ class _JoinedCompareColumns extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.outline.withOpacity(0.24)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                _CompareHeader(modeLabel: modeLabel),
-                Divider(height: 1, color: colors.outline.withOpacity(0.22)),
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
-                    itemCount: rows.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) => _CompareAlignedRow(
-                      row: rows[index],
-                      first: index == 0,
-                      last: index == rows.length - 1,
-                      onStatusChanged: onStatusChanged,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompareHeader extends StatelessWidget {
-  const _CompareHeader({required this.modeLabel});
-
-  final String modeLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: _HeaderCell(
-              title: 'Mode plan',
-              subtitle: modeLabel,
-              icon: Icons.route_rounded,
-              color: AppColors.primary,
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 34,
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            color: colors.outline.withOpacity(0.2),
-          ),
-          const Expanded(
-            child: _HeaderCell(
-              title: 'Your result',
-              subtitle: 'Done / partial / not done',
-              icon: Icons.fact_check_rounded,
-              color: AppColors.success,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderCell extends StatelessWidget {
-  const _HeaderCell({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Row(
-      children: <Widget>[
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 15, color: color),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+        itemCount: rows.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) => _CompareAlignedRow(
+          row: rows[index],
+          first: index == 0,
+          last: index == rows.length - 1,
+          onStatusChanged: onStatusChanged,
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.onSurface,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.onSurface.withOpacity(0.48),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -622,15 +461,12 @@ class _CompareAlignedRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Expanded(
+                    flex: 4,
                     child: _PlanCell(row: row),
                   ),
-                  Container(
-                    width: 1,
-                    height: 86,
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    color: colors.outline.withOpacity(0.18),
-                  ),
+                  const SizedBox(width: 8),
                   Expanded(
+                    flex: 1,
                     child: _UserStatusCell(
                       row: row,
                       statusColor: statusColor,
@@ -660,12 +496,12 @@ class _PlanCell extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          row.time,
+          '${row.phaseLabel} · ${row.time}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: colors.onSurface.withOpacity(0.45),
-            fontSize: 9.5,
+            fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -676,7 +512,7 @@ class _PlanCell extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: colors.onSurface.withOpacity(0.9),
-            fontSize: 11,
+            fontSize: 11.5,
             height: 1.14,
             fontWeight: FontWeight.w700,
           ),
@@ -688,7 +524,7 @@ class _PlanCell extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: colors.onSurface.withOpacity(0.58),
-            fontSize: 9.8,
+            fontSize: 10.2,
             height: 1.16,
             fontWeight: FontWeight.w500,
           ),
@@ -714,71 +550,40 @@ class _UserStatusCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final text = row.userText.isEmpty ? 'No result yet' : row.userText;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Icon(
-              row.done
-                  ? Icons.check_circle_rounded
-                  : row.partial
-                      ? Icons.adjust_rounded
-                      : Icons.radio_button_unchecked_rounded,
-              size: 14,
-              color: statusColor,
-            ),
-            const SizedBox(width: 5),
-            Expanded(
-              child: Text(
-                statusTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
         Text(
-          row.canMark ? text : 'Can mark when this block starts',
-          maxLines: 2,
+          statusTitle,
+          maxLines: 1,
+          textAlign: TextAlign.center,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: colors.onSurface.withOpacity(row.canMark ? 0.58 : 0.38),
-            fontSize: 9.8,
-            height: 1.16,
-            fontWeight: FontWeight.w500,
+            color: statusColor,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 5,
-          runSpacing: 5,
+        const SizedBox(height: 6),
+        Column(
           children: <Widget>[
             _StatusChoiceChip(
-              label: 'Done',
               icon: Icons.check_rounded,
               color: AppColors.success,
               selected: row.status == PlannerSessionStatus.done,
               enabled: row.canMark,
               onTap: () => onStatusChanged(row, PlannerSessionStatus.done),
             ),
+            const SizedBox(height: 5),
             _StatusChoiceChip(
-              label: 'Partial',
               icon: Icons.remove_rounded,
               color: const Color(0xFFE0A224),
               selected: row.status == PlannerSessionStatus.partial,
               enabled: row.canMark,
               onTap: () => onStatusChanged(row, PlannerSessionStatus.partial),
             ),
+            const SizedBox(height: 5),
             _StatusChoiceChip(
-              label: 'Not',
               icon: Icons.close_rounded,
               color: colors.onSurface.withOpacity(0.48),
               selected: row.status == PlannerSessionStatus.notDone,
@@ -794,7 +599,6 @@ class _UserStatusCell extends StatelessWidget {
 
 class _StatusChoiceChip extends StatelessWidget {
   const _StatusChoiceChip({
-    required this.label,
     required this.icon,
     required this.color,
     required this.selected,
@@ -802,7 +606,6 @@ class _StatusChoiceChip extends StatelessWidget {
     required this.onTap,
   });
 
-  final String label;
   final IconData icon;
   final Color color;
   final bool selected;
@@ -816,13 +619,13 @@ class _StatusChoiceChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(999),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 25,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? color.withOpacity(0.13) : colors.surfaceTint,
-            borderRadius: BorderRadius.circular(999),
+            color: selected ? color.withOpacity(0.13) : colors.surface,
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: selected
                   ? color.withOpacity(0.55)
@@ -830,25 +633,12 @@ class _StatusChoiceChip extends StatelessWidget {
             ),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Icon(
                 icon,
-                size: 12,
+                size: 14,
                 color: enabled ? color : colors.onSurface.withOpacity(0.28),
-              ),
-              const SizedBox(width: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  color: enabled
-                      ? selected
-                          ? color
-                          : colors.onSurface.withOpacity(0.58)
-                      : colors.onSurface.withOpacity(0.28),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
               ),
             ],
           ),

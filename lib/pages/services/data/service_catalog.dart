@@ -41,6 +41,7 @@ class AppService {
     required this.category,
     required this.keywords,
     required this.features,
+    this.contributesToScore = false,
   });
 
   /// Stable unique key — used for routing to a real page once built.
@@ -57,6 +58,29 @@ class AppService {
 
   /// "What it will include" — shown on the detail page.
   final List<String> features;
+  final bool contributesToScore;
+}
+
+const AppService todoService = AppService(
+  id: 'todo',
+  emoji: '✅',
+  name: 'Todo',
+  tagline: 'Simple, fast tasks',
+  category: ServiceCategory.productivity,
+  keywords: <String>['todo', 'task', 'list', 'check'],
+  features: <String>[
+    'Tasks with due dates & priority',
+    'Today / upcoming views',
+    'Swipe to complete',
+  ],
+);
+
+AppService? serviceById(String id) {
+  if (id == todoService.id) return todoService;
+  for (final service in serviceCatalog) {
+    if (service.id == id) return service;
+  }
+  return null;
 }
 
 const List<AppService> serviceCatalog = <AppService>[
@@ -99,6 +123,7 @@ const List<AppService> serviceCatalog = <AppService>[
       'Daily goal ring',
       'Hourly nudge reminders',
     ],
+    contributesToScore: true,
   ),
   AppService(
     id: 'symptoms',
@@ -138,6 +163,7 @@ const List<AppService> serviceCatalog = <AppService>[
       'Craving log with triggers',
       'Money & health milestones',
     ],
+    contributesToScore: true,
   ),
   AppService(
     id: 'air_quality',
@@ -233,11 +259,12 @@ const List<AppService> serviceCatalog = <AppService>[
       'Guided audio sessions',
       'Streak & minutes stats',
     ],
+    contributesToScore: true,
   ),
   AppService(
     id: 'breathing',
     emoji: '🌬️',
-    name: 'Breathing Exercises',
+    name: 'Deep Breath',
     tagline: 'Box, 4-7-8, calm-down',
     category: ServiceCategory.mind,
     keywords: <String>['breathing', 'breath', 'box', '478', 'anxiety'],
@@ -246,6 +273,7 @@ const List<AppService> serviceCatalog = <AppService>[
       'Box / 4-7-8 / custom patterns',
       'One-minute panic reset',
     ],
+    contributesToScore: true,
   ),
   AppService(
     id: 'mental_health',
@@ -423,16 +451,16 @@ const List<AppService> serviceCatalog = <AppService>[
 
   // ── PLAN ──────────────────────────────────────────────────────────────
   AppService(
-    id: 'todo',
-    emoji: '✅',
-    name: 'To-Do List',
-    tagline: 'Simple, fast tasks',
+    id: 'you',
+    emoji: '⚡',
+    name: 'You',
+    tagline: 'Your body and brain battery',
     category: ServiceCategory.productivity,
-    keywords: <String>['todo', 'task', 'list', 'check'],
+    keywords: <String>['you', 'battery', 'energy', 'body', 'brain'],
     features: <String>[
-      'Tasks with due dates & priority',
-      'Today / upcoming views',
-      'Swipe to complete',
+      'Body battery level',
+      'Brain battery level',
+      'Energy activity logging',
     ],
   ),
   AppService(
@@ -522,16 +550,25 @@ const List<AppService> serviceCatalog = <AppService>[
   ),
   AppService(
     id: 'focus',
-    emoji: '🎯',
-    name: 'Focus & Reading',
-    tagline: 'Pomodoro + reading log',
+    emoji: '⚡',
+    name: 'Regain',
+    tagline: 'Timer and pomodoro focus',
     category: ServiceCategory.productivity,
-    keywords: <String>['focus', 'pomodoro', 'reading', 'book', 'study'],
-    features: <String>[
-      'Pomodoro timer with breaks',
-      'Reading sessions per book',
-      'Focus minutes per day chart',
+    keywords: <String>[
+      'regain',
+      'focus',
+      'pomodoro',
+      'timer',
+      'reading',
+      'book',
+      'study'
     ],
+    features: <String>[
+      'Quick focus timer',
+      'Pomodoro length presets',
+      'Regain minutes per day',
+    ],
+    contributesToScore: true,
   ),
 
   // ── TRACK ─────────────────────────────────────────────────────────────

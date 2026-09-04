@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
 import '../../../services/service_energy_logger.dart';
+import '../../../shared/widgets/service_energy_score_app_bar.dart';
 import 'toolkit.dart';
 
 /// Daily counter template — one number per day vs a goal.
@@ -60,6 +61,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
   Map<String, dynamic> _days = <String, dynamic>{};
   int _goal = 0;
   bool _loaded = false;
+  int _scoreRefreshToken = 0;
 
   String get _daysKey => 'svc.${widget.config.id}.days';
   String get _goalKey => 'svc.${widget.config.id}.goal';
@@ -97,6 +99,7 @@ class _CounterToolPageState extends State<CounterToolPage> {
         at: DateTime.now(),
         durationMinutes: 5,
       );
+      if (mounted) setState(() => _scoreRefreshToken++);
     }
   }
 
@@ -134,7 +137,10 @@ class _CounterToolPageState extends State<CounterToolPage> {
         : (_goal == 0 ? 0.0 : (_today / _goal).clamp(0.0, 1.0));
 
     return Scaffold(
-      appBar: svcAppBar(c.title),
+      appBar: ServiceEnergyScoreAppBar(
+        title: c.title,
+        refreshToken: _scoreRefreshToken,
+      ),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(

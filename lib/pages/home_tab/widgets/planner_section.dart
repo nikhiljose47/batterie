@@ -10,6 +10,7 @@ import '../../../models/logged_activity.dart';
 import '../../../models/planner_session_log.dart';
 import '../../../models/weather.dart';
 import '../../../services/custom_mode_store.dart';
+import '../../../services/daily_progress_sync_service.dart';
 import '../../../services/energy_log_store.dart';
 import '../../../services/google_calendar_service.dart';
 import '../../../services/remote_sync.dart';
@@ -121,46 +122,33 @@ class PlannerSectionState extends State<PlannerSection> {
 
   int get _currentIndex {
     final now = widget.nowMinutes.floor();
-    return _slots.indexWhere((s) => s.contains(now));
+    final index = _slots.indexWhere((s) => s.contains(now));
+    if (index != -1) return index;
+    if (_slots.isNotEmpty &&
+        isSleepWindowFor(
+          now,
+          wakeMinutes: widget.wakeMinutes,
+          sleepMinutes: widget.sleepMinutes,
+        )) {
+      return _slots.length - 1;
+    }
+    return -1;
   }
 
-  bool get _isWakeCurrent => isWakeWindowFor(
-        widget.nowMinutes,
-        wakeMinutes: widget.wakeMinutes,
-      );
-  bool get _isSleepCurrent => isSleepWindowFor(
-        widget.nowMinutes,
-        wakeMinutes: widget.wakeMinutes,
-        sleepMinutes: widget.sleepMinutes,
-      );
-
-  int get _sleepCardEndMinutes => widget.sleepMinutes > widget.wakeMinutes
-      ? widget.wakeMinutes + kDayMinutes
-      : widget.wakeMinutes;
-
   int get _currentSessionStartMinutes {
-    if (_isWakeCurrent) return widget.wakeMinutes;
-    if (_isSleepCurrent) return widget.sleepMinutes;
     if (_currentIndex != -1) return _slots[_currentIndex].startMinutes;
     return widget.nowMinutes.floor();
   }
 
   int get _currentSessionEndMinutes {
-    if (_isWakeCurrent) return widget.wakeMinutes + kWakeBufferMinutes;
-    if (_isSleepCurrent) return _sleepCardEndMinutes;
     if (_currentIndex != -1) return _slots[_currentIndex].endMinutes;
     return widget.nowMinutes.floor() + 60;
   }
 
   double get _currentCardOffset {
     const step = _regularCardHeight + _cardGap;
-    if (_isSleepCurrent) {
-      return (_slots.length + 1) * step;
-    } else if (_isWakeCurrent || _currentIndex == -1) {
-      return 0.0;
-    }
-    final visualIndex = _currentIndex + 1;
-    return (visualIndex * step).clamp(0.0, (_slots.length + 2) * step);
+    if (_currentIndex == -1) return 0.0;
+    return (_currentIndex * step).clamp(0.0, _slots.length * step);
   }
 
   @override
@@ -241,7 +229,9 @@ class PlannerSectionState extends State<PlannerSection> {
   }
 
   void _onCustomChanged() {
-    if (mounted && widget.modeId == customModeId) setState(() {});
+    if (mounted && CustomModeStore.isCustomModeId(widget.modeId)) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadTodos() async {
@@ -374,6 +364,7 @@ class PlannerSectionState extends State<PlannerSection> {
     try {
       await SqliteEnergyLogStore.instance.savePlannerSessionLog(log);
       await RemoteSync.instance.upsertPlannerSessionLog(log, userId: userId);
+      await DailyProgressSyncService.instance.syncToday();
     } catch (_) {}
   }
 
@@ -427,29 +418,6 @@ class PlannerSectionState extends State<PlannerSection> {
       final due = todo.due;
       if (due == null || svcDay(due) != svcDay(DateTime.now())) return false;
       return slot.contains(due.hour * 60 + due.minute);
-    }).toList();
-  }
-
-  List<_TimedTodo> _todosForWake() {
-    return _todos.where((todo) {
-      final due = todo.due;
-      if (due == null || svcDay(due) != svcDay(DateTime.now())) return false;
-      return isWakeWindowFor(
-        due.hour * 60 + due.minute,
-        wakeMinutes: widget.wakeMinutes,
-      );
-    }).toList();
-  }
-
-  List<_TimedTodo> _todosForSleep() {
-    return _todos.where((todo) {
-      final due = todo.due;
-      if (due == null || svcDay(due) != svcDay(DateTime.now())) return false;
-      return isSleepWindowFor(
-        due.hour * 60 + due.minute,
-        wakeMinutes: widget.wakeMinutes,
-        sleepMinutes: widget.sleepMinutes,
-      );
     }).toList();
   }
 
@@ -604,8 +572,6 @@ class PlannerSectionState extends State<PlannerSection> {
   }
 
   String _currentPeriodLabel(int currentIndex) {
-    if (_isWakeCurrent) return 'Wake period';
-    if (_isSleepCurrent) return 'Sleep period';
     if (currentIndex != -1) return _slots[currentIndex].rangeLabel;
     return 'Current period';
   }
@@ -615,43 +581,7 @@ class PlannerSectionState extends State<PlannerSection> {
     WeatherSnapshot? weather,
     int currentIndex,
   ) {
-    if (_isWakeCurrent || (currentIndex == -1 && !_isSleepCurrent)) {
-      return _CurrentWakeSleepCard(
-        content: WakeSleepCopy(
-          title: 'Wake up',
-          headline: wakeCardContent.headline,
-          sub: wakeCardContent.sub,
-          tip: wakeCardContent.tip,
-        ),
-        variant: _WakeSleepVariant.wake,
-        sessionDone: _sessionLogs['wake']?.isDone ?? false,
-        onToggleSessionDone: () => _toggleSessionDone(
-          sessionId: 'wake',
-          startMinutes: widget.wakeMinutes,
-          endMinutes: widget.wakeMinutes + kWakeBufferMinutes,
-          title: 'Wake up',
-        ),
-      );
-    }
-    if (_isSleepCurrent) {
-      return _CurrentWakeSleepCard(
-        content: WakeSleepCopy(
-          title: 'Sleep',
-          headline: sleepCardContent.headline,
-          sub: sleepCardContent.sub,
-          tip: sleepCardContent.tip,
-        ),
-        variant: _WakeSleepVariant.sleep,
-        sessionDone: _sessionLogs['sleep']?.isDone ?? false,
-        onToggleSessionDone: () => _toggleSessionDone(
-          sessionId: 'sleep',
-          startMinutes: widget.sleepMinutes,
-          endMinutes: _sleepCardEndMinutes,
-          title: 'Sleep',
-        ),
-      );
-    }
-
+    if (currentIndex == -1) return const SizedBox.shrink();
     final slot = _slots[currentIndex];
     final advice = adviceList[currentIndex];
     return _CurrentModeCard(
@@ -686,9 +616,7 @@ class PlannerSectionState extends State<PlannerSection> {
   void showPastBestSummary(BuildContext context) {
     final slotLabel = _currentIndex != -1
         ? _slots[_currentIndex].rangeLabel
-        : _isWakeCurrent
-            ? 'Wake'
-            : 'Sleep';
+        : 'Current period';
     final label = _currentIndex != -1 ? _bestFromPast[_currentIndex] : null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -749,77 +677,15 @@ class PlannerSectionState extends State<PlannerSection> {
 
   Widget _buildList(List<ModeAdvice> adviceList, WeatherSnapshot? weather) {
     final currentIndex = _currentIndex;
-    // Layout: [wake card] + [7 planner cards] + [sleep card].
-    // Index math: 0 = wake, 1..7 = slots, 8 = sleep.
     return Stack(
       children: <Widget>[
         ListView.separated(
           controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-          itemCount: _slots.length + 2,
+          itemCount: _slots.length,
           separatorBuilder: (_, __) => const SizedBox(height: _cardGap),
           itemBuilder: (context, index) {
-            if (index == 0) {
-              return _SessionListRow(
-                height:
-                    _isWakeCurrent ? _currentCardHeight : _regularCardHeight,
-                child: _WakeSleepCard(
-                  content: WakeSleepCopy(
-                    title: 'Wake up',
-                    headline: wakeCardContent.headline,
-                    sub: wakeCardContent.sub,
-                    tip: wakeCardContent.tip,
-                  ),
-                  variant: _WakeSleepVariant.wake,
-                  assetPath: 'assets/icons/wakeup_alarm.svg',
-                  isCurrent: _isWakeCurrent,
-                  height:
-                      _isWakeCurrent ? _currentCardHeight : _regularCardHeight,
-                  todos: _todosForWake(),
-                  onAddTodo: () => _openTodoService(widget.wakeMinutes),
-                  onToggleTodo: _toggleTodo,
-                  onCompleteTodos: _completeTodos,
-                  sessionDone: _sessionLogs['wake']?.isDone ?? false,
-                  onToggleSessionDone: () => _toggleSessionDone(
-                    sessionId: 'wake',
-                    startMinutes: widget.wakeMinutes,
-                    endMinutes: widget.wakeMinutes + kWakeBufferMinutes,
-                    title: 'Wake up',
-                  ),
-                ),
-              );
-            }
-            if (index == _slots.length + 1) {
-              return _SessionListRow(
-                height:
-                    _isSleepCurrent ? _currentCardHeight : _regularCardHeight,
-                child: _WakeSleepCard(
-                  content: WakeSleepCopy(
-                    title: 'Sleep',
-                    headline: sleepCardContent.headline,
-                    sub: sleepCardContent.sub,
-                    tip: sleepCardContent.tip,
-                  ),
-                  variant: _WakeSleepVariant.sleep,
-                  assetPath: 'assets/icons/going_to_sleep.svg',
-                  isCurrent: _isSleepCurrent,
-                  height:
-                      _isSleepCurrent ? _currentCardHeight : _regularCardHeight,
-                  todos: _todosForSleep(),
-                  onAddTodo: () => _openTodoService(widget.sleepMinutes),
-                  onToggleTodo: _toggleTodo,
-                  onCompleteTodos: _completeTodos,
-                  sessionDone: _sessionLogs['sleep']?.isDone ?? false,
-                  onToggleSessionDone: () => _toggleSessionDone(
-                    sessionId: 'sleep',
-                    startMinutes: widget.sleepMinutes,
-                    endMinutes: _sleepCardEndMinutes,
-                    title: 'Sleep',
-                  ),
-                ),
-              );
-            }
-            final slotIndex = index - 1;
+            final slotIndex = index;
             final slot = _slots[slotIndex];
             final advice = adviceList[slotIndex];
             final isCurrent = currentIndex != -1 && slotIndex == currentIndex;

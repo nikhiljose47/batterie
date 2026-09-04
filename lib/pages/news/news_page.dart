@@ -50,56 +50,44 @@ class _NewsPageState extends State<NewsPage> {
           case AsyncStatus.error:
             return ErrorStateView(
               message: state.errorMessage ?? AppStrings.genericError,
-              onRetry: _controller.load,
+              onRetry: _controller.refresh,
             );
           case AsyncStatus.success:
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.large,
-                    AppSpacing.large,
-                    AppSpacing.large,
-                    AppSpacing.small,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        AppStrings.articlesTitle,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.xSmall),
-                      Text(
-                        AppStrings.articlesSubtitle,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
                 NewsFilterBar(
                   filters: NewsController.filters,
                   selectedFilter: state.selectedFilter,
                   onSelected: _controller.selectFilter,
                 ),
                 Expanded(
-                  child: state.visibleArticles.isEmpty
-                      ? const EmptyStateView(message: AppStrings.emptyTitle)
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(AppSpacing.large),
-                          itemCount: state.visibleArticles.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.large),
-                          itemBuilder: (context, index) {
-                            final article = state.visibleArticles[index];
+                  child: RefreshIndicator(
+                    onRefresh: _controller.refresh,
+                    child: state.visibleArticles.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: <Widget>[
+                              SizedBox(height: 160),
+                              EmptyStateView(message: AppStrings.emptyTitle),
+                            ],
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(AppSpacing.large),
+                            itemCount: state.visibleArticles.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: AppSpacing.large),
+                            itemBuilder: (context, index) {
+                              final article = state.visibleArticles[index];
 
-                            return NewsArticleCard(
-                              article: article,
-                              onTap: () => _openArticle(article),
-                            );
-                          },
-                        ),
+                              return NewsArticleCard(
+                                article: article,
+                                onTap: () => _openArticle(article),
+                              );
+                            },
+                          ),
+                  ),
                 ),
               ],
             );

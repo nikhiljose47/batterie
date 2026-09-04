@@ -2,6 +2,68 @@ import '../models/day_template.dart';
 import '../models/energy_log_record.dart';
 import '../models/planner_session_log.dart';
 
+class DailyProgressRecord {
+  const DailyProgressRecord({
+    required this.userId,
+    required this.dateKey,
+    required this.displayName,
+    required this.plannerMode,
+    required this.serviceActionCount,
+    required this.appUseMinutes,
+    required this.focusMinutes,
+    required this.goalDoneCount,
+    required this.goalPartialCount,
+    required this.goalTotalCount,
+    required this.completionPercent,
+    required this.scorePercent,
+  });
+
+  final String userId;
+  final String dateKey;
+  final String displayName;
+  final String plannerMode;
+  final int serviceActionCount;
+  final int appUseMinutes;
+  final int focusMinutes;
+  final int goalDoneCount;
+  final int goalPartialCount;
+  final int goalTotalCount;
+  final int completionPercent;
+  final int scorePercent;
+
+  Map<String, Object?> toMap() => <String, Object?>{
+        'user_id': userId,
+        'date_key': dateKey,
+        'display_name': displayName,
+        'planner_mode': plannerMode,
+        'service_action_count': serviceActionCount,
+        'app_use_minutes': appUseMinutes,
+        'focus_minutes': focusMinutes,
+        'goal_done_count': goalDoneCount,
+        'goal_partial_count': goalPartialCount,
+        'goal_total_count': goalTotalCount,
+        'completion_percent': completionPercent,
+        'score_percent': scorePercent,
+      };
+
+  factory DailyProgressRecord.fromMap(Map<String, dynamic> map) {
+    return DailyProgressRecord(
+      userId: (map['user_id'] as String?) ?? '',
+      dateKey: (map['date_key'] as String?) ?? '',
+      displayName: (map['display_name'] as String?) ?? 'You',
+      plannerMode: (map['planner_mode'] as String?) ?? 'healthy',
+      serviceActionCount: (map['service_action_count'] as num?)?.round() ?? 0,
+      appUseMinutes: (map['app_use_minutes'] as num?)?.round() ?? 0,
+      focusMinutes: (map['focus_minutes'] as num?)?.round() ?? 0,
+      goalDoneCount: (map['goal_done_count'] as num?)?.round() ?? 0,
+      goalPartialCount: (map['goal_partial_count'] as num?)?.round() ?? 0,
+      goalTotalCount: (map['goal_total_count'] as num?)?.round() ?? 0,
+      completionPercent: (map['completion_percent'] as num?)?.round() ?? 0,
+      scorePercent: (map['score_percent'] as num?)?.round() ?? 0,
+    );
+  }
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  Remote Sync — Supabase migration layer
 // ═════════════════════════════════════════════════════════════════════════════
@@ -90,6 +152,26 @@ import '../models/planner_session_log.dart';
 // create policy "owner" on planner_session_logs for all using (auth.uid() = user_id);
 // create index on planner_session_logs (user_id, date_key);
 //
+// create table if not exists daily_progress (
+//   user_id              uuid not null references auth.users on delete cascade,
+//   date_key             text not null,
+//   display_name         text not null,
+//   planner_mode         text not null,
+//   service_action_count int not null default 0,
+//   app_use_minutes      int not null default 0,
+//   focus_minutes        int not null default 0,
+//   goal_done_count      int not null default 0,
+//   goal_partial_count   int not null default 0,
+//   goal_total_count     int not null default 0,
+//   completion_percent   int not null default 0,
+//   score_percent        int not null default 0,
+//   updated_at           timestamptz not null default now(),
+//   primary key (user_id, date_key)
+// );
+// alter table daily_progress enable row level security;
+// create policy "owner-write" on daily_progress for all using (auth.uid() = user_id);
+// create policy "signed-in-read" on daily_progress for select using (auth.uid() is not null);
+//
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Contract for every remote write the app performs.
@@ -131,6 +213,16 @@ abstract class RemoteSync {
   Future<void> upsertPlannerSessionLog(
     PlannerSessionLog log, {
     required String userId,
+  });
+
+  Future<void> upsertDailyProgress(
+    DailyProgressRecord progress, {
+    required String userId,
+  });
+
+  Future<List<DailyProgressRecord>> fetchDailyProgress({
+    required String dateKey,
+    int limit = 7,
   });
 
   // ── Daily remarks ─────────────────────────────────────────────────────────
@@ -179,6 +271,20 @@ class NoOpRemoteSync implements RemoteSync {
     PlannerSessionLog log, {
     required String userId,
   }) async {}
+
+  @override
+  Future<void> upsertDailyProgress(
+    DailyProgressRecord progress, {
+    required String userId,
+  }) async {}
+
+  @override
+  Future<List<DailyProgressRecord>> fetchDailyProgress({
+    required String dateKey,
+    int limit = 7,
+  }) async {
+    return const <DailyProgressRecord>[];
+  }
 
   @override
   Future<void> upsertRemark({

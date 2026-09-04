@@ -9,6 +9,7 @@ import '../models/battery_status.dart';
 import '../models/body_status.dart';
 import '../models/news_article.dart';
 import '../models/person_status.dart';
+import 'daily_progress_sync_service.dart';
 
 class EnergyHealthService {
   const EnergyHealthService();
@@ -53,31 +54,7 @@ class EnergyHealthService {
   }
 
   Future<List<PersonStatus>> fetchPeopleStatuses() async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-
-    return const <PersonStatus>[
-      PersonStatus(
-        name: 'Aarav',
-        role: 'Training partner',
-        energyPercent: 0.81,
-        brainPercent: 0.64,
-        note: 'High readiness, keep session intensity controlled.',
-      ),
-      PersonStatus(
-        name: 'Mira',
-        role: 'Family',
-        energyPercent: 0.49,
-        brainPercent: 0.52,
-        note: 'Low sleep trend. Suggest a lighter evening.',
-      ),
-      PersonStatus(
-        name: 'Dev',
-        role: 'Team member',
-        energyPercent: 0.67,
-        brainPercent: 0.75,
-        note: 'Good focus window until late afternoon.',
-      ),
-    ];
+    return DailyProgressSyncService.instance.cachedTopStatuses();
   }
 
   Future<List<NewsArticle>> fetchNewsArticles() async {

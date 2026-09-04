@@ -19,7 +19,16 @@ class GoogleCalendarService {
     await _accessToken();
   }
 
-  Future<bool> isSignedIn() => _googleSignIn.isSignedIn();
+  Future<bool> isSignedIn() async {
+    if (await _googleSignIn.isSignedIn()) return true;
+    final account = await _googleSignIn.signInSilently();
+    return account != null;
+  }
+
+  Future<void> signOut() async {
+    await _googleSignIn.signOut();
+    await FirebaseAuth.instance.signOut();
+  }
 
   Future<List<GoogleCalendarEvent>> todayEvents() async {
     final api = await _calendarApi();

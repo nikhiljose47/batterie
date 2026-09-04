@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
+import '../../../services/service_energy_logger.dart';
+import '../../../shared/widgets/service_energy_score_app_bar.dart';
 import 'toolkit.dart';
 
 /// Timer template.
@@ -40,12 +42,12 @@ class TimerConfig {
 
 const focusTimerConfig = TimerConfig(
   id: 'focus',
-  title: '🎯 Focus & Reading',
+  title: '⚡ Regain',
   mode: TimerMode.countdown,
   presets: <int>[15, 25, 45, 60],
-  startLabel: 'Start focus',
-  note: 'Classic pomodoro is 25 min on, 5 off. Log reading sessions '
-      'here too.',
+  startLabel: 'Start Regain',
+  note:
+      'Pick a short block, keep one thing open, and finish with a cleaner mind.',
 );
 
 const meditationTimerConfig = TimerConfig(
@@ -105,6 +107,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
 
   List<Map<String, dynamic>> _sessions = <Map<String, dynamic>>[];
   bool _loaded = false;
+  int _scoreRefreshToken = 0;
 
   String get _sessionsKey => 'svc.${widget.config.id}.sessions';
   String get _stateKey => 'svc.${widget.config.id}.state';
@@ -179,6 +182,17 @@ class _TimerToolPageState extends State<TimerToolPage> {
       });
     });
     await ServiceStore.saveList(_sessionsKey, _sessions);
+    if (widget.config.id == 'focus' || widget.config.id == 'meditation') {
+      await ServiceEnergyLogger.instance.addServiceLog(
+        sourceId: widget.config.id,
+        activityId: widget.config.id == 'focus'
+            ? 'focused_coding'
+            : 'mindfulness_meditation',
+        at: DateTime.now(),
+        durationMinutes: minutes,
+      );
+      if (mounted) setState(() => _scoreRefreshToken++);
+    }
     if (!mounted) return;
     showDialog<void>(
       context: context,
@@ -248,7 +262,9 @@ class _TimerToolPageState extends State<TimerToolPage> {
   Widget build(BuildContext context) {
     final c = widget.config;
     final isUp = c.mode == TimerMode.countUp;
+    final isRegain = c.id == 'focus';
     final active = isUp ? _fastStart != null : _running;
+    final accent = isRegain ? AppColors.info : AppColors.primary;
 
     int elapsedSeconds = 0;
     double progress = 0;
@@ -267,7 +283,12 @@ class _TimerToolPageState extends State<TimerToolPage> {
     }).fold<int>(0, (sum, s) => sum + ((s['minutes'] as num?)?.toInt() ?? 0));
 
     return Scaffold(
-      appBar: svcAppBar(c.title),
+      appBar: (c.id == 'focus' || c.id == 'meditation')
+          ? ServiceEnergyScoreAppBar(
+              title: c.title,
+              refreshToken: _scoreRefreshToken,
+            )
+          : svcAppBar(c.title),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -294,6 +315,26 @@ class _TimerToolPageState extends State<TimerToolPage> {
                   padding: const EdgeInsets.all(22),
                   child: Column(
                     children: <Widget>[
+                      if (isRegain) ...<Widget>[
+                        const Text(
+                          'Choose a regain block',
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Pomodoro or longer focus, one clean run.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       SizedBox(
                         width: 170,
                         height: 170,
@@ -307,7 +348,7 @@ class _TimerToolPageState extends State<TimerToolPage> {
                                 value: active ? progress : 0,
                                 strokeWidth: 9,
                                 strokeCap: StrokeCap.round,
-                                color: AppColors.primary,
+                                color: accent,
                                 backgroundColor:
                                     AppColors.surfaceTint.withOpacity(0.8),
                               ),
@@ -354,18 +395,13 @@ class _TimerToolPageState extends State<TimerToolPage> {
 
                       // Preset picker (when idle)
                       if (!active)
-                        Wrap(
-                          spacing: 6,
-                          children: <Widget>[
-                            for (var i = 0; i < c.presets.length; i++)
-                              SvcChip(
-                                label: isUp
-                                    ? '${c.presets[i]} h'
-                                    : '${c.presets[i]} min',
-                                selected: _preset == i,
-                                onTap: () => setState(() => _preset = i),
-                              ),
-                          ],
+                        _TimerPresetGrid(
+                          presets: c.presets,
+                          selectedIndex: _preset,
+                          countUp: isUp,
+                          regain: isRegain,
+                          onSelected: (index) =>
+                              setState(() => _preset = index),
                         ),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -376,16 +412,17 @@ class _TimerToolPageState extends State<TimerToolPage> {
                               ? (isUp ? _endFast : _stopCountdown)
                               : (isUp ? _startFast : _startCountdown),
                           style: FilledButton.styleFrom(
-                            backgroundColor: active
-                                ? const Color(0xFFC62828)
-                                : AppColors.primary,
+                            backgroundColor:
+                                active ? const Color(0xFFC62828) : accent,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
                           ),
                           child: Text(
                             active
                                 ? (isUp ? 'End fast' : 'Stop')
-                                : c.startLabel,
+                                : (isRegain
+                                    ? 'Start ${c.presets[_preset]} min'
+                                    : c.startLabel),
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w700),
                           ),
@@ -407,8 +444,8 @@ class _TimerToolPageState extends State<TimerToolPage> {
                             fontSize: 18, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(width: 8),
-                      const Text('this week',
-                          style: TextStyle(
+                      Text(isRegain ? 'regained this week' : 'this week',
+                          style: const TextStyle(
                               fontSize: 11, color: AppColors.textMuted)),
                     ],
                   ),
@@ -452,5 +489,80 @@ class _TimerToolPageState extends State<TimerToolPage> {
     final t = DateTime.tryParse(s['t'] as String? ?? '');
     if (t == null) return 'Session';
     return '${svcDayLabel(svcDay(t))} · ${svcClock(t)}';
+  }
+}
+
+class _TimerPresetGrid extends StatelessWidget {
+  const _TimerPresetGrid({
+    required this.presets,
+    required this.selectedIndex,
+    required this.countUp,
+    required this.regain,
+    required this.onSelected,
+  });
+
+  final List<int> presets;
+  final int selectedIndex;
+  final bool countUp;
+  final bool regain;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final accent = regain ? AppColors.info : AppColors.primary;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        for (var i = 0; i < presets.length; i++)
+          InkWell(
+            onTap: () => onSelected(i),
+            borderRadius: BorderRadius.circular(13),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 72,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: selectedIndex == i
+                    ? accent.withOpacity(0.12)
+                    : colors.surfaceContainerHighest.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                  color: selectedIndex == i
+                      ? accent.withOpacity(0.5)
+                      : colors.outline.withOpacity(0.35),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    countUp ? '${presets[i]}h' : '${presets[i]}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      color: selectedIndex == i ? accent : colors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    countUp ? 'hours' : (presets[i] == 25 ? 'pomodoro' : 'min'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      height: 1,
+                      fontWeight: FontWeight.w600,
+                      color: colors.onSurface.withOpacity(0.54),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

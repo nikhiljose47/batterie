@@ -1,6 +1,7 @@
 import '../engine/energy_score_engine.dart';
 import '../models/energy_log_record.dart';
 import '../pages/profile/profile_store.dart';
+import 'daily_progress_sync_service.dart';
 import 'energy_log_store.dart';
 import 'remote_sync.dart';
 
@@ -40,6 +41,7 @@ class ServiceEnergyLogger {
     for (final record in recomputed) {
       await RemoteSync.instance.upsertEnergyLog(record, userId: userId);
     }
+    await DailyProgressSyncService.instance.syncForDate(at);
   }
 
   List<EnergyLogRecord> _recompute(
