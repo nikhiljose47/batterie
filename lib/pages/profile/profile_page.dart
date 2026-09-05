@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
+import '../../shared/widgets/profile_avatar.dart';
 import '../../services/google_calendar_service.dart';
 import '../auth/auth_page.dart';
 import '../settings/settings_page.dart';
@@ -179,15 +180,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 onTap: _pickPhoto,
                 child: Stack(
                   children: <Widget>[
-                    CircleAvatar(
+                    ProfileAvatar(
                       key: ValueKey<String?>(path),
                       radius: 44,
                       backgroundColor: AppColors.surfaceTint,
-                      backgroundImage: hasPhoto ? FileImage(File(path)) : null,
-                      child: hasPhoto
-                          ? null
-                          : const Icon(Icons.person_rounded,
-                              size: 42, color: AppColors.primary),
                     ),
                     Positioned(
                       bottom: 0,

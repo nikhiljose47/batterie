@@ -137,7 +137,7 @@ class ProfileStore {
       'normal' => 'healthy',
       'normal_pro' || 'healthy_pro' => 'healthy',
       'coder_pro' || 'coder_super_plus' || 'office_pro' => 'office',
-      'athletic_pro' => 'athletic',
+      'athletic' || 'athletic_pro' => 'healthy',
       'gym_pro' => 'gym',
       'nicotine_free_pro' => 'nicotine_free',
       _ => modeId,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
@@ -19,21 +21,62 @@ class ChangeGoalPage extends StatefulWidget {
 }
 
 class _ChangeGoalPageState extends State<ChangeGoalPage> {
+  static const String _ratingsKey = 'svc.goals.ratings';
+
   late Future<List<SharedGoalPlan>> _sharedPlans;
   final TextEditingController _searchCtl = TextEditingController();
+  Map<String, double> _ratings = const <String, double>{};
+  Timer? _ratingWriteTimer;
 
   @override
   void initState() {
     super.initState();
     _sharedPlans = SharedGoalPlanService.instance.trendingPlans();
     _searchCtl.addListener(() => setState(() {}));
+    _loadRatings();
   }
 
   @override
   void dispose() {
+    _ratingWriteTimer?.cancel();
+    unawaited(_persistRatings());
     _searchCtl.dispose();
     super.dispose();
   }
+
+  Future<void> _loadRatings() async {
+    final stored = await ServiceStore.loadMap(_ratingsKey);
+    if (!mounted) return;
+    setState(() {
+      _ratings = <String, double>{
+        for (final entry in stored.entries)
+          if (entry.value is num) entry.key: (entry.value as num).toDouble(),
+      };
+    });
+  }
+
+  Future<void> _persistRatings() {
+    return ServiceStore.saveMap(_ratingsKey, <String, dynamic>{
+      for (final entry in _ratings.entries) entry.key: entry.value,
+    });
+  }
+
+  void _rateGoal(_GoalEntry entry, double rating) {
+    setState(() {
+      _ratings = <String, double>{
+        ..._ratings,
+        entry.ratingKey: rating.clamp(1, 5).toDouble(),
+      };
+    });
+    _ratingWriteTimer?.cancel();
+    _ratingWriteTimer = Timer(
+      const Duration(milliseconds: 650),
+      () => unawaited(_persistRatings()),
+    );
+  }
+
+  double _displayRating(_GoalEntry entry) =>
+      _ratings[entry.ratingKey] ?? entry.rating;
 
   Future<void> _selectGoal(String id) async {
     if (CustomModeStore.isCustomModeId(id)) {
@@ -173,6 +216,7 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
       MaterialPageRoute<void>(
         builder: (_) => _GoalDetailPage(
           entry: entry,
+          rating: _displayRating(entry),
           selected: entry.modeId == ProfileStore.instance.plannerMode.value,
           onUse: () {
             if (entry.sharedPlan != null) {
@@ -214,7 +258,7 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
       body: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -247,7 +291,7 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
                       ),
                     );
                     return ListView(
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 92),
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 92),
                       children: <Widget>[
                         if (snapshot.connectionState == ConnectionState.waiting)
                           const Padding(
@@ -262,9 +306,11 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
                           for (final entry in entries)
                             _GoalFeedCard(
                               entry: entry,
+                              rating: _displayRating(entry),
                               selected: entry.modeId ==
                                   ProfileStore.instance.plannerMode.value,
                               onTap: () => _openDetails(entry),
+                              onRate: (rating) => _rateGoal(entry, rating),
                               onFeedback: entry.sharedPlan == null
                                   ? null
                                   : () => _toggleLike(entry.sharedPlan!),
@@ -304,8 +350,10 @@ class _GoalEntry {
     return _GoalEntry(
       kind: _GoalEntryKind.shared,
       modeId: plan.id,
-      title: plan.name,
-      description: _slotDescription(plan.slots),
+      title: plan.shortName ?? plan.name,
+      description: plan.description.trim().isEmpty
+          ? _slotDescription(plan.slots)
+          : plan.description,
       author: plan.ownerName,
       tag: plan.tag,
       users: plan.displayUsedCount,
@@ -346,8 +394,10 @@ class _GoalEntry {
     return _GoalEntry(
       kind: _GoalEntryKind.custom,
       modeId: plan.id,
-      title: plan.name,
-      description: _slotDescription(plan.slots),
+      title: plan.shortName ?? plan.name,
+      description: plan.description.trim().isEmpty
+          ? _slotDescription(plan.slots)
+          : plan.description,
       author: 'You',
       tag: plan.tag,
       users: 2,
@@ -373,6 +423,12 @@ class _GoalEntry {
   final bool trending;
   final SharedGoalPlan? sharedPlan;
   final CustomPlan? customPlan;
+
+  String get ratingKey => switch (kind) {
+        _GoalEntryKind.shared => 'shared:$modeId',
+        _GoalEntryKind.ready => 'ready:$modeId',
+        _GoalEntryKind.custom => 'custom:$modeId',
+      };
 
   String get typeLabel => switch (kind) {
         _GoalEntryKind.shared => trending ? 'Trending' : 'Community',
@@ -423,14 +479,18 @@ class _GoalEntry {
 class _GoalFeedCard extends StatelessWidget {
   const _GoalFeedCard({
     required this.entry,
+    required this.rating,
     required this.selected,
     required this.onTap,
+    required this.onRate,
     this.onFeedback,
   });
 
   final _GoalEntry entry;
+  final double rating;
   final bool selected;
   final VoidCallback onTap;
+  final ValueChanged<double> onRate;
   final VoidCallback? onFeedback;
 
   @override
@@ -446,12 +506,12 @@ class _GoalFeedCard extends StatelessWidget {
             bottom: BorderSide(color: colors.outline.withOpacity(0.26)),
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 20),
         child: Row(
           children: <Widget>[
             Container(
               width: 34,
-              height: 42,
+              height: 60,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: entry.accent.withOpacity(0.1),
@@ -473,7 +533,7 @@ class _GoalFeedCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: colors.onSurface,
-                            fontSize: 13.4,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -489,11 +549,11 @@ class _GoalFeedCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     entry.description,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: colors.onSurface.withOpacity(0.52),
-                      fontSize: 11,
+                      fontSize: 11.6,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -516,7 +576,7 @@ class _GoalFeedCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                _RatingBadge(rating: entry.rating),
+                _RatingBadge(rating: rating, onRate: onRate),
                 const SizedBox(height: 5),
                 _UsersBadge(users: entry.users),
               ],
@@ -550,31 +610,58 @@ class _GoalFeedCard extends StatelessWidget {
 }
 
 class _RatingBadge extends StatelessWidget {
-  const _RatingBadge({required this.rating});
+  const _RatingBadge({
+    required this.rating,
+    required this.onRate,
+  });
 
   final double rating;
+  final ValueChanged<double> onRate;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        const Icon(
-          Icons.star_rounded,
-          size: 13,
-          color: Color(0xFFE2A72E),
-        ),
-        const SizedBox(width: 2),
-        Text(
-          rating.toStringAsFixed(1),
-          style: TextStyle(
-            color: colors.onSurface.withOpacity(0.6),
-            fontSize: 10.8,
-            fontWeight: FontWeight.w700,
+    return PopupMenuButton<double>(
+      tooltip: 'Rate goal',
+      onSelected: onRate,
+      padding: EdgeInsets.zero,
+      itemBuilder: (context) => <PopupMenuEntry<double>>[
+        for (var i = 1; i <= 5; i++)
+          PopupMenuItem<double>(
+            value: i.toDouble(),
+            height: 36,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                for (var star = 1; star <= 5; star++)
+                  Icon(
+                    star <= i ? Icons.star_rounded : Icons.star_border_rounded,
+                    size: 16,
+                    color: const Color(0xFFE2A72E),
+                  ),
+              ],
+            ),
           ),
-        ),
       ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(
+            Icons.star_rounded,
+            size: 13,
+            color: Color(0xFFE2A72E),
+          ),
+          const SizedBox(width: 2),
+          Text(
+            rating.toStringAsFixed(1),
+            style: TextStyle(
+              color: colors.onSurface.withOpacity(0.6),
+              fontSize: 10.8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -587,16 +674,21 @@ class _UsersBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 96),
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 86),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withOpacity(0.58),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.outline.withOpacity(0.18)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Icon(
             Icons.group_rounded,
-            size: 12,
-            color: colors.onSurface.withOpacity(0.34),
+            size: 11,
+            color: colors.onSurface.withOpacity(0.42),
           ),
           const SizedBox(width: 3),
           Flexible(
@@ -605,9 +697,10 @@ class _UsersBadge extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: colors.onSurface.withOpacity(0.48),
-                fontSize: 10.4,
-                fontWeight: FontWeight.w700,
+                color: colors.onSurface.withOpacity(0.52),
+                fontSize: 9.6,
+                height: 1,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -620,6 +713,7 @@ class _UsersBadge extends StatelessWidget {
 class _GoalDetailPage extends StatelessWidget {
   const _GoalDetailPage({
     required this.entry,
+    required this.rating,
     required this.selected,
     required this.onUse,
     this.onLike,
@@ -629,6 +723,7 @@ class _GoalDetailPage extends StatelessWidget {
   });
 
   final _GoalEntry entry;
+  final double rating;
   final bool selected;
   final VoidCallback onUse;
   final VoidCallback? onLike;
@@ -712,13 +807,8 @@ class _GoalDetailPage extends StatelessWidget {
                 Row(
                   children: <Widget>[
                     _DetailMetric(
-                      icon: Icons.group_rounded,
-                      label: '${entry.users} people using',
-                    ),
-                    const SizedBox(width: 8),
-                    _DetailMetric(
                       icon: Icons.star_rounded,
-                      label: entry.rating.toStringAsFixed(1),
+                      label: rating.toStringAsFixed(1),
                     ),
                     const SizedBox(width: 8),
                     _DetailMetric(

@@ -115,7 +115,8 @@ class PlannerSectionState extends State<PlannerSection> {
 
   static const String _todoKey = 'svc.todo.items';
 
-  List<TimeSlot> get _slots => plannerSlotsFor(
+  List<TimeSlot> get _slots => plannerSlotsForMode(
+        widget.modeId,
         wakeMinutes: widget.wakeMinutes,
         sleepMinutes: widget.sleepMinutes,
       );

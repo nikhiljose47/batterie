@@ -11,6 +11,7 @@ import '../pages/home_tab/data/mode_advice.dart';
 import '../pages/profile/profile_store.dart';
 import '../pages/services/tools/toolkit.dart';
 import 'energy_log_store.dart';
+import 'escore_reset_service.dart';
 import 'remote_sync.dart';
 
 class DailyProgressSyncService {
@@ -53,11 +54,24 @@ class DailyProgressSyncService {
     await store.claimEnergyLogsForUser(userId);
     await store.claimPlannerSessionLogsForUser(userId);
 
-    final records = await store.recordsForDate(key, userId: userId);
-    final plannerLogs = await store.plannerSessionLogsForDate(
+    final resetAfter = await EscoreResetService.instance.appliedResetAfter();
+    final records = (await store.recordsForDate(key, userId: userId))
+        .where((record) => EscoreResetService.instance.isAfterAppliedReset(
+              date: record.date,
+              startMinutes: record.startMinutes,
+              resetAfter: resetAfter,
+            ))
+        .toList(growable: false);
+    final plannerLogs = (await store.plannerSessionLogsForDate(
       key,
       userId: userId,
-    );
+    ))
+        .where((log) => EscoreResetService.instance.isAfterAppliedReset(
+              date: log.date,
+              startMinutes: log.startMinutes,
+              resetAfter: resetAfter,
+            ))
+        .toList(growable: false);
     final total = plannerSlots.length;
     final done = plannerLogs
         .where((log) => log.status == PlannerSessionStatus.done)

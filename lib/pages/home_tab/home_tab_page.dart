@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../constants/app_colors.dart';
+import '../../constants/avatar_constants.dart';
 import '../../constants/daily_score_rules.dart';
 import '../../data/world_today/world_today_repository.dart';
 import '../../models/energy_log_record.dart';
@@ -16,6 +17,7 @@ import '../../shared/widgets/profile_avatar.dart';
 import '../../services/custom_mode_store.dart';
 import '../../services/daily_progress_sync_service.dart';
 import '../../services/energy_log_store.dart';
+import '../../services/escore_reset_service.dart';
 import '../../services/google_calendar_service.dart';
 import '../compare/compare_page.dart';
 import '../profile/profile_bloc.dart';
@@ -72,6 +74,8 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
   int _todayServiceActionCount = 0;
   int _todayPlanDoneCount = 0;
   int _todayPlanTotalCount = kSlotCount;
+  int _onlineGoalCompletedCount = 0;
+  DateTime? _escoreResetAfter;
   _BodyMetrics? _bodyMetrics;
   bool _googleUpcomingLoading = false;
   bool _googleUpcomingSyncing = false;
@@ -324,7 +328,8 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
       (mode) => mode.id == _modeId,
       orElse: () => allSelectableDayModes.first,
     );
-    final phases = dayPhasesFor(
+    final phases = dayPhasesForMode(
+      _modeId,
       wakeMinutes: schedule.wakeMinutes,
       sleepMinutes: schedule.sleepMinutes,
     );
@@ -345,6 +350,7 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
       cue: _modeCue(advice),
       rhythmNote: '${phase.label} · ${phase.foundationLabel}',
       accent: AppColors.primary,
+      onlineCompletedCount: _onlineGoalCompletedCount,
     );
   }
 
@@ -354,9 +360,9 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
         ? advice.tip.trim()
         : advice.recommendation.trim();
     if (base.isEmpty) {
-      return 'For your $label goal, finish one useful thing in this block.';
+      return 'Now, finish one useful thing in this block.';
     }
-    return 'For your $label goal, $base';
+    return 'Now, $base';
   }
 
   String _modeCue(ModeAdvice advice) {
@@ -450,13 +456,32 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
         dateKey(today),
         userId: userId,
       );
-      final planTotal = plannerSlotsFor(
+      final planTotal = plannerSlotsForMode(
+        _modeId,
         wakeMinutes: _scheduleBloc.state.wakeMinutes,
         sleepMinutes: _scheduleBloc.state.sleepMinutes,
       ).length;
       final todos = await ServiceStore.loadList(_todoKey);
       final focusSessions = await ServiceStore.loadList(_focusSessionsKey);
       final bodyMetrics = await _loadBodyMetrics();
+      final resetAfter = await EscoreResetService.instance.appliedResetAfter();
+      final cachedCommunityProgress =
+          await DailyProgressSyncService.instance.cachedProgress();
+      final todayKey = dateKey(today);
+      final activeRecords = records.where((record) {
+        return EscoreResetService.instance.isAfterAppliedReset(
+          date: record.date,
+          startMinutes: record.startMinutes,
+          resetAfter: resetAfter,
+        );
+      }).toList(growable: false);
+      final activePlannerLogs = plannerLogs.where((log) {
+        return EscoreResetService.instance.isAfterAppliedReset(
+          date: log.date,
+          startMinutes: log.startMinutes,
+          resetAfter: resetAfter,
+        );
+      }).toList(growable: false);
       final todoCount = todos.where((todo) {
         final text = (todo['text'] as String?)?.trim() ?? '';
         final done = (todo['done'] as bool?) ?? false;
@@ -475,9 +500,16 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
         _storedAppUseMinutes = storedAppUseMinutes;
         _todayAppUseMinutes = storedAppUseMinutes;
         _todayFocusMinutes = _focusMinutesForToday(focusSessions, today);
-        _todayServiceActionCount = records.length;
-        _todayPlanDoneCount = plannerLogs.where((log) => log.isDone).length;
+        _todayServiceActionCount = activeRecords.length;
+        _todayPlanDoneCount =
+            activePlannerLogs.where((log) => log.isDone).length;
         _todayPlanTotalCount = planTotal;
+        _onlineGoalCompletedCount = cachedCommunityProgress.where((record) {
+          return record.dateKey == todayKey &&
+              record.plannerMode == ProfileStore.instance.plannerMode.value &&
+              record.goalDoneCount > 0;
+        }).length;
+        _escoreResetAfter = resetAfter;
         _bodyMetrics = bodyMetrics;
       });
     } catch (_) {
@@ -490,6 +522,8 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
         _todayServiceActionCount = 0;
         _todayPlanDoneCount = 0;
         _todayPlanTotalCount = kSlotCount;
+        _onlineGoalCompletedCount = 0;
+        _escoreResetAfter = null;
         _bodyMetrics = null;
       });
     }
@@ -507,7 +541,13 @@ class _HomeTabPageState extends State<HomeTabPage> with WidgetsBindingObserver {
     return DailyScoreRules.appUsePoints(_todayAppUseMinutes) +
         DailyScoreRules.serviceLogPoints(_todayServiceActionCount) +
         DailyScoreRules.dayTrackPoints(
-          loggedCount: _sessionLogs.length,
+          loggedCount: _sessionLogs.where((log) {
+            return EscoreResetService.instance.isAfterAppliedReset(
+              date: log.date,
+              startMinutes: log.startMinutes,
+              resetAfter: _escoreResetAfter,
+            );
+          }).length,
           totalCount: _todayPlanTotalCount,
         );
   }
@@ -1048,6 +1088,7 @@ class _CurrentPlanData {
     required this.cue,
     required this.rhythmNote,
     required this.accent,
+    required this.onlineCompletedCount,
   });
 
   final String sourceLabel;
@@ -1056,6 +1097,7 @@ class _CurrentPlanData {
   final String cue;
   final String rhythmNote;
   final Color accent;
+  final int onlineCompletedCount;
 }
 
 class _BodyMetrics {
@@ -1127,6 +1169,7 @@ class _NowUpcomingSection extends StatelessWidget {
             loading: loading,
             onConnect: onConnect,
             onRefresh: onRefresh,
+            onTrackGoal: onTrackGoal,
           ),
         ),
       ],
@@ -1142,6 +1185,7 @@ class _DayScheduleList extends StatelessWidget {
     required this.loading,
     required this.onConnect,
     required this.onRefresh,
+    required this.onTrackGoal,
   });
 
   final _CurrentPlanData current;
@@ -1150,6 +1194,7 @@ class _DayScheduleList extends StatelessWidget {
   final bool loading;
   final VoidCallback onConnect;
   final VoidCallback onRefresh;
+  final VoidCallback onTrackGoal;
 
   String _eventTimeLabel(GoogleCalendarEvent item) {
     if (item.start == null) return 'Any time today';
@@ -1164,7 +1209,7 @@ class _DayScheduleList extends StatelessWidget {
   Widget build(BuildContext context) {
     final showExistingCalendar = signedIn || events.isNotEmpty;
     final rows = <Widget>[
-      _CurrentPlanCard(data: current),
+      _CurrentPlanCard(data: current, onTap: onTrackGoal),
       if (loading && events.isEmpty)
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 14),
@@ -1239,9 +1284,10 @@ class _CalendarEmptyRow extends StatelessWidget {
 }
 
 class _CurrentPlanCard extends StatelessWidget {
-  const _CurrentPlanCard({required this.data});
+  const _CurrentPlanCard({required this.data, required this.onTap});
 
   final _CurrentPlanData data;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1250,64 +1296,168 @@ class _CurrentPlanCard extends StatelessWidget {
     return _CalendarAgendaRow(
       icon: Icons.flag_circle_rounded,
       color: data.accent,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              colors.surface,
-              data.accent.withOpacity(dark ? 0.18 : 0.10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 96),
+          padding: const EdgeInsets.fromLTRB(13, 20, 13, 19),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                colors.surface,
+                data.accent.withOpacity(dark ? 0.18 : 0.10),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: data.accent.withOpacity(0.34), width: 1),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: data.accent.withOpacity(dark ? 0.16 : 0.10),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
             ],
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: data.accent.withOpacity(0.34), width: 1),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: data.accent.withOpacity(dark ? 0.16 : 0.10),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
-            Container(
-              width: 26,
-              height: 26,
-              margin: const EdgeInsets.only(right: 10, bottom: 1),
-              decoration: BoxDecoration(
-                color: data.accent.withOpacity(dark ? 0.22 : 0.14),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(
-                Icons.track_changes_rounded,
-                size: 15,
-                color: data.accent,
-              ),
-            ),
-            Expanded(
-              child: Text(
-                data.suggestion,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14.6,
-                  height: 1.12,
-                  fontFamily: 'Kalam',
-                  fontFamilyFallback: const <String>['Inter'],
-                  fontWeight: FontWeight.w700,
-                  color: colors.onSurface.withOpacity(0.9),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: data.accent.withOpacity(dark ? 0.22 : 0.14),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  Icons.track_changes_rounded,
+                  size: 18,
+                  color: data.accent,
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            _CalendarTimeLabel(data.range),
-          ],
+              Expanded(
+                child: Text(
+                  data.suggestion,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15.4,
+                    height: 1.16,
+                    fontFamily: 'Kalam',
+                    fontFamilyFallback: const <String>['Inter'],
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface.withOpacity(0.9),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  _CalendarTimeLabel(data.range),
+                  const SizedBox(height: 9),
+                  _HomeUsingPeopleBadge(
+                    count: data.onlineCompletedCount,
+                    color: data.accent,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _HomeUsingPeopleBadge extends StatelessWidget {
+  const _HomeUsingPeopleBadge({required this.count, required this.color});
+
+  final int count;
+  final Color color;
+
+  int get _safeCount => math.max(2, count);
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    const avatarSize = 18.0;
+    const overlap = 10.0;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 112),
+      padding: const EdgeInsets.fromLTRB(5, 4, 8, 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          SizedBox(
+            width: avatarSize + overlap,
+            height: avatarSize,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                for (var i = 0; i < 2; i++)
+                  Positioned(
+                    left: i * overlap,
+                    child: Container(
+                      width: avatarSize,
+                      height: avatarSize,
+                      decoration: BoxDecoration(
+                        color: colors.surface,
+                        shape: BoxShape.circle,
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: colors.shadow.withOpacity(0.08),
+                            blurRadius: 5,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      foregroundDecoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: colors.surface, width: 1.5),
+                      ),
+                      child: ClipOval(
+                        child: Transform.scale(
+                          scale: 1.18,
+                          child: SvgPicture.asset(
+                            AvatarConstants.assetPath(
+                              AvatarConstants
+                                  .avatars[i % AvatarConstants.avatars.length],
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '$_safeCount using',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9.8,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                color: colors.onSurface.withOpacity(0.68),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1804,12 +1954,10 @@ class _HomeInfoCard extends StatelessWidget {
           Row(
             children: <Widget>[
               Expanded(
-                child: _HomeInfoItem(
-                  icon: Icons.flag_rounded,
+                child: _HomeGoalInfoItem(
                   label: 'Goal: $goalLabel',
                   value:
                       '${math.min(planDoneCount, planTotalCount)}/$planTotalCount done',
-                  accent: AppColors.success,
                 ),
               ),
               _InfoDivider(color: colors.outline),
@@ -2149,6 +2297,72 @@ class _HomeInfoItem extends StatelessWidget {
   }
 }
 
+class _HomeGoalInfoItem extends StatelessWidget {
+  const _HomeGoalInfoItem({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const SizedBox(
+            width: 18,
+            child: Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.flag_rounded,
+                size: 15,
+                color: AppColors.success,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface.withOpacity(0.46),
+                    fontSize: 9,
+                    height: 1,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface.withOpacity(0.86),
+                    fontSize: 10.5,
+                    height: 1.08,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HomeShortcutSection extends StatelessWidget {
   const _HomeShortcutSection({
     required this.services,
@@ -2304,63 +2518,77 @@ class _DidYouKnowTodayCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: dark
             ? colors.surfaceContainerHighest.withOpacity(0.42)
             : const Color(0xFFF6F9FC),
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFF4F7FE5).withOpacity(dark ? 0.18 : 0.11),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(
-              Icons.lightbulb_outline_rounded,
-              size: 17,
-              color: Color(0xFF4F7FE5),
-            ),
+            height: 1,
+            //   margin: const EdgeInsets.symmetric(horizontal: 12),
+            color: colors.outline.withOpacity(dark ? 0.16 : 0.26),
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Did you know today?',
-                        maxLines: 1,
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F7FE5).withOpacity(
+                      dark ? 0.18 : 0.11,
+                    ),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const Icon(
+                    Icons.lightbulb_outline_rounded,
+                    size: 16,
+                    color: Color(0xFF4F7FE5),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              'Did you know today?',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                                color: colors.onSurface.withOpacity(0.88),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        fact,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
-                          color: colors.onSurface.withOpacity(0.88),
+                          fontSize: 10.5,
+                          height: 1.18,
+                          fontWeight: FontWeight.w600,
+                          color: colors.onSurface.withOpacity(0.64),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  fact,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    height: 1.22,
-                    fontWeight: FontWeight.w600,
-                    color: colors.onSurface.withOpacity(0.64),
+                    ],
                   ),
                 ),
               ],

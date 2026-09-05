@@ -16,13 +16,16 @@ class GoogleCalendarService {
   );
 
   Future<void> signIn() async {
-    await _accessToken();
+    await _accessToken(interactive: true);
   }
 
   Future<bool> isSignedIn() async {
-    if (await _googleSignIn.isSignedIn()) return true;
-    final account = await _googleSignIn.signInSilently();
-    return account != null;
+    try {
+      await _accessToken(interactive: false);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> signOut() async {
@@ -158,19 +161,20 @@ class GoogleCalendarService {
   }
 
   Future<calendar.CalendarApi> _calendarApi() async {
-    final accessToken = await _accessToken();
+    final accessToken = await _accessToken(interactive: false);
     return calendar.CalendarApi(_GoogleAuthClient(accessToken));
   }
 
   Future<tasks.TasksApi> _tasksApi() async {
-    final accessToken = await _accessToken();
+    final accessToken = await _accessToken(interactive: false);
     return tasks.TasksApi(_GoogleAuthClient(accessToken));
   }
 
-  Future<String> _accessToken() async {
-    final account = await _googleSignIn.signIn();
+  Future<String> _accessToken({required bool interactive}) async {
+    var account = await _googleSignIn.signInSilently();
+    account ??= interactive ? await _googleSignIn.signIn() : null;
     if (account == null) {
-      throw Exception('Google sign-in cancelled');
+      throw Exception('Google sign-in required');
     }
 
     final auth = await account.authentication;
@@ -183,7 +187,9 @@ class GoogleCalendarService {
       accessToken: accessToken,
       idToken: auth.idToken,
     );
-    await FirebaseAuth.instance.signInWithCredential(credential);
+    if (FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    }
 
     return accessToken;
   }

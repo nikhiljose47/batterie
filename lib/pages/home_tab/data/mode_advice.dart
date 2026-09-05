@@ -104,13 +104,7 @@ const List<DayMode> allDayModes = <DayMode>[
     id: 'healthy',
     emoji: '🙂',
     label: 'Stay Balanced',
-    shortLabel: 'Balance',
-  ),
-  DayMode(
-    id: 'athletic',
-    emoji: '🏃',
-    label: 'Move More',
-    shortLabel: 'Move',
+    shortLabel: 'Balanced',
   ),
 ];
 
@@ -122,8 +116,8 @@ List<DayMode> get customDayModes {
       .map((plan) => DayMode(
             id: plan.id,
             emoji: '✨',
-            label: plan.name,
-            shortLabel: plan.name,
+            label: plan.longName ?? plan.name,
+            shortLabel: plan.shortName ?? plan.name,
           ))
       .toList();
 }
@@ -288,7 +282,7 @@ const List<PresetGoalContent> presetGoalContentLibrary = <PresetGoalContent>[
   PresetGoalContent(modeId: 'office', cards: _office),
   PresetGoalContent(modeId: 'nicotine_free', cards: _nicotineFree),
   PresetGoalContent(modeId: 'student', cards: _student),
-  PresetGoalContent(modeId: 'language', cards: _student),
+  PresetGoalContent(modeId: 'language', cards: _language),
   PresetGoalContent(modeId: 'coder_pro', cards: coderProAdvice),
   PresetGoalContent(modeId: 'coder_super_plus', cards: coderSuperPlusAdvice),
   PresetGoalContent(modeId: 'healthy_pro', cards: _normalPro),
@@ -465,6 +459,53 @@ List<DayPhase> get dayPhases => dayPhasesFor(
       sleepMinutes: homeDaySleepMinutes,
     );
 
+List<TimeSlot> plannerSlotsForMode(
+  String modeId, {
+  required int wakeMinutes,
+  required int sleepMinutes,
+}) {
+  if (CustomModeStore.isCustomModeId(modeId)) {
+    final cards = CustomModeStore.instance.planForModeId(modeId).planCards;
+    if (cards.isNotEmpty) {
+      return cards
+          .map((card) => TimeSlot(
+                startMinutes: wakeMinutes + card.startOffsetMinutes,
+                endMinutes: wakeMinutes + card.endOffsetMinutes,
+              ))
+          .toList(growable: false);
+    }
+  }
+  return plannerSlotsFor(wakeMinutes: wakeMinutes, sleepMinutes: sleepMinutes);
+}
+
+List<DayPhase> dayPhasesForMode(
+  String modeId, {
+  required int wakeMinutes,
+  required int sleepMinutes,
+}) {
+  if (CustomModeStore.isCustomModeId(modeId)) {
+    final slots = plannerSlotsForMode(
+      modeId,
+      wakeMinutes: wakeMinutes,
+      sleepMinutes: sleepMinutes,
+    );
+    if (slots.isNotEmpty) {
+      return List<DayPhase>.generate(slots.length, (index) {
+        final blueprint =
+            kDayPhaseBlueprints[index % kDayPhaseBlueprints.length];
+        return DayPhase(
+          id: blueprint.id,
+          label: blueprint.label,
+          energyLabel: blueprint.energyLabel,
+          foundationLabel: 'Wake-time offset plan',
+          slot: slots[index],
+        );
+      });
+    }
+  }
+  return dayPhasesFor(wakeMinutes: wakeMinutes, sleepMinutes: sleepMinutes);
+}
+
 List<DayPhase> dayPhasesFor({
   required int wakeMinutes,
   required int sleepMinutes,
@@ -547,16 +588,6 @@ String timeOfDayLabel(TimeOfDay t) {
 // ═════════════════════════════════════════════════════════════════════════
 
 // Broad, accessible mode advice. Each list has one item per planner slot.
-const AdviceMap _steadyStart = <String, Object>{
-  'recommendation': 'Pick one useful task and make the first step small.',
-  'tip': 'Start with 10 focused minutes',
-  'descriptions': <String>[
-    'Choose one outcome for this session.',
-    'Write the first tiny step before starting.',
-    'Keep distractions outside the first 10 minutes.',
-  ],
-};
-
 const AdviceMap _focusedProgress = <String, Object>{
   'recommendation':
       'Use this block for the work that needs your clearest mind.',
@@ -704,28 +735,6 @@ const AdviceMap _triggerPlan = <String, Object>{
   ],
 };
 
-const AdviceMap _studyStart = <String, Object>{
-  'recommendation':
-      'Study the hardest idea first while attention is still fresh.',
-  'tip': 'Explain the idea out loud after reading it',
-  'descriptions': <String>[
-    'Start with the hardest concept.',
-    'Turn reading into recall.',
-    'Keep study blocks short enough to repeat.',
-  ],
-};
-
-const AdviceMap _studyReview = <String, Object>{
-  'recommendation':
-      'Review what matters, then stop before your brain gets noisy.',
-  'tip': 'Short recall beats long rereading',
-  'descriptions': <String>[
-    'Review the material that fades fastest.',
-    'Use recall before checking notes.',
-    'Stop while your brain can still settle.',
-  ],
-};
-
 const AdviceMap _proPlan = <String, Object>{
   'recommendation':
       'Choose the highest-value outcome and remove one friction point.',
@@ -749,13 +758,43 @@ const AdviceMap _proReview = <String, Object>{
 };
 
 const List<AdviceMap> _normal = <AdviceMap>[
-  _steadyStart,
-  _focusedProgress,
-  _replyAndDecide,
-  _recharge,
-  _secondWind,
-  _moveAndReset,
-  _bedtimePrep,
+  <String, Object>{
+    'tip': 'Don’t try to fix your whole life in one morning.',
+    'recommendation': 'Pick one useful thing and start with 10 minutes.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Doing five things together usually means doing none properly.',
+    'recommendation': 'Choose one task, finish a small part, then move on.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Messages and calls don’t need your attention all day.',
+    'recommendation': 'Keep one fixed time to clear them together.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'A small break is better than sitting tired for hours.',
+    'recommendation': 'Eat, drink water, walk a bit, and come back fresh.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Small pending things create unnecessary stress.',
+    'recommendation': 'Close one or two easy tasks before the day ends.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Not every free minute needs to become work time.',
+    'recommendation':
+        'Keep some time for family, friends, rest, or just doing nothing.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Tomorrow doesn’t need a full timetable tonight.',
+    'recommendation':
+        'Decide the first thing you’ll do tomorrow, then switch off.',
+    'descriptions': <String>[],
+  },
 ];
 
 const List<AdviceMap> _athletic = <AdviceMap>[
@@ -769,43 +808,209 @@ const List<AdviceMap> _athletic = <AdviceMap>[
 ];
 
 const List<AdviceMap> _gym = <AdviceMap>[
-  _activeStart,
-  _trainingBlock,
-  _recharge,
-  _focusedProgress,
-  _moveAndReset,
-  _mobilityReset,
-  _bedtimePrep,
+  <String, Object>{
+    'tip': 'Don’t wait for the perfect workout mood.',
+    'recommendation': 'Change clothes, warm up, and just start.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'You don’t need to destroy yourself in every workout.',
+    'recommendation': 'Train properly, but keep enough energy to recover.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Muscle needs food also, not only workouts.',
+    'recommendation': 'Have a proper meal with enough protein after training.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Don’t randomly change your workout every day.',
+    'recommendation':
+        'Follow the same basic plan and track your reps or weights.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Missed one workout? Don’t make it a full week.',
+    'recommendation': 'Do a shorter workout today and continue normally.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Recovery is part of getting stronger.',
+    'recommendation':
+        'Stretch a bit, drink water, eat properly, and get enough sleep.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Small progress still counts.',
+    'recommendation':
+        'Note today’s workout and try to improve one small thing next time.',
+    'descriptions': <String>[],
+  },
 ];
 
 const List<AdviceMap> _office = <AdviceMap>[
-  _officeStart,
-  _replyAndDecide,
-  _recharge,
-  _secondWind,
-  _officeClose,
-  _closeTheDay,
-  _bedtimePrep,
+  <String, Object>{
+    'tip': 'Don’t start your day with notifications.',
+    'recommendation': 'Mute them and finish one important task first.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Replying every five minutes will eat your full day.',
+    'recommendation': 'Check messages together at one fixed time.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Feeling tired? Don’t directly start scrolling.',
+    'recommendation': 'Drink water, eat something, and walk for 5–10 minutes.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Too many open tasks make your brain more tired.',
+    'recommendation': 'Finish one small pending task before starting another.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'You don’t need to finish everything today.',
+    'recommendation': 'Pick the top 2–3 things and complete those properly.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'If you keep pushing, focus will only get worse.',
+    'recommendation': 'Take one proper break without work or calls.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Don’t carry today’s mess into tomorrow.',
+    'recommendation': 'Note tomorrow’s first task and close work for the day.',
+    'descriptions': <String>[],
+  },
 ];
 
 const List<AdviceMap> _nicotineFree = <AdviceMap>[
-  _habitReset,
-  _focusedProgress,
-  _recharge,
-  _triggerPlan,
-  _moveAndReset,
-  _closeTheDay,
-  _bedtimePrep,
+  <String, Object>{
+    'tip': 'Don’t automatically smoke the moment you feel the urge.',
+    'recommendation':
+        'Wait a few minutes. Drink water, walk, or message someone.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Notice when you usually reach for a cigarette.',
+    'recommendation':
+        'Check if it happens with chai, stress, work breaks, or boredom.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'One craving doesn’t mean you have to act on it.',
+    'recommendation':
+        'Change what you’re doing for 5–10 minutes and let the urge pass.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Make smoking a little less convenient.',
+    'recommendation':
+        'Keep cigarettes away from your desk, bed, or usual sitting place.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Don’t think only about quitting everything at once.',
+    'recommendation': 'Focus on skipping or delaying the next cigarette first.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'If you smoked more today, don’t give up on the full plan.',
+    'recommendation':
+        'Notice what triggered it and start reducing again from the next one.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Keep track without judging yourself too much.',
+    'recommendation':
+        'Note how many you had today and aim for a little better tomorrow.',
+    'descriptions': <String>[],
+  },
 ];
 
 const List<AdviceMap> _student = <AdviceMap>[
-  _studyStart,
-  _focusedProgress,
-  _recharge,
-  _replyAndDecide,
-  _moveAndReset,
-  _studyReview,
-  _bedtimePrep,
+  <String, Object>{
+    'tip': 'Don’t wait for full motivation. Just start somehow.',
+    'recommendation': 'Pick one topic and study for 10–15 minutes. Bas, start.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'One proper session is better than wasting the full day.',
+    'recommendation':
+        'Set a 25–30 minute timer. Start with the topic you keep avoiding.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Take a break, but don’t make it too long.',
+    'recommendation':
+        'Eat, drink water, check your phone a bit, then come back at a fixed time.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Small-small work can take your whole day.',
+    'recommendation':
+        'Finish calls, messages, and small tasks together. Then study again.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'If your brain is not working, don’t keep forcing it.',
+    'recommendation':
+        'Walk a bit, stretch, have chai or coffee, then start with an easy topic.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Too tired to learn something new? Revise instead.',
+    'recommendation':
+        'Go through formulas, key points, definitions, or old questions.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'No need to make a big plan before sleeping.',
+    'recommendation':
+        'Decide tomorrow’s first topic, keep your books ready, and sleep.',
+    'descriptions': <String>[],
+  },
+];
+
+const List<AdviceMap> _language = <AdviceMap>[
+  <String, Object>{
+    'tip': 'Don’t try to learn 50 new words in one sitting.',
+    'recommendation': 'Learn 5–10 useful words and actually use them.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Reading only is not enough. Say things out loud.',
+    'recommendation': 'Speak a few simple sentences using what you learnt.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Ten minutes daily is better than two hours once a week.',
+    'recommendation': 'Keep one small daily language session.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Don’t stop every time you forget one word.',
+    'recommendation': 'Say the sentence in an easier way and keep going.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Use content you already enjoy.',
+    'recommendation':
+        'Watch a short video, reel, or show clip in that language.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Revision works better than reading the same page again.',
+    'recommendation': 'Try remembering old words before checking the answer.',
+    'descriptions': <String>[],
+  },
+  <String, Object>{
+    'tip': 'Keep tomorrow’s practice easy to start.',
+    'recommendation': 'Pick one small lesson or topic before you sleep.',
+    'descriptions': <String>[],
+  },
 ];
 
 const List<AdviceMap> _normalPro = <AdviceMap>[
@@ -870,14 +1075,11 @@ List<ModeAdvice> adviceForMode(String modeId) {
     'normal_pro' => 'healthy_pro',
     _ => modeId,
   };
-  final healthy =
-      presetGoalCardsFor('healthy').map(_modeAdviceFromMap).toList();
   if (CustomModeStore.isCustomModeId(modeId)) {
     final plan = CustomModeStore.instance.planForModeId(modeId);
-    final slots = plan.slots;
-    return List<ModeAdvice>.generate(healthy.length, (i) {
-      final s = i < slots.length ? slots[i] : const CustomSlot();
-      return _customAdviceFromSlot(slot: s);
+    final slots = CustomModeStore.slotsFromCards(plan.planCards);
+    return List<ModeAdvice>.generate(slots.length, (i) {
+      return _customAdviceFromSlot(slot: slots[i]);
     });
   }
   final source = presetGoalCardsFor(normalizedModeId);

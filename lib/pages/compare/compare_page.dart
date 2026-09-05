@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-
 import '../../constants/app_colors.dart';
+import '../../constants/track_goal_ui_constants.dart';
 import '../../models/energy_log_record.dart';
 import '../../models/planner_session_log.dart';
+import '../../shared/widgets/goal_people_strip.dart';
 import '../../services/custom_mode_store.dart';
 import '../../services/daily_progress_sync_service.dart';
 import '../../services/energy_log_store.dart';
@@ -97,10 +98,10 @@ class _ComparePageState extends State<ComparePage> {
         }
       }
       if (!mounted) return;
-      setState(() => _usingNowCount = matched?.displayUsedCount ?? 0);
+      setState(() => _usingNowCount = matched?.displayUsedCount ?? 2);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _usingNowCount = 0);
+      setState(() => _usingNowCount = 2);
     }
   }
 
@@ -111,7 +112,8 @@ class _ComparePageState extends State<ComparePage> {
       (mode) => mode.id == modeId,
       orElse: () => allSelectableDayModes.first,
     );
-    final phases = dayPhasesFor(
+    final phases = dayPhasesForMode(
+      modeId,
       wakeMinutes: SleepScheduleStore.instance.wakeMinutes,
       sleepMinutes: SleepScheduleStore.instance.sleepMinutes,
     );
@@ -124,18 +126,21 @@ class _ComparePageState extends State<ComparePage> {
     );
     final rows = <_CompareRow>[
       for (var i = 0; i < slots.length; i++)
-        _CompareRow(
-          sessionId: 'slot_$i',
-          time: slots[i].rangeLabel,
-          phaseLabel: phases[i].label,
-          startMinutes: slots[i].startMinutes,
-          endMinutes: slots[i].endMinutes,
-          planTitle: advice[i].tip,
-          planBody: advice[i].recommendation,
-          userText: _userTextFor('slot_$i'),
-          status: _statusFor('slot_$i'),
-          canMark: slots[i].startMinutes <= nowMinutes,
-        ),
+        () {
+          final safeIndex = i.clamp(0, advice.length - 1).toInt();
+          return _CompareRow(
+            sessionId: 'slot_$i',
+            time: slots[i].rangeLabel,
+            phaseLabel: phases[i].label,
+            startMinutes: slots[i].startMinutes,
+            endMinutes: slots[i].endMinutes,
+            planTitle: advice[safeIndex].tip,
+            planBody: advice[safeIndex].recommendation,
+            userText: _userTextFor('slot_$i'),
+            status: _statusFor('slot_$i'),
+            canMark: slots[i].startMinutes <= nowMinutes,
+          );
+        }(),
     ];
     final content = Container(
       color: Theme.of(context).scaffoldBackgroundColor,
@@ -244,73 +249,37 @@ class _DayModeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return ValueListenableBuilder<List<CustomPlan>>(
-      valueListenable: CustomModeStore.instance.plans,
-      builder: (context, plans, _) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(11, 8, 11, 8),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.success.withOpacity(0.22)),
+    final count =
+        usingNowCount == null ? 2 : usingNowCount!.clamp(2, 999).toInt();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(3, 3, 3, 5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            modeLabel,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: colors.onSurface,
+              fontSize: 23,
+              height: 1.04,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 22,
-                height: 22,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: const Icon(
-                  Icons.flag_rounded,
-                  size: 13,
-                  color: AppColors.success,
-                ),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  modeLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontSize: 12,
-                    height: 1.05,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                height: 22,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.success.withOpacity(0.2)),
-                ),
-                child: Text(
-                  usingNowCount == null
-                      ? 'Loading'
-                      : '$usingNowCount using now',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.success,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 9),
+          GoalPeopleStrip(
+            count: count,
+            avatarSize: 28,
+            overlap: 16,
+            textStyle: TextStyle(
+              color: colors.onSurface.withOpacity(0.82),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -358,23 +327,108 @@ class _JoinedCompareColumns extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.outline.withOpacity(0.24)),
-      ),
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
-        itemCount: rows.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) => _CompareAlignedRow(
-          row: rows[index],
-          first: index == 0,
-          last: index == rows.length - 1,
+    final children = <Widget>[];
+    TrackGoalSectionInfo? previousSection;
+    for (var i = 0; i < rows.length; i++) {
+      final section = TrackGoalUiConstants.sectionForCardIndex(i);
+      if (previousSection?.title != section.title) {
+        if (children.isNotEmpty) children.add(const SizedBox(height: 48));
+        children.add(
+          _TrackGoalSectionHeader(
+            section: section,
+            description: _phaseDescriptionForSection(section),
+          ),
+        );
+        children.add(const SizedBox(height: 12));
+        previousSection = section;
+      } else {
+        children.add(const SizedBox(height: 8));
+      }
+      children.add(
+        _CompareAlignedRow(
+          row: rows[i],
           onStatusChanged: onStatusChanged,
+          outlineColor: colors.outline.withOpacity(0.2),
         ),
-      ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      children: children,
+    );
+  }
+
+  String _phaseDescriptionForSection(TrackGoalSectionInfo section) {
+    final labels = <String>[];
+    for (var i = 0; i < rows.length; i++) {
+      final itemSection = TrackGoalUiConstants.sectionForCardIndex(i);
+      if (itemSection.title != section.title) continue;
+      final label = rows[i].phaseLabel.trim();
+      if (label.isNotEmpty && !labels.contains(label)) labels.add(label);
+    }
+    return labels.join(', ');
+  }
+}
+
+class _TrackGoalSectionHeader extends StatelessWidget {
+  const _TrackGoalSectionHeader({
+    required this.section,
+    required this.description,
+  });
+
+  final TrackGoalSectionInfo section;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: section.color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(section.icon, size: 14, color: section.color),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                section.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurface.withOpacity(0.82),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (description.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface.withOpacity(0.46),
+                    fontSize: 10.4,
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -382,15 +436,13 @@ class _JoinedCompareColumns extends StatelessWidget {
 class _CompareAlignedRow extends StatelessWidget {
   const _CompareAlignedRow({
     required this.row,
-    required this.first,
-    required this.last,
     required this.onStatusChanged,
+    required this.outlineColor,
   });
 
   final _CompareRow row;
-  final bool first;
-  final bool last;
   final void Function(_CompareRow row, String status) onStatusChanged;
+  final Color outlineColor;
 
   Color _statusColor(ColorScheme colors) {
     return switch (row.status) {
@@ -402,11 +454,14 @@ class _CompareAlignedRow extends StatelessWidget {
     };
   }
 
-  String get _statusTitle {
+  Color _cardColor(ColorScheme colors) {
     return switch (row.status) {
-      PlannerSessionStatus.done => 'Done',
-      PlannerSessionStatus.partial => 'Partly done',
-      _ => row.canMark ? 'Not done' : 'Upcoming',
+      PlannerSessionStatus.done => AppColors.success.withOpacity(0.11),
+      PlannerSessionStatus.partial => const Color(0xFFE0A224).withOpacity(0.13),
+      PlannerSessionStatus.notDone => row.canMark
+          ? colors.surfaceContainerHighest.withOpacity(0.46)
+          : colors.surfaceContainerLow,
+      _ => colors.surfaceContainerLow,
     };
   }
 
@@ -414,71 +469,36 @@ class _CompareAlignedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final statusColor = _statusColor(colors);
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          SizedBox(
-            width: 22,
-            child: Column(
-              children: <Widget>[
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    color: first
-                        ? Colors.transparent
-                        : colors.outline.withOpacity(0.24),
-                  ),
-                ),
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    color: last
-                        ? Colors.transparent
-                        : colors.outline.withOpacity(0.24),
-                  ),
-                ),
-              ],
-            ),
+    return Material(
+      color: _cardColor(colors),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: row.status == PlannerSessionStatus.notDone
+                ? outlineColor
+                : statusColor.withOpacity(0.3),
           ),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 9),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: colors.outline.withOpacity(0.14)),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Expanded(
-                    flex: 4,
-                    child: _PlanCell(row: row),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 1,
-                    child: _UserStatusCell(
-                      row: row,
-                      statusColor: statusColor,
-                      statusTitle: _statusTitle,
-                      onStatusChanged: onStatusChanged,
-                    ),
-                  ),
-                ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              flex: 4,
+              child: _PlanCell(row: row),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 1,
+              child: _UserStatusCell(
+                row: row,
+                onStatusChanged: onStatusChanged,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -496,7 +516,7 @@ class _PlanCell extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '${row.phaseLabel} · ${row.time}',
+          row.time,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -511,10 +531,10 @@ class _PlanCell extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: colors.onSurface.withOpacity(0.9),
-            fontSize: 11.5,
-            height: 1.14,
-            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+            fontSize: 13.5,
+            height: 1.12,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 4),
@@ -537,60 +557,39 @@ class _PlanCell extends StatelessWidget {
 class _UserStatusCell extends StatelessWidget {
   const _UserStatusCell({
     required this.row,
-    required this.statusColor,
-    required this.statusTitle,
     required this.onStatusChanged,
   });
 
   final _CompareRow row;
-  final Color statusColor;
-  final String statusTitle;
   final void Function(_CompareRow row, String status) onStatusChanged;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          statusTitle,
-          maxLines: 1,
-          textAlign: TextAlign.center,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: statusColor,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
+        _StatusChoiceChip(
+          icon: Icons.check_rounded,
+          color: AppColors.success,
+          selected: row.status == PlannerSessionStatus.done,
+          enabled: row.canMark,
+          onTap: () => onStatusChanged(row, PlannerSessionStatus.done),
         ),
-        const SizedBox(height: 6),
-        Column(
-          children: <Widget>[
-            _StatusChoiceChip(
-              icon: Icons.check_rounded,
-              color: AppColors.success,
-              selected: row.status == PlannerSessionStatus.done,
-              enabled: row.canMark,
-              onTap: () => onStatusChanged(row, PlannerSessionStatus.done),
-            ),
-            const SizedBox(height: 5),
-            _StatusChoiceChip(
-              icon: Icons.remove_rounded,
-              color: const Color(0xFFE0A224),
-              selected: row.status == PlannerSessionStatus.partial,
-              enabled: row.canMark,
-              onTap: () => onStatusChanged(row, PlannerSessionStatus.partial),
-            ),
-            const SizedBox(height: 5),
-            _StatusChoiceChip(
-              icon: Icons.close_rounded,
-              color: colors.onSurface.withOpacity(0.48),
-              selected: row.status == PlannerSessionStatus.notDone,
-              enabled: row.canMark,
-              onTap: () => onStatusChanged(row, PlannerSessionStatus.notDone),
-            ),
-          ],
+        const SizedBox(height: 5),
+        _StatusChoiceChip(
+          icon: Icons.more_horiz_rounded,
+          color: const Color(0xFFE0A224),
+          selected: row.status == PlannerSessionStatus.partial,
+          enabled: row.canMark,
+          onTap: () => onStatusChanged(row, PlannerSessionStatus.partial),
+        ),
+        const SizedBox(height: 5),
+        _StatusChoiceChip(
+          icon: Icons.close_rounded,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.48),
+          selected: row.status == PlannerSessionStatus.notDone,
+          enabled: row.canMark,
+          onTap: () => onStatusChanged(row, PlannerSessionStatus.notDone),
         ),
       ],
     );

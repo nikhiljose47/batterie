@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
+import '../../../constants/avatar_constants.dart';
 import '../../../models/person_status.dart';
 
 class PersonStatusRail extends StatelessWidget {
@@ -22,26 +24,74 @@ class PersonStatusRail extends StatelessWidget {
         final score =
             person.scorePercent ?? (person.energyPercent * 100).round();
         return SizedBox(
-          width: 70,
+          width: 68,
           child: Column(
             children: <Widget>[
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: colors.outline.withOpacity(0.22)),
-                ),
-                alignment: Alignment.center,
-                child: CircleAvatar(
-                  radius: 21,
-                  backgroundColor: AppColors.surfaceTint,
-                  foregroundColor: AppColors.primary,
-                  child: Text(
-                    person.name.isEmpty ? '?' : person.name.substring(0, 1),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colors.outline.withOpacity(0.22),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: CircleAvatar(
+                        radius: 28,
+                        backgroundColor: AppColors.surfaceTint,
+                        child: ClipOval(
+                          child: SizedBox.expand(
+                            child: SvgPicture.asset(
+                              AvatarConstants.assetPath(
+                                AvatarConstants.defaultAvatarId,
+                              ),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colors.primary, width: 2),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: colors.shadow.withOpacity(0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          '$score',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: score >= 100 ? 8 : 9,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 4),
@@ -54,30 +104,6 @@ class PersonStatusRail extends StatelessWidget {
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Container(
-                height: 18,
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.18),
-                  ),
-                ),
-                child: Text(
-                  'eScore $score',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
               ),
             ],
           ),

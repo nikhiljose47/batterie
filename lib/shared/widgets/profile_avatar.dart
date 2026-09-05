@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../constants/avatar_constants.dart';
 import '../../constants/app_colors.dart';
 import '../../pages/profile/profile_bloc.dart';
 
@@ -33,22 +35,27 @@ class ProfileAvatar extends StatelessWidget {
           backgroundImage: hasPhoto ? FileImage(File(path)) : null,
           child: hasPhoto
               ? null
-              : Icon(
-                  Icons.person_rounded,
-                  size: iconSize ?? radius * 1.2,
-                  color: AppColors.primary,
+              : ClipOval(
+                  child: SizedBox.expand(
+                    child: SvgPicture.asset(
+                      AvatarConstants.assetPath(
+                          AvatarConstants.defaultAvatarId),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
         );
 
         if (border == null) return avatar;
 
         return Container(
-          padding: const EdgeInsets.all(2),
+          width: radius * 2,
+          height: radius * 2,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: border,
           ),
-          child: avatar,
+          child: ClipOval(child: avatar),
         );
       },
     );

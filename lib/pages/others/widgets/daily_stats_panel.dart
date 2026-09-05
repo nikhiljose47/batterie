@@ -296,6 +296,15 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     return ((done / _sessionLogs.length) * 100).round();
   }
 
+  int? get _energyScore {
+    final physical = _avgPhysical;
+    final brain = _avgBrain;
+    if (physical != null && brain != null) {
+      return ((physical + brain) / 2).round();
+    }
+    return _donePercent;
+  }
+
   /// Plain-language read of the day: best case "all green", otherwise names
   /// the activity right before the lowest dip.
   String? get _summary {
@@ -497,36 +506,15 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                         ),
                         const SizedBox(height: AppSpacing.medium),
 
-                        // Averages
-                        Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: _AverageCard(
-                                label: 'Avg physical',
-                                value: _avgPhysical,
-                                color: AppColors.energyPhysicalAccent,
-                                background: AppColors.energyPhysicalBg,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.small),
-                            Expanded(
-                              child: _AverageCard(
-                                label: 'Avg brain',
-                                value: _avgBrain,
-                                color: AppColors.energyBrainAccent,
-                                background: AppColors.energyBrainBg,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.small),
-                            Expanded(
-                              child: _AverageCard(
-                                label: 'Sessions done',
-                                value: _donePercent,
-                                color: AppColors.primary,
-                                background: AppColors.surfaceTint,
-                              ),
-                            ),
-                          ],
+                        _StatusScoreCard(
+                          score: _energyScore,
+                          physical: _avgPhysical,
+                          brain: _avgBrain,
+                          donePercent: _donePercent,
+                          doneCount:
+                              _sessionLogs.where((log) => log.isDone).length,
+                          totalSessions: _sessionLogs.length,
+                          energyLogs: _records.length,
                         ),
 
                         if (_tips.isNotEmpty) ...<Widget>[
@@ -576,24 +564,6 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                           style: const TextStyle(fontSize: 13),
                         ),
                         const SizedBox(height: AppSpacing.medium),
-
-                        // Log entries
-                        const Text(
-                          'LOG',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textMuted,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.small),
-                        ..._sessionLogs.map((log) => _PlannerLogRow(log: log)),
-                        ..._records.map((r) => _LogRow(
-                              record: r,
-                              activityName:
-                                  _engine.activityById(r.activityId).name,
-                            )),
 
                         if (widget.onOpenCoach != null) ...<Widget>[
                           const SizedBox(height: AppSpacing.medium),
@@ -1077,54 +1047,268 @@ class _ContributionStat extends StatelessWidget {
   }
 }
 
-// ── Averages ──────────────────────────────────────────────────────────────────
+// ── Score summary ─────────────────────────────────────────────────────────────
 
-class _AverageCard extends StatelessWidget {
-  const _AverageCard({
+class _StatusScoreCard extends StatelessWidget {
+  const _StatusScoreCard({
+    required this.score,
+    required this.physical,
+    required this.brain,
+    required this.donePercent,
+    required this.doneCount,
+    required this.totalSessions,
+    required this.energyLogs,
+  });
+
+  final int? score;
+  final int? physical;
+  final int? brain;
+  final int? donePercent;
+  final int doneCount;
+  final int totalSessions;
+  final int energyLogs;
+
+  double get _progress => ((score ?? 0).clamp(0, 100)) / 100;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.medium),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outline.withOpacity(0.32)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow.withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 360;
+          final circle = _ScoreCircle(score: score, progress: _progress);
+          final stats = _ScoreStatWrap(
+            physical: physical,
+            brain: brain,
+            donePercent: donePercent,
+            doneCount: doneCount,
+            totalSessions: totalSessions,
+            energyLogs: energyLogs,
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                circle,
+                const SizedBox(height: AppSpacing.medium),
+                stats,
+              ],
+            );
+          }
+          return Row(
+            children: <Widget>[
+              circle,
+              const SizedBox(width: AppSpacing.medium),
+              Expanded(child: stats),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ScoreCircle extends StatelessWidget {
+  const _ScoreCircle({required this.score, required this.progress});
+
+  final int? score;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 104,
+      height: 104,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          SizedBox(
+            width: 104,
+            height: 104,
+            child: CircularProgressIndicator(
+              value: score == null ? 0 : progress,
+              strokeWidth: 9,
+              strokeCap: StrokeCap.round,
+              backgroundColor: colors.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+            ),
+          ),
+          Container(
+            width: 82,
+            height: 82,
+            decoration: BoxDecoration(
+              color: colors.primary.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                score == null ? '--' : '$score',
+                style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 27,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                'eScore',
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScoreStatWrap extends StatelessWidget {
+  const _ScoreStatWrap({
+    required this.physical,
+    required this.brain,
+    required this.donePercent,
+    required this.doneCount,
+    required this.totalSessions,
+    required this.energyLogs,
+  });
+
+  final int? physical;
+  final int? brain;
+  final int? donePercent;
+  final int doneCount;
+  final int totalSessions;
+  final int energyLogs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.small,
+      runSpacing: AppSpacing.small,
+      children: <Widget>[
+        _ScoreMiniStat(
+          label: 'Physical',
+          value: physical == null ? '--' : '$physical%',
+          color: AppColors.energyPhysicalAccent,
+          background: AppColors.energyPhysicalBg,
+        ),
+        _ScoreMiniStat(
+          label: 'Brain',
+          value: brain == null ? '--' : '$brain%',
+          color: AppColors.energyBrainAccent,
+          background: AppColors.energyBrainBg,
+        ),
+        _ScoreMiniStat(
+          label: 'Done',
+          value: totalSessions == 0 ? '--' : '$donePercent%',
+          detail: totalSessions == 0 ? 'No cards' : '$doneCount/$totalSessions',
+          color: AppColors.primary,
+          background: AppColors.surfaceTint,
+        ),
+        _ScoreMiniStat(
+          label: 'Logs',
+          value: '$energyLogs',
+          color: AppColors.info,
+          background: const Color(0xFFEAF2FF),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScoreMiniStat extends StatelessWidget {
+  const _ScoreMiniStat({
     required this.label,
     required this.value,
     required this.color,
     required this.background,
+    this.detail,
   });
 
   final String label;
-  final int? value;
+  final String value;
+  final String? detail;
   final Color color;
   final Color background;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.medium,
-        vertical: AppSpacing.small,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: color.withOpacity(0.8),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 104, maxWidth: 132),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color.withOpacity(0.78),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value == null ? '—' : '$value%',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: color,
+            const SizedBox(height: 2),
+            Row(
+              children: <Widget>[
+                Flexible(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (detail != null) ...<Widget>[
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      detail!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: color.withOpacity(0.72),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1215,144 +1399,6 @@ class _CoachEntry extends StatelessWidget {
             Icon(Icons.chevron_right, color: colors.onSurfaceVariant, size: 18),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Log rows ──────────────────────────────────────────────────────────────────
-
-class _PlannerLogRow extends StatelessWidget {
-  const _PlannerLogRow({required this.log});
-
-  final PlannerSessionLog log;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = log.isDone ? AppColors.primary : AppColors.error;
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.small),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.medium,
-        vertical: AppSpacing.small,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(
-            log.isDone ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            size: 18,
-            color: color,
-          ),
-          const SizedBox(width: AppSpacing.small),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  log.title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${formatMinutes(log.startMinutes)} · ${formatMinutes(log.endMinutes)}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            log.isDone ? 'Done' : 'Not done',
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LogRow extends StatelessWidget {
-  const _LogRow({required this.record, required this.activityName});
-
-  final EnergyLogRecord record;
-  final String activityName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.small),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.medium,
-        vertical: AppSpacing.small,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Row(
-        children: <Widget>[
-          Text(
-            activityEmojis[record.activityId] ?? '⚡',
-            style: const TextStyle(fontSize: 16),
-          ),
-          const SizedBox(width: AppSpacing.small),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  activityName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${formatMinutes(record.startMinutes)} · ${record.durationMinutes} min',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '💪 ${record.physicalAfter}%',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.energyPhysicalAccent,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.small),
-          Text(
-            '🧠 ${record.brainAfter}%',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.energyBrainAccent,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }

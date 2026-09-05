@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/goal_plan_constants.dart';
+import '../../../models/community_plan.dart';
 import '../../../services/custom_mode_store.dart';
 import '../../../services/sleep_schedule_store.dart';
 import '../../home_tab/data/mode_advice.dart'
@@ -147,6 +148,26 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
     );
   }
 
+  List<PlanCard> _cardsFromDraftSlots() {
+    final phases = dayPhases;
+    final wakeMinutes = SleepScheduleStore.instance.wakeMinutes;
+    return List<PlanCard>.generate(_draftSlots.length, (index) {
+      final slot = _draftSlots[index];
+      final phase = phases[index.clamp(0, phases.length - 1).toInt()];
+      final title = slot.recommendation.trim().isNotEmpty
+          ? slot.recommendation.trim()
+          : slot.tip.trim();
+      return PlanCard(
+        id: 'card_${(index + 1).toString().padLeft(3, '0')}',
+        title: title.isEmpty ? 'Plan card ${index + 1}' : title,
+        description: slot.descriptions.join('\n'),
+        startOffsetMinutes: phase.slot.startMinutes - wakeMinutes,
+        endOffsetMinutes: phase.slot.endMinutes - wakeMinutes,
+        position: index + 1,
+      );
+    });
+  }
+
   void _goBack() {
     if (_step == 0) {
       Navigator.of(context).maybePop();
@@ -245,6 +266,9 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
       name: name,
       slots: CustomModeStore.normalizeSlots(_draftSlots),
       tag: _tag,
+      shortName: name,
+      longName: name,
+      cards: _cardsFromDraftSlots(),
     );
     await CustomModeStore.instance.savePlan(plan);
     await ProfileStore.instance.setPlannerMode(plan.id);

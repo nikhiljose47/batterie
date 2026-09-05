@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../services/daily_progress_sync_service.dart';
+import '../../services/escore_reset_service.dart';
 import '../../services/google_calendar_service.dart';
 import '../profile/profile_store.dart';
 
@@ -45,6 +46,7 @@ class _AuthPageState extends State<AuthPage> {
       if (display.trim().isNotEmpty) {
         await ProfileStore.instance.setName(display);
       }
+      await EscoreResetService.instance.checkForRemoteReset();
       await DailyProgressSyncService.instance.syncToday();
       if (mounted) Navigator.of(context).pop();
     } catch (error) {
@@ -63,6 +65,7 @@ class _AuthPageState extends State<AuthPage> {
       if (displayName != null && displayName.trim().isNotEmpty) {
         await ProfileStore.instance.setName(displayName);
       }
+      await EscoreResetService.instance.checkForRemoteReset();
       await DailyProgressSyncService.instance.syncToday();
       if (mounted) Navigator.of(context).pop();
     } catch (error) {

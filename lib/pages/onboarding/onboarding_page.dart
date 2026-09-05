@@ -67,7 +67,7 @@ class _OnboardingPageState extends State<OnboardingPage>
     ),
     _FriendlyMode(
       id: 'healthy',
-      title: 'Stay Balanced',
+      title: 'Stay Balanced and Move More',
       icon: Icons.auto_awesome_rounded,
       color: Color(0xFF7B61FF),
     ),
