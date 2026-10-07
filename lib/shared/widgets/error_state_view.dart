@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
 
@@ -24,18 +25,30 @@ class ErrorStateView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.error_outline,
-              color: colorScheme.error,
-              size: AppSpacing.xxLarge,
-            ),
-            const SizedBox(height: AppSpacing.medium),
-            Text(
-              message,
-              style: textTheme.bodyLarge,
-              textAlign: TextAlign.center,
+            Container(
+              width: 72,
+              height: 72,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colorScheme.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(
+                Icons.error_outline,
+                color: colorScheme.error,
+                size: 34,
+              ),
             ),
             const SizedBox(height: AppSpacing.large),
+            Text(
+              message,
+              style: textTheme.titleMedium?.copyWith(
+                color: AppColors.textStrong,
+                fontWeight: FontWeight.w900,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xLarge),
             FilledButton(
               onPressed: onRetry,
               child: const Text(AppStrings.retry),

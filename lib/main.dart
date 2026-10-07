@@ -18,6 +18,7 @@ import 'services/daily_progress_sync_service.dart';
 import 'services/escore_reset_service.dart';
 import 'services/firestore_remote_sync.dart';
 import 'services/remote_sync.dart';
+import 'services/shared_goal_plan_service.dart';
 import 'services/sleep_schedule_store.dart';
 import 'services/theme_mode_store.dart';
 
@@ -25,9 +26,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      systemNavigationBarColor: Color(0xFF07090D),
-      systemNavigationBarDividerColor: Color(0xFF07090D),
-      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFFF7F9FC),
+      systemNavigationBarDividerColor: Color(0xFFF7F9FC),
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
 
@@ -58,12 +59,14 @@ Future<void> _initFirebaseSync() async {
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user == null) return;
       unawaited(
-        EscoreResetService.instance
-            .checkForRemoteReset()
-            .then((_) => DailyProgressSyncService.instance.syncToday()),
+        EscoreResetService.instance.checkForRemoteReset().then((_) async {
+          await SharedGoalPlanService.instance.publishLocalPlans();
+          await DailyProgressSyncService.instance.syncToday();
+        }),
       );
     });
     await EscoreResetService.instance.checkForRemoteReset();
+    await SharedGoalPlanService.instance.publishLocalPlans();
     DailyProgressSyncService.instance.startBackgroundTopScoreRefresh();
   } catch (_) {}
 }

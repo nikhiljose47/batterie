@@ -12,6 +12,10 @@ class AlarmNotificationService {
   static const String _channelId = 'batterie_alarm_channel';
   static const String _channelName = 'Alarms';
   static const String _channelDescription = 'Planner and service alarms';
+  static const String _updatesChannelId = 'batterie_updates_channel';
+  static const String _updatesChannelName = 'Batterie updates';
+  static const String _updatesChannelDescription =
+      'Helpful app updates and rank board notifications';
   static const String _soundResource = 'universal_alarm';
   static const String _soundFile = 'universal_alarm.mp3';
 
@@ -57,8 +61,48 @@ class AlarmNotificationService {
         sound: RawResourceAndroidNotificationSound(_soundResource),
       ),
     );
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _updatesChannelId,
+        _updatesChannelName,
+        description: _updatesChannelDescription,
+        importance: Importance.defaultImportance,
+      ),
+    );
 
     _ready = true;
+  }
+
+  Future<void> showAppNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    await init();
+    if (kIsWeb) return;
+
+    await _plugin.show(
+      id,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _updatesChannelId,
+          _updatesChannelName,
+          channelDescription: _updatesChannelDescription,
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          visibility: NotificationVisibility.public,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: false,
+          presentSound: false,
+        ),
+      ),
+      payload: payload,
+    );
   }
 
   Future<void> scheduleAlarm({

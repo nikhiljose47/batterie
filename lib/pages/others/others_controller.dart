@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../constants/app_strings.dart';
@@ -22,8 +24,9 @@ class OthersController extends ChangeNotifier {
     try {
       final current =
           await DailyProgressSyncService.instance.currentUserStatus();
-      final loaded =
-          await DailyProgressSyncService.instance.cachedTopStatuses();
+      final loaded = await DailyProgressSyncService.instance.topStatuses(
+        limit: 20,
+      );
       final people = <PersonStatus>[
         if (current != null) current,
         ...loaded,
@@ -32,12 +35,16 @@ class OthersController extends ChangeNotifier {
           final bScore = b.scorePercent ?? (b.energyPercent * 100).round();
           return bScore.compareTo(aScore);
         });
-      final topPeople = people.take(7).toList(growable: false);
+      final topPeople = people.take(10).toList(growable: false);
       if (_disposed) return;
 
       _state = _state.copyWith(
         status: topPeople.isEmpty ? AsyncStatus.empty : AsyncStatus.success,
         people: topPeople,
+      );
+      unawaited(
+        DailyProgressSyncService.instance
+            .showRankBoardNotificationOnceToday(topPeople.length),
       );
     } catch (_) {
       if (_disposed) return;

@@ -8,10 +8,12 @@ import 'package:image_picker/image_picker.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../shared/widgets/profile_avatar.dart';
+import '../../services/daily_progress_sync_service.dart';
 import '../../services/google_calendar_service.dart';
 import '../auth/auth_page.dart';
 import '../settings/settings_page.dart';
 import 'profile_bloc.dart';
+import 'profile_store.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -73,11 +75,18 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (shouldLogout != true) return;
-    await GoogleCalendarService.instance.signOut();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Logged out')),
-    );
+    try {
+      await GoogleCalendarService.instance.signOut();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged out')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not logout. Please try again.')),
+      );
+    }
   }
 
   void _openSettings() {
@@ -110,6 +119,8 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         children: <Widget>[
           _buildPhotoCard(),
+          const SizedBox(height: 14),
+          const _ProfileScoreSection(),
           const SizedBox(height: 14),
           StreamBuilder<User?>(
             stream: FirebaseAuth.instance.authStateChanges(),
@@ -259,6 +270,170 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ProfileScoreSection extends StatelessWidget {
+  const _ProfileScoreSection();
+
+  Future<_ProfileScoreData> _load() async {
+    final service = DailyProgressSyncService.instance;
+    final today = await service.todayRecord();
+    final cached = await service.cachedProgress();
+    final userId = ProfileStore.instance.userId.value;
+    final mine = cached.where((record) => record.userId == userId).toList();
+    final allTime = mine.fold<int>(0, (sum, item) => sum + item.scorePercent);
+    final top = await service.cachedTopStatuses();
+    final leaders = <int>[
+      if (today != null) today.scorePercent,
+      ...top.map((person) => person.scorePercent ?? 0),
+    ]..sort((a, b) => b.compareTo(a));
+    final rank = today == null
+        ? null
+        : leaders.indexWhere((score) => score <= today.scorePercent) + 1;
+    return _ProfileScoreData(
+      currentScore: today?.scorePercent ?? 0,
+      allTimeScore: allTime,
+      rank: rank == 0 ? null : rank,
+      peopleCount: top.length + 1,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return FutureBuilder<_ProfileScoreData>(
+      future: _load(),
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? const _ProfileScoreData();
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.primary.withOpacity(0.07),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.primary.withOpacity(0.16)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(Icons.leaderboard_rounded,
+                      size: 18, color: colors.primary),
+                  const SizedBox(width: 7),
+                  Text(
+                    'Score',
+                    style: TextStyle(
+                      color: colors.onSurface,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: _ScoreMetric(
+                      label: 'Current',
+                      value: '${data.currentScore}',
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  Expanded(
+                    child: _ScoreMetric(
+                      label: 'All time',
+                      value: '${data.allTimeScore}',
+                      color: AppColors.success,
+                    ),
+                  ),
+                  Expanded(
+                    child: _ScoreMetric(
+                      label: 'By others',
+                      value: data.rank == null ? '--' : '#${data.rank}',
+                      color: const Color(0xFFE0A224),
+                      subLabel: '${data.peopleCount} users',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProfileScoreData {
+  const _ProfileScoreData({
+    this.currentScore = 0,
+    this.allTimeScore = 0,
+    this.rank,
+    this.peopleCount = 1,
+  });
+
+  final int currentScore;
+  final int allTimeScore;
+  final int? rank;
+  final int peopleCount;
+}
+
+class _ScoreMetric extends StatelessWidget {
+  const _ScoreMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.subLabel,
+  });
+
+  final String label;
+  final String value;
+  final String? subLabel;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: 23,
+            height: 1,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: colors.onSurface.withOpacity(0.58),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (subLabel != null)
+          Text(
+            subLabel!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: colors.onSurface.withOpacity(0.42),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+      ],
     );
   }
 }
@@ -520,7 +695,7 @@ class _ProfileDetailsPanel extends StatelessWidget {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  'Uses sleep, activity, weather, focus, and goal progress to keep your daily view personal.',
+                  'Uses sleep, activity, weather, and goal progress to keep your daily view personal.',
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.25,

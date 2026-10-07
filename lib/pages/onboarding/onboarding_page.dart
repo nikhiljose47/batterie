@@ -8,6 +8,7 @@ import '../../pages/home_tab/data/mode_advice.dart';
 import '../../pages/profile/profile_store.dart';
 import '../../pages/services/tools/toolkit.dart';
 import '../../services/google_calendar_service.dart';
+import '../../services/sleep_schedule_store.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -27,6 +28,7 @@ class _OnboardingPageState extends State<OnboardingPage>
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<FormState> _bodyFormKey = GlobalKey<FormState>();
   String _modeId = 'student';
+  TimeOfDay _wakeTime = SleepScheduleStore.instance.wakeTime.value;
   int _pageIndex = 0;
   bool _connectCalendar = false;
   bool _saving = false;
@@ -148,6 +150,7 @@ class _OnboardingPageState extends State<OnboardingPage>
         userAge: age,
         modeId: _modeId,
       );
+      await SleepScheduleStore.instance.setWake(_wakeTime);
       await _saveBodyMetrics();
       if (!mounted) return;
       setState(() => _showOutro = true);
@@ -192,7 +195,7 @@ class _OnboardingPageState extends State<OnboardingPage>
     return Column(
       children: <Widget>[
         _IntroDots(index: pageIndex, count: 3),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         Row(
           children: <Widget>[
             if (pageIndex > 0)
@@ -269,6 +272,9 @@ class _OnboardingPageState extends State<OnboardingPage>
                           formKey: _formKey,
                           nameController: _nameController,
                           ageController: _ageController,
+                          wakeTime: _wakeTime,
+                          onWakeTimeChanged: (time) =>
+                              setState(() => _wakeTime = time),
                           navigation: _buildInlineNav(0),
                         ),
                         _IntroBodyPage(
@@ -304,39 +310,45 @@ class _IntroProfilePage extends StatelessWidget {
     required this.formKey,
     required this.nameController,
     required this.ageController,
+    required this.wakeTime,
+    required this.onWakeTimeChanged,
     required this.navigation,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController ageController;
+  final TimeOfDay wakeTime;
+  final ValueChanged<TimeOfDay> onWakeTimeChanged;
   final Widget navigation;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 18),
+      padding: const EdgeInsets.fromLTRB(24, 34, 24, 22),
       child: Form(
         key: formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const _OnboardingHeader(),
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             _SetupCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     'Let\'s start with you.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: const Color(0xFF111827),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                      fontSize: 26,
+                      height: 1.08,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
                   _IntroQuestionField(
                     question: 'What\'s your name?',
                     child: TextFormField(
@@ -354,7 +366,7 @@ class _IntroProfilePage extends StatelessWidget {
                       },
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   _IntroQuestionField(
                     question: 'How old are you?',
                     child: TextFormField(
@@ -379,10 +391,18 @@ class _IntroProfilePage extends StatelessWidget {
                       },
                     ),
                   ),
+                  const SizedBox(height: 18),
+                  _IntroQuestionField(
+                    question: 'What time do you usually wake up?',
+                    child: _IntroWakeTimePicker(
+                      time: wakeTime,
+                      onChanged: onWakeTimeChanged,
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 30),
             navigation,
           ],
         ),
@@ -408,7 +428,7 @@ class _IntroBodyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 18),
+      padding: const EdgeInsets.fromLTRB(24, 34, 24, 22),
       child: Form(
         key: formKey,
         child: Column(
@@ -416,13 +436,15 @@ class _IntroBodyPage extends StatelessWidget {
           children: <Widget>[
             Text(
               'Your body details',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: const Color(0xFF111827),
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
+                color: colors.onSurface,
+                fontSize: 30,
+                height: 1.08,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             _SetupCard(
               child: Column(
                 children: <Widget>[
@@ -451,7 +473,7 @@ class _IntroBodyPage extends StatelessWidget {
                       },
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   _IntroQuestionField(
                     question: 'What\'s your weight?',
                     child: TextFormField(
@@ -480,7 +502,7 @@ class _IntroBodyPage extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 30),
             navigation,
           ],
         ),
@@ -512,29 +534,42 @@ class _IntroGoalPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 18),
+      padding: const EdgeInsets.fromLTRB(24, 34, 24, 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            'What would you like to achieve?',
+            'What\'s your target?',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: const Color(0xFF111827),
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
+              color: colors.onSurface,
+              fontSize: 31,
+              height: 1.08,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Text(
+            'Help us understand your needs better',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: colors.onSurface.withOpacity(0.62),
+              fontSize: 15,
+              height: 1.28,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 24),
           _CustomPlanNote(colors: colors),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisExtent: 92,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+              mainAxisExtent: 128,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
             itemCount: modes.length,
             itemBuilder: (context, index) {
@@ -546,17 +581,17 @@ class _IntroGoalPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           Material(
             color: colors.surface,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(22),
             child: InkWell(
               onTap: saving ? null : () => onCalendarChanged(!connectCalendar),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(22),
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(
                     color: connectCalendar
                         ? AppColors.primary.withOpacity(0.65)
@@ -611,6 +646,49 @@ class _IntroGoalPage extends StatelessWidget {
   }
 }
 
+class _IntroWakeTimePicker extends StatelessWidget {
+  const _IntroWakeTimePicker({
+    required this.time,
+    required this.onChanged,
+  });
+
+  final TimeOfDay time;
+  final ValueChanged<TimeOfDay> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(4),
+      child: InkWell(
+        onTap: () async {
+          final picked = await showTimePicker(
+            context: context,
+            initialTime: time,
+          );
+          if (picked != null) onChanged(picked);
+        },
+        borderRadius: BorderRadius.circular(4),
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.wb_twilight_rounded),
+            border: OutlineInputBorder(),
+          ),
+          child: Text(
+            time.format(context),
+            style: TextStyle(
+              color: colors.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _IntroQuestionField extends StatelessWidget {
   const _IntroQuestionField({
     required this.question,
@@ -630,9 +708,9 @@ class _IntroQuestionField extends StatelessWidget {
           question,
           style: TextStyle(
             color: colors.onSurface,
-            fontSize: 15,
+            fontSize: 15.5,
             height: 1.15,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 9),
@@ -656,9 +734,9 @@ class _IntroDots extends StatelessWidget {
         final active = dotIndex == index;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          width: active ? 18 : 7,
-          height: 7,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: active ? 58 : 52,
+          height: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
             color: active ? AppColors.primary : AppColors.outline,
             borderRadius: BorderRadius.circular(999),
@@ -685,7 +763,7 @@ class _CustomPlanNote extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(
+          const Icon(
             Icons.edit_note_rounded,
             size: 20,
             color: AppColors.info,
@@ -716,7 +794,7 @@ class _OnboardingHeader extends StatelessWidget {
     return Column(
       children: <Widget>[
         SizedBox(
-          height: 112,
+          height: 132,
           child: Lottie.asset(
             'assets/lottie/panda_sleeping.json',
             repeat: true,
@@ -728,9 +806,10 @@ class _OnboardingHeader extends StatelessWidget {
           'Welcome to Batterie',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Color(0xFF111827),
-            fontSize: 26,
-            fontWeight: FontWeight.w700,
+            color: AppColors.textStrong,
+            fontSize: 34,
+            height: 1.05,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ],
@@ -805,16 +884,16 @@ class _SetupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.softAccent),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppColors.outline.withOpacity(0.78)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.035),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: AppColors.primary.withOpacity(0.07),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
@@ -838,33 +917,54 @@ class _ModeChoiceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Material(
-      color: selected ? mode.color.withOpacity(0.1) : colors.surface,
-      borderRadius: BorderRadius.circular(12),
+      color: selected ? AppColors.primary : colors.surface,
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color:
-                  selected ? mode.color : AppColors.outline.withOpacity(0.65),
-              width: selected ? 1.4 : 1,
+              color: selected ? AppColors.primary : AppColors.outline,
+              width: selected ? 1.5 : 1,
             ),
+            boxShadow: selected
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.22),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(mode.icon, color: mode.color, size: 20),
+                  Icon(
+                    mode.icon,
+                    color: selected ? colors.onPrimary : mode.color,
+                    size: 28,
+                  ),
                   const Spacer(),
                   if (selected)
-                    Icon(
-                      Icons.check_circle_rounded,
-                      color: mode.color,
-                      size: 18,
+                    Container(
+                      width: 28,
+                      height: 28,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: AppColors.primary,
+                        size: 19,
+                      ),
                     ),
                 ],
               ),
@@ -873,11 +973,12 @@ class _ModeChoiceTile extends StatelessWidget {
                 mode.title,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12.5,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15.5,
                   height: 1.08,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF202638),
+                  fontWeight: FontWeight.w900,
+                  color: selected ? Colors.white : AppColors.textStrong,
                 ),
               ),
             ],

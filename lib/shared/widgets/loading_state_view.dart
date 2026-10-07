@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
 
@@ -19,7 +20,15 @@ class LoadingStateView extends StatelessWidget {
         children: <Widget>[
           const CircularProgressIndicator(),
           const SizedBox(height: AppSpacing.large),
-          Text(message),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );

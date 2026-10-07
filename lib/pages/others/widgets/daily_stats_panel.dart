@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_spacing.dart';
-import '../../../engine/energy_score_engine.dart';
-import '../../../models/energy_log_record.dart';
-import '../../../models/logged_activity.dart';
-import '../../../models/planner_session_log.dart';
+import '../../../models/energy_log_record.dart' show dateKey;
 import '../../../pages/profile/profile_store.dart';
 import '../../../services/energy_log_store.dart';
 import '../../services/tools/toolkit.dart';
@@ -16,13 +13,19 @@ enum StatsHeatmapRange {
   threeDays('3 days', 3),
   week('1 week', 7),
   month('1 month', 31),
-  threeMonths('3 months', 92),
-  sixMonths('6 months', 183),
-  all('All time', null);
+  sixMonths('6 months', 183);
 
   const StatsHeatmapRange(this.label, this.days);
   final String label;
-  final int? days;
+  final int days;
+}
+
+enum _ActivityMapView {
+  heatmap('Heatmap'),
+  month('Month');
+
+  const _ActivityMapView(this.label);
+  final String label;
 }
 
 const List<String> _contributionListKeys = <String>[
@@ -51,16 +54,6 @@ const List<String> _contributionCounterKeys = <String>[
   'svc.nicotine.days',
 ];
 
-const List<String> _weekdayLabels = <String>[
-  'Mon',
-  'Tue',
-  'Wed',
-  'Thu',
-  'Fri',
-  'Sat',
-  'Sun',
-];
-
 /// Statistics for a chosen day plus a GitHub-style activity heatmap. The
 /// heatmap reads persisted state, so actions that are added and then removed
 /// do not leave a counted contribution behind.
@@ -83,25 +76,18 @@ class DailyStatsPanel extends StatefulWidget {
 }
 
 class _DailyStatsPanelState extends State<DailyStatsPanel> {
-  static const EnergyScoreEngine _engine = EnergyScoreEngine();
-  static const int _daysBack = 7;
+  static final Map<String, List<_ContributionDay>> _heatmapCache =
+      <String, List<_ContributionDay>>{};
+  static final Set<String> _claimedUsers = <String>{};
 
   late final EnergyLogStore _store =
       widget.store ?? SqliteEnergyLogStore.instance;
-  final TextEditingController _remarkController = TextEditingController();
 
-  int _dayOffset = 0; // 0 = today, 1 = yesterday, ... up to _daysBack - 1
-  StatsHeatmapRange _heatmapRange = StatsHeatmapRange.month;
-  List<EnergyLogRecord> _records = const <EnergyLogRecord>[];
-  List<PlannerSessionLog> _sessionLogs = const <PlannerSessionLog>[];
+  StatsHeatmapRange _heatmapRange = StatsHeatmapRange.sixMonths;
+  _ActivityMapView _activityView = _ActivityMapView.heatmap;
   List<_ContributionDay> _contributionDays = const <_ContributionDay>[];
+  List<_ContributionDay> _calendarDays = const <_ContributionDay>[];
   bool _loading = true;
-  bool _remarkSaved = false;
-
-  DateTime get _selectedDate =>
-      DateTime.now().subtract(Duration(days: _dayOffset));
-
-  String get _dateKey => dateKey(_selectedDate);
 
   @override
   void initState() {
@@ -113,62 +99,79 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
   void didUpdateWidget(covariant DailyStatsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
+      _heatmapCache.clear();
       _load();
     }
   }
 
-  @override
-  void dispose() {
-    _remarkController.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
+    final userId = ProfileStore.instance.userId.value;
+    final cached = _heatmapCache[_cacheKey(userId, _heatmapRange)];
+    final calendarCached =
+        _heatmapCache[_cacheKey(userId, StatsHeatmapRange.month)];
+    if (cached != null &&
+        (_activityView == _ActivityMapView.heatmap || calendarCached != null)) {
+      setState(() {
+        _contributionDays = cached;
+        if (calendarCached != null) _calendarDays = calendarCached;
+        _loading = false;
+      });
+      return;
+    }
     setState(() => _loading = true);
     try {
-      final userId = ProfileStore.instance.userId.value;
-      await _store.claimEnergyLogsForUser(userId);
-      await _store.claimPlannerSessionLogsForUser(userId);
-      final records = await _store.recordsForDate(_dateKey, userId: userId);
-      final sessionLogs = await _store.plannerSessionLogsForDate(
-        _dateKey,
-        userId: userId,
+      if (!_claimedUsers.contains(userId)) {
+        await _store.claimEnergyLogsForUser(userId);
+        await _store.claimPlannerSessionLogsForUser(userId);
+        _claimedUsers.add(userId);
+      }
+      final contributionDays = await _loadContributionDays(
+        userId,
+        _heatmapRange,
       );
-      final remark = await _store.remarkForDate(_dateKey);
-      final contributionDays = await _loadContributionDays(userId);
+      final calendarDays = _activityView == _ActivityMapView.month
+          ? await _loadContributionDays(userId, StatsHeatmapRange.month)
+          : _calendarDays;
       if (!mounted) return;
       setState(() {
-        _records = records;
-        _sessionLogs = sessionLogs;
         _contributionDays = contributionDays;
-        _remarkController.text = remark ?? '';
+        _calendarDays = calendarDays;
         _loading = false;
-        _remarkSaved = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _records = const <EnergyLogRecord>[];
-        _sessionLogs = const <PlannerSessionLog>[];
         _contributionDays = const <_ContributionDay>[];
         _loading = false;
       });
     }
   }
 
-  Future<List<_ContributionDay>> _loadContributionDays(String userId) async {
+  String _cacheKey(String userId, StatsHeatmapRange range) {
+    return '$userId:${range.name}:${dateKey(DateTime.now())}';
+  }
+
+  Future<List<_ContributionDay>> _loadContributionDays(
+    String userId,
+    StatsHeatmapRange range,
+  ) async {
+    final cacheKey = _cacheKey(userId, range);
+    final cached = _heatmapCache[cacheKey];
+    if (cached != null) return cached;
+
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final fixedDays = _heatmapRange.days;
-    final start = fixedDays == null
-        ? (await _earliestContributionDate(userId)) ?? today
-        : today.subtract(Duration(days: fixedDays - 1));
+    final fixedDays = range.days;
+    final start = today.subtract(Duration(days: fixedDays - 1));
     final days = today.difference(start).inDays + 1;
     final counts = <String, int>{
       for (var i = 0; i < days; i++) dateKey(start.add(Duration(days: i))): 0,
     };
 
-    for (final key in counts.keys.toList()) {
+    final activityDates = (await _store.activityDates(userId: userId))
+        .where(counts.containsKey)
+        .toList(growable: false);
+    for (final key in activityDates) {
       final energyRecords = await _store.recordsForDate(key, userId: userId);
       final plannerLogs =
           await _store.plannerSessionLogsForDate(key, userId: userId);
@@ -181,48 +184,14 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     await _addTaskCounts(counts, _contributionTaskKeys);
     await _addCounterCounts(counts, _contributionCounterKeys);
 
-    return counts.entries
+    final contributionDays = counts.entries
         .map((entry) => _ContributionDay(
               date: DateTime.parse(entry.key),
               count: entry.value,
             ))
         .toList(growable: false);
-  }
-
-  Future<DateTime?> _earliestContributionDate(String userId) async {
-    DateTime? earliest;
-
-    void include(DateTime? date) {
-      if (date == null) return;
-      final day = DateTime(date.year, date.month, date.day);
-      if (earliest == null || day.isBefore(earliest!)) earliest = day;
-    }
-
-    for (final key in await _store.activityDates(userId: userId)) {
-      include(DateTime.tryParse(key));
-    }
-    for (final key in _contributionListKeys) {
-      final entries = await ServiceStore.loadList(key);
-      for (final entry in entries) {
-        final raw = entry['t'] ?? entry['createdAt'] ?? entry['date'];
-        include(raw is String ? DateTime.tryParse(raw) : null);
-      }
-    }
-    for (final key in _contributionTaskKeys) {
-      final items = await ServiceStore.loadList(key);
-      for (final item in items) {
-        include(DateTime.tryParse((item['due'] as String?) ?? ''));
-      }
-    }
-    for (final key in _contributionCounterKeys) {
-      final days = await ServiceStore.loadMap(key);
-      for (final entry in days.entries) {
-        final count = (entry.value as num?)?.round() ?? 0;
-        if (count > 0) include(DateTime.tryParse(entry.key));
-      }
-    }
-
-    return earliest;
+    _heatmapCache[cacheKey] = contributionDays;
+    return contributionDays;
   }
 
   Future<void> _addListEntryCounts(
@@ -270,103 +239,6 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
     }
   }
 
-  Future<void> _saveRemark() async {
-    try {
-      await _store.saveRemark(_dateKey, _remarkController.text.trim());
-      if (!mounted) return;
-      setState(() => _remarkSaved = true);
-    } catch (_) {}
-  }
-
-  int? get _avgPhysical => _records.isEmpty
-      ? null
-      : (_records.map((r) => r.physicalAfter).reduce((a, b) => a + b) /
-              _records.length)
-          .round();
-
-  int? get _avgBrain => _records.isEmpty
-      ? null
-      : (_records.map((r) => r.brainAfter).reduce((a, b) => a + b) /
-              _records.length)
-          .round();
-
-  int? get _donePercent {
-    if (_sessionLogs.isEmpty) return null;
-    final done = _sessionLogs.where((log) => log.isDone).length;
-    return ((done / _sessionLogs.length) * 100).round();
-  }
-
-  int? get _energyScore {
-    final physical = _avgPhysical;
-    final brain = _avgBrain;
-    if (physical != null && brain != null) {
-      return ((physical + brain) / 2).round();
-    }
-    return _donePercent;
-  }
-
-  /// Plain-language read of the day: best case "all green", otherwise names
-  /// the activity right before the lowest dip.
-  String? get _summary {
-    if (_records.isEmpty) return null;
-
-    var minPhysical = 100;
-    var minBrain = 100;
-    EnergyLogRecord? worst;
-    for (final r in _records) {
-      if (r.physicalAfter < minPhysical) minPhysical = r.physicalAfter;
-      if (r.brainAfter < minBrain) minBrain = r.brainAfter;
-      final worstSoFar =
-          worst == null ? 101 : math.min(worst.physicalAfter, worst.brainAfter);
-      if (math.min(r.physicalAfter, r.brainAfter) < worstSoFar) worst = r;
-    }
-
-    final overallMin = math.min(minPhysical, minBrain);
-    if (overallMin >= 80) return 'Great day — energy stayed 80%+ all day.';
-    if (worst == null) return 'Energy dipped to $overallMin%.';
-
-    final name = _engine.activityById(worst.activityId).name;
-    final metric =
-        worst.physicalAfter <= worst.brainAfter ? 'physical' : 'brain';
-    final time = formatMinutes(worst.startMinutes);
-    return overallMin < 40
-        ? 'Low $metric energy after $name ($time).'
-        : 'Dipped to $overallMin% $metric after $name ($time).';
-  }
-
-  /// A couple of simple, data-driven suggestions for the selected day.
-  List<String> get _tips {
-    if (_records.isEmpty) return const <String>[];
-    final tips = <String>[];
-
-    final drainCount = _records.where((r) {
-      final a = _engine.activityById(r.activityId);
-      return a.physicalDelta + a.brainDelta < 0;
-    }).length;
-
-    if (drainCount == _records.length && _records.length >= 2) {
-      tips.add(
-        'Every logged activity drained energy — add a short walk, breathing break, or nap between draining tasks.',
-      );
-    }
-
-    final avgBrain = _avgBrain;
-    if (avgBrain != null && avgBrain < 50) {
-      tips.add(
-        'Brain energy averaged $avgBrain% — try shorter focus blocks with a break every 60–90 minutes.',
-      );
-    }
-
-    final avgPhysical = _avgPhysical;
-    if (avgPhysical != null && avgPhysical < 50) {
-      tips.add(
-        'Physical energy averaged $avgPhysical% — a brisk walk or light meal break can help recovery.',
-      );
-    }
-
-    return tips.take(2).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -398,7 +270,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'Your Activity',
+                  'Activity Map',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -412,46 +284,7 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
           ),
         ),
 
-        // ── Day rail + contribution range filter ────────────────────────
         const SizedBox(height: AppSpacing.small),
-        SizedBox(
-          height: 52,
-          child: _DayRail(
-            selectedOffset: _dayOffset,
-            daysBack: _daysBack,
-            onSelect: (offset) {
-              setState(() => _dayOffset = offset);
-              _load();
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.large,
-            AppSpacing.small,
-            AppSpacing.large,
-            0,
-          ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: _FilterChipGroup<StatsHeatmapRange>(
-                    value: _heatmapRange,
-                    options: StatsHeatmapRange.values
-                        .map((range) => (range, range.label))
-                        .toList(growable: false),
-                    onChanged: (range) {
-                      setState(() => _heatmapRange = range);
-                      _load();
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
 
         // ── Scrollable stats content ─────────────────────────────────────
         Expanded(
@@ -463,233 +296,62 @@ class _DailyStatsPanelState extends State<DailyStatsPanel> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
-              : _records.isEmpty &&
-                      _sessionLogs.isEmpty &&
-                      !_contributionDays.any((day) => day.count > 0)
-                  ? _EmptyDay(isToday: _dayOffset == 0)
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.large,
-                        AppSpacing.medium,
-                        AppSpacing.large,
-                        AppSpacing.medium,
-                      ),
-                      children: <Widget>[
-                        if (_summary != null)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                                bottom: AppSpacing.medium),
-                            child: Text(
-                              _summary!,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        if (_summary == null && _sessionLogs.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                                bottom: AppSpacing.medium),
-                            child: Text(
-                              '${_sessionLogs.where((log) => log.isDone).length}/${_sessionLogs.length} planner cards marked done.',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-
-                        _ContributionHeatmapCard(
-                          days: _contributionDays,
-                          range: _heatmapRange,
-                        ),
-                        const SizedBox(height: AppSpacing.medium),
-
-                        _StatusScoreCard(
-                          score: _energyScore,
-                          physical: _avgPhysical,
-                          brain: _avgBrain,
-                          donePercent: _donePercent,
-                          doneCount:
-                              _sessionLogs.where((log) => log.isDone).length,
-                          totalSessions: _sessionLogs.length,
-                          energyLogs: _records.length,
-                        ),
-
-                        if (_tips.isNotEmpty) ...<Widget>[
-                          const SizedBox(height: AppSpacing.medium),
-                          const Text(
-                            'HELP TO IMPROVE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textMuted,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.small),
-                          ..._tips.map((tip) => _TipCard(text: tip)),
-                        ],
-
-                        const SizedBox(height: AppSpacing.medium),
-
-                        // Remark
-                        TextField(
-                          controller: _remarkController,
-                          onChanged: (_) =>
-                              setState(() => _remarkSaved = false),
-                          onSubmitted: (_) => _saveRemark(),
-                          decoration: InputDecoration(
-                            labelText: 'Remark for this day',
-                            hintText: 'e.g. slept badly, deadline week…',
-                            isDense: true,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            suffixIcon: IconButton(
-                              tooltip: 'Save remark',
-                              icon: Icon(
-                                _remarkSaved
-                                    ? Icons.check_circle_rounded
-                                    : Icons.save_outlined,
-                                size: 18,
-                                color: _remarkSaved
-                                    ? AppColors.energyBrainAccent
-                                    : AppColors.textMuted,
-                              ),
-                              onPressed: _saveRemark,
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        const SizedBox(height: AppSpacing.medium),
-
-                        if (widget.onOpenCoach != null) ...<Widget>[
-                          const SizedBox(height: AppSpacing.medium),
-                          _CoachEntry(onTap: widget.onOpenCoach!),
-                        ],
-                      ],
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.medium,
+                    AppSpacing.medium,
+                    AppSpacing.medium,
+                    AppSpacing.medium,
+                  ),
+                  children: <Widget>[
+                    _ContributionHeatmapCard(
+                      days: _contributionDays,
+                      calendarDays: _calendarDays.isEmpty
+                          ? _contributionDays
+                          : _calendarDays,
+                      view: _activityView,
+                      range: _heatmapRange,
+                      onViewChanged: (view) {
+                        if (view == _activityView) return;
+                        final userId = ProfileStore.instance.userId.value;
+                        final cached = _heatmapCache[_cacheKey(
+                          userId,
+                          StatsHeatmapRange.month,
+                        )];
+                        setState(() {
+                          _activityView = view;
+                          if (cached != null) _calendarDays = cached;
+                        });
+                        if (view == _ActivityMapView.month && cached == null) {
+                          _load();
+                        }
+                      },
+                      onRangeChanged: (range) {
+                        if (range == _heatmapRange) return;
+                        final userId = ProfileStore.instance.userId.value;
+                        final cached = _heatmapCache[_cacheKey(
+                          userId,
+                          range,
+                        )];
+                        if (cached != null) {
+                          setState(() {
+                            _heatmapRange = range;
+                            _contributionDays = cached;
+                          });
+                          return;
+                        }
+                        setState(() => _heatmapRange = range);
+                        _load();
+                      },
                     ),
+                    if (widget.onOpenCoach != null) ...<Widget>[
+                      const SizedBox(height: AppSpacing.medium),
+                      _CoachEntry(onTap: widget.onOpenCoach!),
+                    ],
+                  ],
+                ),
         ),
       ],
-    );
-  }
-}
-
-// ── Day rail ────────────────────────────────────────────────────────────────
-
-class _DayRail extends StatelessWidget {
-  const _DayRail({
-    required this.selectedOffset,
-    required this.daysBack,
-    required this.onSelect,
-  });
-
-  final int selectedOffset;
-  final int daysBack;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
-      itemCount: daysBack,
-      separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.small),
-      itemBuilder: (context, offset) {
-        final date = now.subtract(Duration(days: offset));
-        final selected = offset == selectedOffset;
-        final topLabel = offset == 0
-            ? 'Today'
-            : offset == 1
-                ? 'Yesterday'
-                : _weekdayLabels[date.weekday - 1];
-
-        return GestureDetector(
-          onTap: () => onSelect(offset),
-          child: Container(
-            width: offset <= 1 ? 64 : 48,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.primary : AppColors.surfaceTint,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  topLabel,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : AppColors.textMuted,
-                  ),
-                ),
-                Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Filter chips ──────────────────────────────────────────────────────────────
-
-class _FilterChipGroup<T> extends StatelessWidget {
-  const _FilterChipGroup({
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
-
-  final T value;
-  final List<(T, String)> options;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTint,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: options.map((option) {
-          final selected = option.$1 == value;
-          return GestureDetector(
-            onTap: () => onChanged(option.$1),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: selected ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-                border: selected ? Border.all(color: AppColors.outline) : null,
-              ),
-              child: Text(
-                option.$2,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
     );
   }
 }
@@ -709,11 +371,19 @@ class _ContributionDay {
 class _ContributionHeatmapCard extends StatelessWidget {
   const _ContributionHeatmapCard({
     required this.days,
+    required this.calendarDays,
+    required this.view,
     required this.range,
+    required this.onViewChanged,
+    required this.onRangeChanged,
   });
 
   final List<_ContributionDay> days;
+  final List<_ContributionDay> calendarDays;
+  final _ActivityMapView view;
   final StatsHeatmapRange range;
+  final ValueChanged<_ActivityMapView> onViewChanged;
+  final ValueChanged<StatsHeatmapRange> onRangeChanged;
 
   int get _total => days.fold<int>(0, (sum, day) => sum + day.count);
   int get _activeDays => days.where((day) => day.count > 0).length;
@@ -774,12 +444,7 @@ class _ContributionHeatmapCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final weeks = _weeks();
-    const cell = 13.0;
-    const gap = 4.0;
-    final chartWidth = math.max(
-      220.0,
-      weeks.length * (cell + gap) - gap,
-    );
+    final calendarTitle = _calendarTitle(calendarDays);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.medium),
@@ -801,7 +466,9 @@ class _ContributionHeatmapCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'App activity contributions',
+                  view == _ActivityMapView.heatmap
+                      ? 'Contribution heatmap'
+                      : calendarTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -812,7 +479,7 @@ class _ContributionHeatmapCard extends StatelessWidget {
                 ),
               ),
               Text(
-                range.label,
+                view == _ActivityMapView.heatmap ? range.label : 'Current',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -821,96 +488,38 @@ class _ContributionHeatmapCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Counts saved actions still present: done cards, service entries, tasks, counters, and logs.',
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.28,
-              color: colors.onSurface.withOpacity(0.58),
-              fontWeight: FontWeight.w600,
-            ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: <Widget>[
+              for (final option in _ActivityMapView.values)
+                _HeatmapRangeChip(
+                  label: option.label,
+                  selected: option == view,
+                  onTap: () => onViewChanged(option),
+                ),
+            ],
           ),
+          if (view == _ActivityMapView.heatmap) ...<Widget>[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: <Widget>[
+                for (final option in StatsHeatmapRange.values)
+                  _HeatmapRangeChip(
+                    label: option.label,
+                    selected: option == range,
+                    onTap: () => onRangeChanged(option),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: chartWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  SizedBox(
-                    height: 18,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        for (var w = 0; w < weeks.length; w++)
-                          SizedBox(
-                            width: cell + gap,
-                            child: Text(
-                              _monthStartLabel(weeks[w], w),
-                              maxLines: 1,
-                              overflow: TextOverflow.visible,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: colors.onSurface.withOpacity(0.46),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      SizedBox(
-                        width: 24,
-                        child: Column(
-                          children: const <Widget>[
-                            _WeekdayHeatmapLabel('M'),
-                            _WeekdayHeatmapLabel(''),
-                            _WeekdayHeatmapLabel('W'),
-                            _WeekdayHeatmapLabel(''),
-                            _WeekdayHeatmapLabel('F'),
-                            _WeekdayHeatmapLabel(''),
-                            _WeekdayHeatmapLabel(''),
-                          ],
-                        ),
-                      ),
-                      for (final week in weeks)
-                        Padding(
-                          padding: const EdgeInsets.only(right: gap),
-                          child: Column(
-                            children: <Widget>[
-                              for (final day in week)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: gap),
-                                  child: Tooltip(
-                                    message: day == null
-                                        ? ''
-                                        : '${dateKey(day.date)} · ${day.count} actions',
-                                    child: Container(
-                                      width: cell,
-                                      height: cell,
-                                      decoration: BoxDecoration(
-                                        color: day == null
-                                            ? Colors.transparent
-                                            : _colorFor(context, day.count),
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+          view == _ActivityMapView.heatmap
+              ? _buildHeatmapGrid(context, weeks)
+              : _buildMonthCalendar(context, calendarDays),
           const SizedBox(height: 12),
           Row(
             children: <Widget>[
@@ -986,17 +595,281 @@ class _ContributionHeatmapCard extends StatelessWidget {
     }
     return '';
   }
+
+  Widget _buildHeatmapGrid(
+    BuildContext context,
+    List<List<_ContributionDay?>> weeks,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const labelWidth = 20.0;
+        const gap = 3.0;
+        final weekCount = math.max(weeks.length, 1);
+        final available = math.max(0.0, constraints.maxWidth - labelWidth);
+        final cell = ((available - (weekCount - 1) * gap) / weekCount)
+            .clamp(5.5, 13.0)
+            .toDouble();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.only(left: labelWidth),
+              child: Row(
+                children: <Widget>[
+                  for (var w = 0; w < weeks.length; w++)
+                    SizedBox(
+                      width: cell + (w == weeks.length - 1 ? 0 : gap),
+                      child: Text(
+                        _monthStartLabel(weeks[w], w),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: colors.onSurface.withOpacity(0.46),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 3),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                SizedBox(
+                  width: labelWidth,
+                  child: Column(
+                    children: <Widget>[
+                      _WeekdayHeatmapLabel('M', height: cell + gap),
+                      _WeekdayHeatmapLabel('', height: cell + gap),
+                      _WeekdayHeatmapLabel('W', height: cell + gap),
+                      _WeekdayHeatmapLabel('', height: cell + gap),
+                      _WeekdayHeatmapLabel('F', height: cell + gap),
+                      _WeekdayHeatmapLabel('', height: cell + gap),
+                      _WeekdayHeatmapLabel('', height: cell),
+                    ],
+                  ),
+                ),
+                for (var index = 0; index < weeks.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      right: index == weeks.length - 1 ? 0 : gap,
+                    ),
+                    child: Column(
+                      children: <Widget>[
+                        for (var dayIndex = 0;
+                            dayIndex < weeks[index].length;
+                            dayIndex++)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: dayIndex == 6 ? 0 : gap,
+                            ),
+                            child: Tooltip(
+                              message: weeks[index][dayIndex] == null
+                                  ? ''
+                                  : '${dateKey(weeks[index][dayIndex]!.date)} - ${weeks[index][dayIndex]!.count} actions',
+                              child: Container(
+                                width: cell,
+                                height: cell,
+                                decoration: BoxDecoration(
+                                  color: weeks[index][dayIndex] == null
+                                      ? Colors.transparent
+                                      : _colorFor(
+                                          context,
+                                          weeks[index][dayIndex]!.count,
+                                        ),
+                                  borderRadius: BorderRadius.circular(
+                                    cell < 8 ? 2 : 3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthCalendar(
+    BuildContext context,
+    List<_ContributionDay> monthDays,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final first = DateTime(now.year, now.month);
+    final totalDays = DateTime(now.year, now.month + 1, 0).day;
+    final byKey = <String, _ContributionDay>{
+      for (final day in monthDays) dateKey(day.date): day,
+    };
+    final cells = <DateTime?>[
+      for (var i = 0; i < first.weekday - 1; i++) null,
+      for (var day = 1; day <= totalDays; day++)
+        DateTime(now.year, now.month, day),
+    ];
+    while (cells.length % 7 != 0) {
+      cells.add(null);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 6.0;
+        final cellWidth =
+            ((constraints.maxWidth - 6 * gap) / 7).clamp(30.0, 52.0).toDouble();
+        return Column(
+          children: <Widget>[
+            const Row(
+              children: <Widget>[
+                _CalendarWeekday('M'),
+                _CalendarWeekday('T'),
+                _CalendarWeekday('W'),
+                _CalendarWeekday('T'),
+                _CalendarWeekday('F'),
+                _CalendarWeekday('S'),
+                _CalendarWeekday('S'),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: <Widget>[
+                for (final date in cells)
+                  Builder(
+                    builder: (context) {
+                      final day = date == null ? null : byKey[dateKey(date)];
+                      final isToday =
+                          date != null && dateKey(date) == dateKey(now);
+                      return Tooltip(
+                        message: date == null
+                            ? ''
+                            : '${dateKey(date)} - ${day?.count ?? 0} actions',
+                        child: Container(
+                          width: cellWidth,
+                          height: 38,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: date == null
+                                ? Colors.transparent
+                                : _colorFor(context, day?.count ?? 0),
+                            borderRadius: BorderRadius.circular(10),
+                            border: isToday
+                                ? Border.all(color: colors.primary, width: 1.3)
+                                : null,
+                          ),
+                          child: date == null
+                              ? null
+                              : Text(
+                                  '${date.day}',
+                                  style: TextStyle(
+                                    color: (day?.count ?? 0) > 0
+                                        ? Colors.white
+                                        : colors.onSurface.withOpacity(0.58),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _calendarTitle(List<_ContributionDay> monthDays) {
+    final now = DateTime.now();
+    return '${_monthLabel(now)} ${now.year} calendar';
+  }
 }
 
-class _WeekdayHeatmapLabel extends StatelessWidget {
-  const _WeekdayHeatmapLabel(this.label);
+class _CalendarWeekday extends StatelessWidget {
+  const _CalendarWeekday(this.label);
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: colors.onSurface.withOpacity(0.48),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeatmapRangeChip extends StatelessWidget {
+  const _HeatmapRangeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? colors.primary.withOpacity(0.12)
+              : colors.surfaceContainerHighest.withOpacity(0.62),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? colors.primary.withOpacity(0.38)
+                : colors.outline.withOpacity(0.18),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color:
+                selected ? colors.primary : colors.onSurface.withOpacity(0.58),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekdayHeatmapLabel extends StatelessWidget {
+  const _WeekdayHeatmapLabel(this.label, {required this.height});
+
+  final String label;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
-      height: 17,
+      height: height,
       child: Text(
         label,
         style: TextStyle(
@@ -1043,306 +916,6 @@ class _ContributionStat extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── Score summary ─────────────────────────────────────────────────────────────
-
-class _StatusScoreCard extends StatelessWidget {
-  const _StatusScoreCard({
-    required this.score,
-    required this.physical,
-    required this.brain,
-    required this.donePercent,
-    required this.doneCount,
-    required this.totalSessions,
-    required this.energyLogs,
-  });
-
-  final int? score;
-  final int? physical;
-  final int? brain;
-  final int? donePercent;
-  final int doneCount;
-  final int totalSessions;
-  final int energyLogs;
-
-  double get _progress => ((score ?? 0).clamp(0, 100)) / 100;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outline.withOpacity(0.32)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colors.shadow.withOpacity(0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 360;
-          final circle = _ScoreCircle(score: score, progress: _progress);
-          final stats = _ScoreStatWrap(
-            physical: physical,
-            brain: brain,
-            donePercent: donePercent,
-            doneCount: doneCount,
-            totalSessions: totalSessions,
-            energyLogs: energyLogs,
-          );
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
-                circle,
-                const SizedBox(height: AppSpacing.medium),
-                stats,
-              ],
-            );
-          }
-          return Row(
-            children: <Widget>[
-              circle,
-              const SizedBox(width: AppSpacing.medium),
-              Expanded(child: stats),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ScoreCircle extends StatelessWidget {
-  const _ScoreCircle({required this.score, required this.progress});
-
-  final int? score;
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 104,
-      height: 104,
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          SizedBox(
-            width: 104,
-            height: 104,
-            child: CircularProgressIndicator(
-              value: score == null ? 0 : progress,
-              strokeWidth: 9,
-              strokeCap: StrokeCap.round,
-              backgroundColor: colors.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
-            ),
-          ),
-          Container(
-            width: 82,
-            height: 82,
-            decoration: BoxDecoration(
-              color: colors.primary.withOpacity(0.08),
-              shape: BoxShape.circle,
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                score == null ? '--' : '$score',
-                style: TextStyle(
-                  color: colors.onSurface,
-                  fontSize: 27,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                'eScore',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScoreStatWrap extends StatelessWidget {
-  const _ScoreStatWrap({
-    required this.physical,
-    required this.brain,
-    required this.donePercent,
-    required this.doneCount,
-    required this.totalSessions,
-    required this.energyLogs,
-  });
-
-  final int? physical;
-  final int? brain;
-  final int? donePercent;
-  final int doneCount;
-  final int totalSessions;
-  final int energyLogs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.small,
-      runSpacing: AppSpacing.small,
-      children: <Widget>[
-        _ScoreMiniStat(
-          label: 'Physical',
-          value: physical == null ? '--' : '$physical%',
-          color: AppColors.energyPhysicalAccent,
-          background: AppColors.energyPhysicalBg,
-        ),
-        _ScoreMiniStat(
-          label: 'Brain',
-          value: brain == null ? '--' : '$brain%',
-          color: AppColors.energyBrainAccent,
-          background: AppColors.energyBrainBg,
-        ),
-        _ScoreMiniStat(
-          label: 'Done',
-          value: totalSessions == 0 ? '--' : '$donePercent%',
-          detail: totalSessions == 0 ? 'No cards' : '$doneCount/$totalSessions',
-          color: AppColors.primary,
-          background: AppColors.surfaceTint,
-        ),
-        _ScoreMiniStat(
-          label: 'Logs',
-          value: '$energyLogs',
-          color: AppColors.info,
-          background: const Color(0xFFEAF2FF),
-        ),
-      ],
-    );
-  }
-}
-
-class _ScoreMiniStat extends StatelessWidget {
-  const _ScoreMiniStat({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.background,
-    this.detail,
-  });
-
-  final String label;
-  final String value;
-  final String? detail;
-  final Color color;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 104, maxWidth: 132),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color.withOpacity(0.78),
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: <Widget>[
-                Flexible(
-                  child: Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                if (detail != null) ...<Widget>[
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      detail!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: color.withOpacity(0.72),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Tips ──────────────────────────────────────────────────────────────────────
-
-class _TipCard extends StatelessWidget {
-  const _TipCard({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.small),
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3DC),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Text('💡', style: TextStyle(fontSize: 14)),
-          const SizedBox(width: AppSpacing.small),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF8A6D1D)),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1397,39 +970,6 @@ class _CoachEntry extends StatelessWidget {
               ),
             ),
             Icon(Icons.chevron_right, color: colors.onSurfaceVariant, size: 18),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyDay extends StatelessWidget {
-  const _EmptyDay({required this.isToday});
-
-  final bool isToday;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xLarge),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.insights_rounded,
-                size: 32, color: AppColors.textMuted),
-            const SizedBox(height: AppSpacing.small),
-            Text(
-              isToday
-                  ? 'Nothing logged today yet.\nAdd activities from the You tab.'
-                  : 'Nothing was logged on this day.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textMuted,
-              ),
-            ),
           ],
         ),
       ),

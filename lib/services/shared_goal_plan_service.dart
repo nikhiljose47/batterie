@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../constants/goal_plan_constants.dart';
 import '../models/community_plan.dart';
+import '../pages/profile/profile_store.dart';
 import 'custom_mode_store.dart';
 
 class SharedGoalPlan {
@@ -12,6 +13,7 @@ class SharedGoalPlan {
     required this.ownerName,
     required this.likesCount,
     required this.usedCount,
+    required this.usedByNames,
     required this.rating,
     required this.slots,
     required this.likedByMe,
@@ -33,6 +35,7 @@ class SharedGoalPlan {
   final String ownerName;
   final int likesCount;
   final int usedCount;
+  final List<String> usedByNames;
   final double rating;
   final List<CustomSlot> slots;
   final bool likedByMe;
@@ -53,6 +56,7 @@ class SharedGoalPlan {
   SharedGoalPlan copyWith({
     int? likesCount,
     int? usedCount,
+    List<String>? usedByNames,
     bool? likedByMe,
   }) {
     return SharedGoalPlan(
@@ -61,6 +65,7 @@ class SharedGoalPlan {
       ownerName: ownerName,
       likesCount: likesCount ?? this.likesCount,
       usedCount: usedCount ?? this.usedCount,
+      usedByNames: usedByNames ?? this.usedByNames,
       rating: rating,
       slots: slots,
       likedByMe: likedByMe ?? this.likedByMe,
@@ -86,6 +91,12 @@ class SharedGoalPlan {
     final likedBy = ((data['liked_by'] as List<dynamic>?) ?? const <dynamic>[])
         .whereType<String>()
         .toSet();
+    final usedByNames =
+        ((data['used_by_names'] as List<dynamic>?) ?? const <dynamic>[])
+            .whereType<String>()
+            .map((name) => name.trim())
+            .where((name) => name.isNotEmpty)
+            .toList(growable: false);
     final cards = CustomModeStore.normalizeCards(
       ((data['cards'] as List<dynamic>?) ?? const <dynamic>[])
           .whereType<Map<String, dynamic>>()
@@ -117,6 +128,7 @@ class SharedGoalPlan {
       ownerName: (data['owner_name'] as String?) ?? 'Someone',
       likesCount: (data['likes_count'] as num?)?.round() ?? likedBy.length,
       usedCount: (data['used_count'] as num?)?.round() ?? 0,
+      usedByNames: usedByNames,
       rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
       likedByMe: uid != null && likedBy.contains(uid),
       tag: GoalPlanConstants.normalizeTag(
@@ -149,21 +161,48 @@ class SharedGoalPlanService {
 
   Future<List<SharedGoalPlan>> trendingPlans({int limit = 20}) async {
     final currentUid = uid;
-    try {
-      final snapshot = await _plans
-          .orderBy('used_count', descending: true)
-          .limit(limit)
-          .get();
-      final plans = snapshot.docs
-          .map((doc) => SharedGoalPlan.fromDoc(doc, currentUid))
-          .toList(growable: false);
-      plans.sort((a, b) {
-        final used = b.usedCount.compareTo(a.usedCount);
-        return used == 0 ? b.likesCount.compareTo(a.likesCount) : used;
-      });
-      return plans;
-    } catch (_) {
-      return const <SharedGoalPlan>[];
+    final byId = <String, SharedGoalPlan>{};
+
+    Future<void> addPlans(
+      Query<Map<String, dynamic>> query,
+    ) async {
+      try {
+        final snapshot = await query.get();
+        for (final doc in snapshot.docs) {
+          final plan = SharedGoalPlan.fromDoc(doc, currentUid);
+          if (plan.status != 'published' || plan.visibility != 'public') {
+            continue;
+          }
+          byId[plan.id] = plan;
+        }
+      } catch (_) {
+        // Older installs may not have every indexed field yet; keep the feed usable.
+      }
+    }
+
+    await addPlans(_plans.orderBy('used_count', descending: true).limit(limit));
+    await addPlans(_plans.orderBy('updated_at', descending: true).limit(limit));
+
+    final plans = byId.values.toList(growable: false);
+    plans.sort((a, b) {
+      final used = b.usedCount.compareTo(a.usedCount);
+      if (used != 0) return used;
+      final likes = b.likesCount.compareTo(a.likesCount);
+      if (likes != 0) return likes;
+      final bUpdated = b.updatedAt ?? b.createdAt ?? DateTime(1970);
+      final aUpdated = a.updatedAt ?? a.createdAt ?? DateTime(1970);
+      return bUpdated.compareTo(aUpdated);
+    });
+    return plans;
+  }
+
+  Future<void> publishLocalPlans() async {
+    if (uid == null) return;
+    for (final plan in CustomModeStore.instance.plans.value) {
+      if (plan.planCards.isEmpty && plan.slots.every((slot) => slot.isEmpty)) {
+        continue;
+      }
+      await publishPlan(plan);
     }
   }
 
@@ -180,6 +219,8 @@ class SharedGoalPlanService {
     final currentUid = uid;
     if (currentUid == null) return;
     final current = plan;
+    final docRef = _plans.doc('${currentUid}_${current.id}');
+    final existing = await docRef.get();
     final planData = current
         .copyWith(
           shortName: current.shortName ?? current.name,
@@ -191,21 +232,29 @@ class SharedGoalPlanService {
         )
         .toPlan(authorIdOverride: currentUid)
         .toJson();
-    await _plans.doc('${currentUid}_${current.id}').set(
+    final displayName = _auth.currentUser?.displayName?.trim();
+    final profileName = ProfileStore.instance.name.value.trim();
+    await docRef.set(
       <String, Object?>{
         ...planData,
         'name': current.name,
         'owner_id': currentUid,
-        'owner_name': _auth.currentUser?.displayName ?? 'Someone',
+        'owner_name': displayName != null && displayName.isNotEmpty
+            ? displayName
+            : profileName.isNotEmpty
+                ? profileName
+                : 'Someone',
         'tag': current.tag,
         'slots': current.slots.map((slot) => slot.toJson()).toList(),
         'cards': current.planCards.map((card) => card.toJson()).toList(),
-        'likes_count': 0,
-        'used_count': 0,
-        'rating': 4.5,
-        'liked_by': <String>[],
+        if (!existing.exists) ...<String, Object?>{
+          'likes_count': 0,
+          'used_count': 0,
+          'rating': 4.5,
+          'liked_by': <String>[],
+          'created_at': FieldValue.serverTimestamp(),
+        },
         'updated_at': FieldValue.serverTimestamp(),
-        'created_at': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );
@@ -236,8 +285,17 @@ class SharedGoalPlanService {
       visibility: 'private',
     );
     if (imported == null) return null;
+    final displayName = _auth.currentUser?.displayName?.trim();
+    final profileName = ProfileStore.instance.name.value.trim();
+    final userName = displayName != null && displayName.isNotEmpty
+        ? displayName
+        : profileName.isNotEmpty
+            ? profileName
+            : null;
     await _plans.doc(plan.id).update(<String, Object?>{
       'used_count': FieldValue.increment(1),
+      if (userName != null)
+        'used_by_names': FieldValue.arrayUnion(<String>[userName]),
       'updated_at': FieldValue.serverTimestamp(),
     });
     return imported;

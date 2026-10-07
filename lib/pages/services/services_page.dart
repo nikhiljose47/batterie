@@ -48,13 +48,13 @@ const List<_ServiceGroup> _groups = <_ServiceGroup>[
     emoji: '🏃',
     title: 'Body & Health',
     cats: <ServiceCategory>[ServiceCategory.health],
-    color: Color(0xFF2E7D32),
+    color: AppColors.success,
   ),
   _ServiceGroup(
     emoji: '🧠',
     title: 'Mind & Nutrition',
     cats: <ServiceCategory>[ServiceCategory.mind, ServiceCategory.food],
-    color: Color(0xFF5E35B1),
+    color: Color(0xFF5A6CFF),
   ),
   _ServiceGroup(
     emoji: '🌸',
@@ -70,7 +70,7 @@ const List<_ServiceGroup> _groups = <_ServiceGroup>[
       ServiceCategory.productivity,
       ServiceCategory.lifestyle,
     ],
-    color: Color(0xFF1565C0),
+    color: AppColors.primary,
   ),
 ];
 
@@ -258,7 +258,7 @@ class _ServicesPageState extends State<ServicesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 48,
+        toolbarHeight: 64,
         scrolledUnderElevation: 0,
         titleSpacing: 0,
         title: _ServicesTopSearch(
@@ -279,16 +279,6 @@ class _ServicesPageState extends State<ServicesPage> {
             else ...<Widget>[
               _buildRecentServices(),
               for (int i = 0; i < _groups.length; i++) ...<Widget>[
-                if (i > 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.large),
-                    child: Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: AppColors.outline.withOpacity(0.5),
-                    ),
-                  ),
                 _buildGroup(_groups[i]),
               ],
             ],
@@ -317,21 +307,21 @@ class _ServicesPageState extends State<ServicesPage> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1C2030),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textStrong,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
           ],
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisExtent: 96,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+              mainAxisExtent: 128,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
             itemCount: items.length,
             itemBuilder: (_, i) => _ServiceTile(
@@ -353,7 +343,7 @@ class _ServicesPageState extends State<ServicesPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.large,
-            AppSpacing.medium,
+            AppSpacing.xLarge,
             AppSpacing.large,
             12,
           ),
@@ -378,9 +368,9 @@ class _ServicesPageState extends State<ServicesPage> {
               const Text(
                 'Favourites / Recent',
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1C2030),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textStrong,
                 ),
               ),
               const Spacer(),
@@ -409,9 +399,9 @@ class _ServicesPageState extends State<ServicesPage> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisExtent: 96,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+              mainAxisExtent: 128,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
             itemCount: items.length,
             itemBuilder: (_, i) => _ServiceTile(
@@ -421,14 +411,6 @@ class _ServicesPageState extends State<ServicesPage> {
           ),
         ),
         const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.outline.withOpacity(0.5),
-          ),
-        ),
       ],
     );
   }
@@ -443,7 +425,7 @@ class _ServicesPageState extends State<ServicesPage> {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.fromLTRB(
-              AppSpacing.large, 30, AppSpacing.large, 12),
+              AppSpacing.large, 30, AppSpacing.large, 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
@@ -461,9 +443,9 @@ class _ServicesPageState extends State<ServicesPage> {
               Text(
                 g.title,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1C2030),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textStrong,
                 ),
               ),
               const Spacer(),
@@ -492,9 +474,9 @@ class _ServicesPageState extends State<ServicesPage> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisExtent: 96,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+              mainAxisExtent: 128,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
             itemCount: items.length,
             itemBuilder: (_, i) => _ServiceTile(
@@ -528,9 +510,9 @@ class _ServicesPageState extends State<ServicesPage> {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          mainAxisExtent: 96,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
+          mainAxisExtent: 128,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
         ),
         itemCount: results.length,
         itemBuilder: (_, i) => _ServiceTile(
@@ -561,16 +543,16 @@ class _ServicesTopSearch extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.medium),
       child: Container(
-        height: 36,
+        height: 46,
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: colors.outline.withOpacity(0.18)),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: colors.outline.withOpacity(0.65)),
           boxShadow: <BoxShadow>[
             BoxShadow(
               color: Colors.black.withOpacity(0.045),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -580,15 +562,15 @@ class _ServicesTopSearch extends StatelessWidget {
           onChanged: onChanged,
           textInputAction: TextInputAction.search,
           style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
             color: colors.onSurface,
           ),
           decoration: InputDecoration(
             isDense: true,
             hintText: 'Search',
             hintStyle: TextStyle(
-              fontSize: 12.5,
+              fontSize: 14,
               color: colors.onSurfaceVariant.withOpacity(0.72),
               fontWeight: FontWeight.w600,
             ),
@@ -627,7 +609,7 @@ class _ServicesTopSearch extends StatelessWidget {
             filled: true,
             fillColor: Colors.transparent,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -651,18 +633,18 @@ class _ServiceTile extends StatelessWidget {
     final accent = categoryAccent(service.category);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppColors.outline.withOpacity(0.8)),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.045),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -677,10 +659,10 @@ class _ServiceTile extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: categoryTint(service.category),
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(13),
                   ),
                   child:
-                      Text(service.emoji, style: const TextStyle(fontSize: 15)),
+                      Text(service.emoji, style: const TextStyle(fontSize: 17)),
                 ),
                 const Spacer(),
                 if (service.contributesToScore)
@@ -692,10 +674,10 @@ class _ServiceTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: const Text(
-                      '+ eScore',
+                      '+ Score',
                       style: TextStyle(
-                        fontSize: 7.5,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
                         color: AppColors.info,
                       ),
                     ),
@@ -715,20 +697,26 @@ class _ServiceTile extends StatelessWidget {
             const Spacer(),
             Text(
               service.name,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2A2E3B),
+                fontSize: 15,
+                height: 1.08,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textStrong,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 5),
             Text(
               service.tagline,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 9.5, color: AppColors.textMuted),
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMuted,
+              ),
             ),
           ],
         ),

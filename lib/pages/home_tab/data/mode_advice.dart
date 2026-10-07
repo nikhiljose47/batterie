@@ -79,8 +79,8 @@ const List<DayMode> allDayModes = <DayMode>[
   DayMode(
     id: 'office',
     emoji: '🎯',
-    label: 'I need to Focus More Time today',
-    shortLabel: 'Focus',
+    label: 'I need a better office workday',
+    shortLabel: 'Office',
   ),
   DayMode(
     id: 'gym',

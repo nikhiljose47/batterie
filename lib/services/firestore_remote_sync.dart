@@ -94,6 +94,7 @@ class FirestoreRemoteSync implements RemoteSync {
   }) async {
     final uid = _uid;
     if (uid == null) return const <DailyProgressRecord>[];
+    final byUserId = <String, DailyProgressRecord>{};
     try {
       final snapshot = await _firestore
           .collection('daily_progress')
@@ -101,12 +102,45 @@ class FirestoreRemoteSync implements RemoteSync {
           .orderBy('score_percent', descending: true)
           .limit(limit)
           .get();
-      return snapshot.docs
-          .map((doc) => DailyProgressRecord.fromMap(doc.data()))
-          .toList(growable: false);
-    } catch (_) {
-      return const <DailyProgressRecord>[];
-    }
+      for (final doc in snapshot.docs) {
+        final record = DailyProgressRecord.fromMap(doc.data());
+        if (record.userId.isNotEmpty) byUserId[record.userId] = record;
+      }
+    } catch (_) {}
+
+    try {
+      final users = await _firestore
+          .collection('users')
+          .orderBy('updated_at', descending: true)
+          .limit(limit)
+          .get();
+      for (final doc in users.docs) {
+        if (byUserId.containsKey(doc.id)) continue;
+        final data = doc.data();
+        byUserId[doc.id] = DailyProgressRecord(
+          userId: doc.id,
+          dateKey: dateKey,
+          displayName: (data['name'] as String?) ?? 'User',
+          plannerMode: (data['planner_mode'] as String?) ?? 'healthy',
+          serviceActionCount: 0,
+          appUseMinutes: 0,
+          focusMinutes: 0,
+          goalDoneCount: 0,
+          goalPartialCount: 0,
+          goalTotalCount: 0,
+          completionPercent: 0,
+          scorePercent: 0,
+        );
+      }
+    } catch (_) {}
+
+    final records = byUserId.values.toList(growable: false)
+      ..sort((a, b) {
+        final score = b.scorePercent.compareTo(a.scorePercent);
+        if (score != 0) return score;
+        return a.displayName.compareTo(b.displayName);
+      });
+    return records.take(limit).toList(growable: false);
   }
 
   @override

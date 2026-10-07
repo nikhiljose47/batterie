@@ -13,6 +13,18 @@ import 'toolkit.dart';
 
 enum _GoalEntryKind { shared, ready, custom }
 
+String? _firstUsefulName(List<String> names) {
+  const ignored = <String>{'alf', 'friend', 'someone', 'user', 'you'};
+  for (final raw in names) {
+    final name = raw.trim();
+    if (name.isEmpty) continue;
+    final first = name.split(RegExp(r'\s+')).first;
+    if (first.length < 3 || ignored.contains(first.toLowerCase())) continue;
+    return first;
+  }
+  return null;
+}
+
 class ChangeGoalPage extends StatefulWidget {
   const ChangeGoalPage({super.key});
 
@@ -31,7 +43,7 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
   @override
   void initState() {
     super.initState();
-    _sharedPlans = SharedGoalPlanService.instance.trendingPlans();
+    _sharedPlans = SharedGoalPlanService.instance.trendingPlans(limit: 60);
     _searchCtl.addListener(() => setState(() {}));
     _loadRatings();
   }
@@ -77,6 +89,13 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
 
   double _displayRating(_GoalEntry entry) =>
       _ratings[entry.ratingKey] ?? entry.rating;
+
+  Future<void> _refreshSharedPlans() async {
+    setState(() {
+      _sharedPlans = SharedGoalPlanService.instance.trendingPlans(limit: 60);
+    });
+    await _sharedPlans;
+  }
 
   Future<void> _selectGoal(String id) async {
     if (CustomModeStore.isCustomModeId(id)) {
@@ -147,6 +166,8 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
   Future<void> _publishPlan(CustomPlan plan) async {
     await SharedGoalPlanService.instance.publishPlan(plan);
     if (!mounted) return;
+    await _refreshSharedPlans();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Plan shared')),
     );
@@ -191,13 +212,23 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
     required List<SharedGoalPlan> sharedPlans,
     required List<CustomPlan> customPlans,
   }) {
+    final visibleCustomPlans =
+        customPlans.where((plan) => !_isBlankDefaultPlan(plan));
     return <_GoalEntry>[
       for (var i = 0; i < sharedPlans.length; i++)
         _GoalEntry.shared(sharedPlans[i], trending: i < 4),
       for (var i = 0; i < allDayModes.length; i++)
         _GoalEntry.ready(allDayModes[i], index: i),
-      for (final plan in customPlans) _GoalEntry.custom(plan),
+      for (final plan in visibleCustomPlans) _GoalEntry.custom(plan),
     ];
+  }
+
+  bool _isBlankDefaultPlan(CustomPlan plan) {
+    final isDefaultName = plan.name.trim().toLowerCase() == 'my plan';
+    final isEmpty = plan.slots.every((slot) => slot.isEmpty) &&
+        plan.cards.isEmpty &&
+        plan.description.trim().isEmpty;
+    return isDefaultName && isEmpty;
   }
 
   List<_GoalEntry> _filterEntries(List<_GoalEntry> entries) {
@@ -258,7 +289,7 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
       body: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -270,8 +301,8 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.onSurface.withOpacity(0.5),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -290,32 +321,37 @@ class _ChangeGoalPageState extends State<ChangeGoalPage> {
                         customPlans: customPlans,
                       ),
                     );
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 92),
-                      children: <Widget>[
-                        if (snapshot.connectionState == ConnectionState.waiting)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 18),
-                            child: Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        else if (entries.isEmpty)
-                          const EmptyHint('No plans found.')
-                        else
-                          for (final entry in entries)
-                            _GoalFeedCard(
-                              entry: entry,
-                              rating: _displayRating(entry),
-                              selected: entry.modeId ==
-                                  ProfileStore.instance.plannerMode.value,
-                              onTap: () => _openDetails(entry),
-                              onRate: (rating) => _rateGoal(entry, rating),
-                              onFeedback: entry.sharedPlan == null
-                                  ? null
-                                  : () => _toggleLike(entry.sharedPlan!),
-                            ),
-                      ],
+                    return RefreshIndicator(
+                      onRefresh: _refreshSharedPlans,
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 92),
+                        children: <Widget>[
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 18),
+                              child: Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          else if (entries.isEmpty)
+                            const EmptyHint('No plans found.')
+                          else
+                            for (final entry in entries)
+                              _GoalFeedCard(
+                                entry: entry,
+                                rating: _displayRating(entry),
+                                selected: entry.modeId ==
+                                    ProfileStore.instance.plannerMode.value,
+                                onTap: () => _openDetails(entry),
+                                onRate: (rating) => _rateGoal(entry, rating),
+                                onFeedback: entry.sharedPlan == null
+                                    ? null
+                                    : () => _toggleLike(entry.sharedPlan!),
+                              ),
+                        ],
+                      ),
                     );
                   },
                 );
@@ -455,7 +491,7 @@ class _GoalEntry {
   static String _tagForMode(String id) {
     return switch (id) {
       'student' => 'exam',
-      'office' => 'focus',
+      'office' => 'office',
       'gym' || 'athletic' => 'fitness',
       'nicotine_free' => 'nicotine',
       'language' => 'language',
@@ -499,27 +535,44 @@ class _GoalFeedCard extends StatelessWidget {
     final sharedPlan = entry.sharedPlan;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
       child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: selected ? entry.accent.withOpacity(0.06) : Colors.transparent,
-          border: Border(
-            bottom: BorderSide(color: colors.outline.withOpacity(0.26)),
+          color: selected ? AppColors.primary : colors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color:
+                selected ? AppColors.primary : colors.outline.withOpacity(0.78),
           ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withOpacity(0.045),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 20),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: <Widget>[
             Container(
-              width: 34,
-              height: 60,
+              width: 50,
+              height: 58,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: entry.accent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                color: selected
+                    ? Colors.white.withOpacity(0.18)
+                    : entry.accent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(entry.icon, size: 18, color: entry.accent),
+              child: Icon(
+                entry.icon,
+                size: 24,
+                color: selected ? Colors.white : entry.accent,
+              ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,76 +585,73 @@ class _GoalFeedCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            color: selected ? Colors.white : colors.onSurface,
+                            fontSize: 16,
+                            height: 1.1,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
                       if (selected)
-                        Icon(
-                          Icons.check_circle_rounded,
-                          size: 15,
-                          color: entry.accent,
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            size: 17,
+                            color: AppColors.primary,
+                          ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 6),
                   Text(
                     entry.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colors.onSurface.withOpacity(0.52),
-                      fontSize: 11.6,
-                      fontWeight: FontWeight.w500,
+                      color: selected
+                          ? Colors.white.withOpacity(0.78)
+                          : colors.onSurface.withOpacity(0.58),
+                      fontSize: 12,
+                      height: 1.18,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 8),
                   Text(
                     '${entry.typeLabel} - ${entry.author}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colors.onSurface.withOpacity(0.43),
-                      fontSize: 10.2,
-                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? Colors.white.withOpacity(0.7)
+                          : colors.onSurface.withOpacity(0.46),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                _RatingBadge(rating: rating, onRate: onRate),
-                const SizedBox(height: 5),
-                _UsersBadge(users: entry.users),
+                if (sharedPlan == null)
+                  _RatingBadge(rating: rating, onRate: onRate)
+                else
+                  _LoveBadge(plan: sharedPlan, onTap: onFeedback),
+                const SizedBox(height: 4),
+                _UsersBadge(users: entry.users, names: sharedPlan?.usedByNames),
               ],
             ),
-            if (onFeedback != null) ...<Widget>[
-              const SizedBox(width: 2),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 34,
-                  height: 34,
-                ),
-                onPressed: onFeedback,
-                icon: Icon(
-                  sharedPlan?.likedByMe == true
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  size: 18,
-                  color: sharedPlan?.likedByMe == true
-                      ? AppColors.error
-                      : colors.onSurface.withOpacity(0.38),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -666,16 +716,96 @@ class _RatingBadge extends StatelessWidget {
   }
 }
 
+class _LoveBadge extends StatelessWidget {
+  const _LoveBadge({required this.plan, required this.onTap});
+
+  final SharedGoalPlan plan;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final loved = plan.likedByMe;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(maxWidth: 74),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            color: loved
+                ? AppColors.error.withOpacity(0.12)
+                : colors.surfaceContainerHighest.withOpacity(0.58),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: loved
+                  ? AppColors.error.withOpacity(0.34)
+                  : colors.outline.withOpacity(0.18),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              AnimatedScale(
+                duration: const Duration(milliseconds: 180),
+                scale: loved ? 1.12 : 1,
+                curve: Curves.easeOutBack,
+                child: Icon(
+                  loved
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  size: 12,
+                  color: loved
+                      ? AppColors.error
+                      : colors.onSurface.withOpacity(0.42),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Flexible(
+                child: Text(
+                  '${plan.likesCount}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: loved
+                        ? AppColors.error
+                        : colors.onSurface.withOpacity(0.55),
+                    fontSize: 10,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _UsersBadge extends StatelessWidget {
-  const _UsersBadge({required this.users});
+  const _UsersBadge({required this.users, this.names});
 
   final int users;
+  final List<String>? names;
+
+  String get _label {
+    final firstName = _firstUsefulName(names ?? const <String>[]);
+    if (firstName != null && users > 1) return '$firstName + others';
+    if (firstName != null) return '$firstName using';
+    return '$users using';
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      constraints: const BoxConstraints(maxWidth: 86),
+      constraints: const BoxConstraints(maxWidth: 118),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withOpacity(0.58),
@@ -693,7 +823,7 @@ class _UsersBadge extends StatelessWidget {
           const SizedBox(width: 3),
           Flexible(
             child: Text(
-              '$users using',
+              _label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -863,7 +993,7 @@ class _GoalDetailPage extends StatelessWidget {
                         : Icons.favorite_border_rounded,
                     size: 17,
                   ),
-                  label: Text(sharedPlan?.likedByMe == true ? 'Liked' : 'Like'),
+                  label: Text(sharedPlan?.likedByMe == true ? 'Loved' : 'Love'),
                 ),
               if (onDelete != null)
                 OutlinedButton.icon(

@@ -10,6 +10,7 @@ import '../models/planner_session_log.dart';
 import '../pages/home_tab/data/mode_advice.dart';
 import '../pages/profile/profile_store.dart';
 import '../pages/services/tools/toolkit.dart';
+import 'alarm_notification_service.dart';
 import 'energy_log_store.dart';
 import 'escore_reset_service.dart';
 import 'remote_sync.dart';
@@ -22,9 +23,11 @@ class DailyProgressSyncService {
       <String, String>{};
   static Timer? _remoteFetchTimer;
   static int _remoteFetchDelayMinutes = 1;
+  static DateTime? _lastTopScoreFetchAt;
   static const String _focusSessionsKey = 'svc.focus.sessions';
   static const String _progressCacheKey = 'status.daily_progress.v1';
   static const String _appUsageCacheKey = 'status.app_usage_minutes.v1';
+  static const String _rankNotificationKey = 'status.rank_notice_date.v1';
 
   Future<void> syncToday() => syncForDate(DateTime.now());
 
@@ -41,7 +44,10 @@ class DailyProgressSyncService {
   Future<void> saveTodayAppUseMinutes(int minutes) async {
     final prefs = await SharedPreferences.getInstance();
     final cached = await _cachedAppUsageMinutes();
-    cached[dateKey(DateTime.now())] = minutes.clamp(0, 1440).toInt();
+    final key = dateKey(DateTime.now());
+    final next = minutes.clamp(0, 1440).toInt();
+    if (cached[key] == next) return;
+    cached[key] = next;
     await prefs.setString(_appUsageCacheKey, jsonEncode(cached));
   }
 
@@ -150,7 +156,38 @@ class DailyProgressSyncService {
             record.dateKey == today && record.userId != currentUserId)
         .toList(growable: false)
       ..sort((a, b) => b.scorePercent.compareTo(a.scorePercent));
-    return records.take(7).map(_statusFromProgress).toList(growable: false);
+    return records.take(20).map(_statusFromProgress).toList(growable: false);
+  }
+
+  Future<List<PersonStatus>> topStatuses({
+    int limit = 20,
+    bool refresh = false,
+  }) async {
+    if (refresh || _shouldRefreshTopScores()) {
+      await _fetchRemoteTopScores(limit: limit, reschedule: false);
+    }
+    return cachedTopStatuses();
+  }
+
+  bool _shouldRefreshTopScores() {
+    final last = _lastTopScoreFetchAt;
+    if (last == null) return true;
+    return DateTime.now().difference(last) > const Duration(minutes: 5);
+  }
+
+  Future<void> showRankBoardNotificationOnceToday(int peopleCount) async {
+    if (peopleCount <= 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final today = dateKey(DateTime.now());
+    if (prefs.getString(_rankNotificationKey) == today) return;
+    await prefs.setString(_rankNotificationKey, today);
+    await AlarmNotificationService.instance.showAppNotification(
+      id: 830100,
+      title: 'Rank board is ready',
+      body:
+          "$peopleCount people are on today's board. Check your activity map.",
+      payload: 'rank_board',
+    );
   }
 
   void _scheduleRemoteFetch(Duration delay) {
@@ -160,15 +197,20 @@ class DailyProgressSyncService {
     });
   }
 
-  Future<void> _fetchRemoteTopScores() async {
+  Future<void> _fetchRemoteTopScores({
+    int limit = 20,
+    bool reschedule = true,
+  }) async {
     try {
       final records = await RemoteSync.instance.fetchDailyProgress(
         dateKey: dateKey(DateTime.now()),
-        limit: 7,
+        limit: limit,
       );
       await _cacheProgressList(records);
+      _lastTopScoreFetchAt = DateTime.now();
     } catch (_) {}
 
+    if (!reschedule) return;
     final nextDelay = Duration(minutes: _remoteFetchDelayMinutes);
     _remoteFetchDelayMinutes =
         (_remoteFetchDelayMinutes * 2).clamp(1, 60).toInt();

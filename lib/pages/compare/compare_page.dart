@@ -142,6 +142,8 @@ class _ComparePageState extends State<ComparePage> {
           );
         }(),
     ];
+    final currentRowIndex =
+        slots.indexWhere((slot) => slot.contains(nowMinutes));
     final content = Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
@@ -157,6 +159,8 @@ class _ComparePageState extends State<ComparePage> {
             child: _JoinedCompareColumns(
               modeLabel: selectedMode.label,
               rows: rows,
+              currentIndex:
+                  currentRowIndex == -1 ? rows.length - 1 : currentRowIndex,
               onStatusChanged: _setSessionStatus,
             ),
           ),
@@ -313,23 +317,78 @@ class _CompareRow {
   bool get partial => status == PlannerSessionStatus.partial;
 }
 
-class _JoinedCompareColumns extends StatelessWidget {
+class _JoinedCompareColumns extends StatefulWidget {
   const _JoinedCompareColumns({
     required this.modeLabel,
     required this.rows,
+    required this.currentIndex,
     required this.onStatusChanged,
   });
 
   final String modeLabel;
   final List<_CompareRow> rows;
+  final int currentIndex;
   final void Function(_CompareRow row, String status) onStatusChanged;
+
+  @override
+  State<_JoinedCompareColumns> createState() => _JoinedCompareColumnsState();
+}
+
+class _JoinedCompareColumnsState extends State<_JoinedCompareColumns> {
+  late List<GlobalKey> _rowKeys;
+  String? _lastScrollTarget;
+
+  @override
+  void initState() {
+    super.initState();
+    _rowKeys = List<GlobalKey>.generate(
+      widget.rows.length,
+      (_) => GlobalKey(),
+    );
+    _scheduleCurrentRowScroll();
+  }
+
+  @override
+  void didUpdateWidget(covariant _JoinedCompareColumns oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rows.length != widget.rows.length) {
+      _rowKeys = List<GlobalKey>.generate(
+        widget.rows.length,
+        (_) => GlobalKey(),
+      );
+      _lastScrollTarget = null;
+    }
+    if (oldWidget.currentIndex != widget.currentIndex ||
+        oldWidget.rows != widget.rows) {
+      _scheduleCurrentRowScroll();
+    }
+  }
+
+  void _scheduleCurrentRowScroll() {
+    if (widget.rows.isEmpty) return;
+    final index = widget.currentIndex.clamp(0, widget.rows.length - 1).toInt();
+    final target = '${widget.rows[index].sessionId}:$index';
+    if (_lastScrollTarget == target) return;
+    _lastScrollTarget = target;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || index >= _rowKeys.length) return;
+      final context = _rowKeys[index].currentContext;
+      if (context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.14,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final children = <Widget>[];
     TrackGoalSectionInfo? previousSection;
-    for (var i = 0; i < rows.length; i++) {
+    for (var i = 0; i < widget.rows.length; i++) {
       final section = TrackGoalUiConstants.sectionForCardIndex(i);
       if (previousSection?.title != section.title) {
         if (children.isNotEmpty) children.add(const SizedBox(height: 48));
@@ -346,8 +405,9 @@ class _JoinedCompareColumns extends StatelessWidget {
       }
       children.add(
         _CompareAlignedRow(
-          row: rows[i],
-          onStatusChanged: onStatusChanged,
+          key: _rowKeys[i],
+          row: widget.rows[i],
+          onStatusChanged: widget.onStatusChanged,
           outlineColor: colors.outline.withOpacity(0.2),
         ),
       );
@@ -361,10 +421,10 @@ class _JoinedCompareColumns extends StatelessWidget {
 
   String _phaseDescriptionForSection(TrackGoalSectionInfo section) {
     final labels = <String>[];
-    for (var i = 0; i < rows.length; i++) {
+    for (var i = 0; i < widget.rows.length; i++) {
       final itemSection = TrackGoalUiConstants.sectionForCardIndex(i);
       if (itemSection.title != section.title) continue;
-      final label = rows[i].phaseLabel.trim();
+      final label = widget.rows[i].phaseLabel.trim();
       if (label.isNotEmpty && !labels.contains(label)) labels.add(label);
     }
     return labels.join(', ');
@@ -435,6 +495,7 @@ class _TrackGoalSectionHeader extends StatelessWidget {
 
 class _CompareAlignedRow extends StatelessWidget {
   const _CompareAlignedRow({
+    super.key,
     required this.row,
     required this.onStatusChanged,
     required this.outlineColor,

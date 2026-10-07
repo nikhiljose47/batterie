@@ -98,9 +98,9 @@ class SectionLabel extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.6,
           color: colors.onSurface.withOpacity(0.58),
         ),
       ),
@@ -119,16 +119,16 @@ class WhiteCard extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
-      padding: padding ?? const EdgeInsets.all(14),
+      padding: padding ?? const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outline.withOpacity(0.58)),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.outline.withOpacity(0.7)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(dark ? 0.22 : 0.035),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(dark ? 0.22 : 0.045),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -180,10 +180,10 @@ class SvcChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: selected ? colors.primary : colors.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: selected ? colors.primary : colors.outline.withOpacity(0.58),
           ),
@@ -191,8 +191,8 @@ class SvcChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
             color: selected ? colors.onPrimary : colors.onSurface,
           ),
         ),
@@ -204,11 +204,11 @@ class SvcChip extends StatelessWidget {
 /// Thin app bar used by every service page.
 PreferredSizeWidget svcAppBar(String title) {
   return AppBar(
-    toolbarHeight: 44,
+    toolbarHeight: 54,
     scrolledUnderElevation: 0,
     title: Text(
       title,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
     ),
   );
 }

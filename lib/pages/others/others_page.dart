@@ -1,11 +1,10 @@
-import 'dart:ui';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/app_strings.dart';
+import '../../models/person_status.dart';
 import '../../shared/widgets/empty_state_view.dart';
 import '../../shared/widgets/error_state_view.dart';
 import '../../shared/widgets/loading_state_view.dart';
@@ -13,7 +12,6 @@ import '../../state/async_view_state.dart';
 import '../chat/chat_page.dart';
 import 'others_controller.dart';
 import 'widgets/daily_stats_panel.dart';
-import 'widgets/person_status_rail.dart';
 
 class OthersPage extends StatefulWidget {
   const OthersPage({super.key, this.refreshToken = 0});
@@ -72,36 +70,16 @@ class _OthersPageState extends State<OthersPage> {
               case AsyncStatus.success:
                 return Column(
                   children: <Widget>[
-                    // ── Others' status, WhatsApp-status-style rail ────────────
                     const SizedBox(height: AppSpacing.small),
-                    const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: AppSpacing.large),
-                      child: Row(
-                        children: <Widget>[
-                          Text(
-                            'STATUS',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textMuted,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.large,
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    SizedBox(
-                      height: signedIn ? 92 : 116,
                       child: signedIn
-                          ? PersonStatusRail(people: state.people)
-                          : const _LockedStatusRail(),
+                          ? _StatusLeaderboard(people: state.people)
+                          : const _LockedLeaderboard(),
                     ),
                     const SizedBox(height: AppSpacing.small),
-                    const Divider(height: 1, color: AppColors.outline),
-
-                    // ── Your own detailed log, stats, and tips ─────────────────
                     Expanded(
                       child: DailyStatsPanel(
                         refreshToken: widget.refreshToken,
@@ -121,80 +99,170 @@ class _OthersPageState extends State<OthersPage> {
   }
 }
 
-class _LockedStatusRail extends StatelessWidget {
-  const _LockedStatusRail();
+class _StatusLeaderboard extends StatelessWidget {
+  const _StatusLeaderboard({required this.people});
+
+  final List<PersonStatus> people;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
-      itemCount: 4,
-      separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.medium),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return const _StatusSignInCard();
-        }
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              width: 72,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: colors.surface.withOpacity(0.46),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: colors.outline.withOpacity(0.28)),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.onSurface.withOpacity(0.08),
-                      border: Border.all(
-                        color: colors.primary.withOpacity(0.25),
-                        width: 2,
-                      ),
-                    ),
+    final leaders = people.take(20).toList(growable: false);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outline.withOpacity(0.18)),
+      ),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.military_tech_rounded,
+                  size: 18, color: colors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Rank board',
+                  style: TextStyle(
+                    color: colors.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 42,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: colors.onSurface.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Text(
+                '${leaders.length} users',
+                style: TextStyle(
+                  color: colors.onSurface.withOpacity(0.48),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-        );
-      },
+          const SizedBox(height: 10),
+          for (var i = 0; i < leaders.length; i++) ...<Widget>[
+            _LeaderboardRow(rank: i + 1, person: leaders[i]),
+            if (i != leaders.length - 1)
+              Divider(
+                height: 10,
+                color: colors.outline.withOpacity(0.1),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-class _StatusSignInCard extends StatelessWidget {
-  const _StatusSignInCard();
+class _LeaderboardRow extends StatelessWidget {
+  const _LeaderboardRow({required this.rank, required this.person});
+
+  final int rank;
+  final PersonStatus person;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final score = person.scorePercent ?? (person.energyPercent * 100).round();
+    final accent = rank == 1
+        ? const Color(0xFFE0A224)
+        : rank == 2
+            ? AppColors.primary
+            : AppColors.success;
+    return Row(
+      children: <Widget>[
+        SizedBox(
+          width: 27,
+          child: Text(
+            '#$rank',
+            style: TextStyle(
+              color: accent,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        CircleAvatar(
+          radius: 15,
+          backgroundColor: accent.withOpacity(0.13),
+          child: Text(
+            person.name.trim().isEmpty
+                ? 'U'
+                : person.name.trim().substring(0, 1).toUpperCase(),
+            style: TextStyle(
+              color: accent,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                person.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Goal ${person.goalDoneCount ?? 0}/${person.goalTotalCount ?? 0} · App ${person.appUseMinutes ?? 0}m · Focus ${person.focusMinutes ?? 0}m',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurface.withOpacity(0.48),
+                  fontSize: 9.8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          width: 48,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          decoration: BoxDecoration(
+            color: accent.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$score',
+            style: TextStyle(
+              color: accent,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LockedLeaderboard extends StatelessWidget {
+  const _LockedLeaderboard();
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      width: 210,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.surface.withOpacity(0.76),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outline.withOpacity(0.34)),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outline.withOpacity(0.22)),
       ),
       child: Row(
         children: <Widget>[
@@ -226,7 +294,7 @@ class _StatusSignInCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   AppStrings.statusLockedMessage,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.onSurface.withOpacity(0.58),

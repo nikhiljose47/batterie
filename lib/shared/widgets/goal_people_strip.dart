@@ -24,9 +24,8 @@ class GoalPeopleStrip extends StatelessWidget {
 
   String get _label {
     if (compact) return '$_safeCount using';
-    final firstName = AvatarConstants.samplePeopleNames.first;
     final others = _safeCount - 1;
-    return others == 1 ? '$firstName + 1 other' : '$firstName + $others others';
+    return others == 1 ? '1 friend + you' : '$others friends + you';
   }
 
   @override

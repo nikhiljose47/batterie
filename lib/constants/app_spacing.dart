@@ -8,8 +8,10 @@ class AppSpacing {
   static const double xLarge = 24;
   static const double xxLarge = 32;
 
-  static const double radiusSmall = 8;
-  static const double radiusMedium = 8;
+  static const double radiusSmall = 12;
+  static const double radiusMedium = 18;
+  static const double radiusLarge = 24;
+  static const double radiusPill = 999;
   static const double filterBarHeight = 48;
   static const double metricLabelWidth = 48;
   static const double metricValueWidth = 44;

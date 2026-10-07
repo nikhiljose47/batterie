@@ -15,7 +15,10 @@ class AppTheme {
       secondary: AppColors.secondary,
       surface: AppColors.surface,
       surfaceTint: AppColors.surfaceTint,
+      outline: AppColors.outline,
       error: AppColors.error,
+      onSurface: AppColors.textStrong,
+      onSurfaceVariant: AppColors.textMuted,
     );
 
     return ThemeData(
@@ -23,17 +26,56 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.scaffoldBackground,
       useMaterial3: true,
       fontFamily: 'Inter',
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          fontSize: 34,
+          height: 1.05,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textStrong,
+        ),
+        headlineMedium: TextStyle(
+          fontSize: 26,
+          height: 1.08,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textStrong,
+        ),
+        titleLarge: TextStyle(
+          fontSize: 21,
+          height: 1.12,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textStrong,
+        ),
+        titleMedium: TextStyle(
+          fontSize: 16,
+          height: 1.18,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textStrong,
+        ),
+        bodyMedium: TextStyle(
+          fontSize: 13.5,
+          height: 1.34,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textStrong,
+        ),
+        bodySmall: TextStyle(
+          fontSize: 11.5,
+          height: 1.28,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textMuted,
+        ),
+      ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: AppColors.surface,
+        backgroundColor: AppColors.scaffoldBackground,
+        surfaceTintColor: AppColors.scaffoldBackground,
         foregroundColor: AppColors.primary,
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
+          fontSize: 18,
+          height: 1.1,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textStrong,
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -41,12 +83,18 @@ class AppTheme {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textMuted,
         elevation: 0,
-        selectedLabelStyle: TextStyle(fontSize: 12),
-        unselectedLabelStyle: TextStyle(fontSize: 12),
+        selectedLabelStyle: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
-        elevation: 0,
+        elevation: 0.5,
         margin: EdgeInsets.zero,
         surfaceTintColor: AppColors.surface,
         shape: RoundedRectangleBorder(
@@ -58,12 +106,12 @@ class AppTheme {
         backgroundColor: AppColors.surfaceTint,
         selectedColor: AppColors.primary,
         labelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
           color: AppColors.textMuted,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
           side: const BorderSide(color: AppColors.outline),
         ),
       ),
@@ -75,6 +123,16 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        hintStyle: const TextStyle(
+          color: AppColors.textMuted,
+          fontWeight: FontWeight.w600,
+        ),
+        labelStyle: const TextStyle(
+          color: AppColors.textMuted,
+          fontWeight: FontWeight.w700,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
           borderSide: const BorderSide(color: AppColors.outline),
@@ -92,9 +150,48 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.onPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+          minimumSize: const Size(64, 52),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            letterSpacing: 0.2,
+            fontWeight: FontWeight.w900,
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textStrong,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          side: const BorderSide(color: AppColors.outline),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+          ),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.textStrong,
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
         ),
       ),
     );

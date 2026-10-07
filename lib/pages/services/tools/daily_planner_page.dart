@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../constants/goal_plan_constants.dart';
 import '../../../models/community_plan.dart';
 import '../../../services/custom_mode_store.dart';
+import '../../../services/shared_goal_plan_service.dart';
 import '../../../services/sleep_schedule_store.dart';
 import '../../home_tab/data/mode_advice.dart'
     show allDayModes, adviceForMode, dayPhases, plannerSlots, timeOfDayLabel;
@@ -247,7 +250,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (!mounted || confirmed != true) return;
     setState(() => _saving = true);
     final name =
         _nameCtl.text.trim().isEmpty ? 'My Plan' : _nameCtl.text.trim();
@@ -271,6 +274,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
       cards: _cardsFromDraftSlots(),
     );
     await CustomModeStore.instance.savePlan(plan);
+    unawaited(SharedGoalPlanService.instance.publishPlan(plan));
     await ProfileStore.instance.setPlannerMode(plan.id);
     if (!mounted) return;
     setState(() => _saving = false);
@@ -305,7 +309,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
     final colors = Theme.of(context).colorScheme;
     final progress = (_step + 1) / (_saveStep + 1);
     final content = Padding(
-      padding: EdgeInsets.fromLTRB(14, widget.embedded ? 0 : 12, 14, 14),
+      padding: EdgeInsets.fromLTRB(18, widget.embedded ? 0 : 18, 18, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -314,7 +318,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
             subtitle: _stepSubtitle(),
             progress: progress,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -348,7 +352,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
                         ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
             children: <Widget>[
               Expanded(
@@ -362,7 +366,7 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
                   label: Text(_step == 0 ? 'Cancel' : 'Back'),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 flex: 2,
                 child: FilledButton.icon(
@@ -383,14 +387,14 @@ class _DailyPlannerPageState extends State<DailyPlannerPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             'Step ${_step + 1} of ${_saveStep + 1}',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.onSurface.withOpacity(0.46),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -420,11 +424,18 @@ class _GuideHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.outline.withOpacity(0.18)),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: colors.outline.withOpacity(0.72)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,20 +443,20 @@ class _GuideHeader extends StatelessWidget {
           Row(
             children: <Widget>[
               Container(
-                width: 34,
-                height: 34,
+                width: 44,
+                height: 44,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
                   Icons.auto_awesome_rounded,
                   color: AppColors.primary,
-                  size: 18,
+                  size: 22,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,8 +467,9 @@ class _GuideHeader extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -467,9 +479,9 @@ class _GuideHeader extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.onSurface.withOpacity(0.58),
-                        fontSize: 11.5,
+                        fontSize: 12.5,
                         height: 1.15,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -477,11 +489,11 @@ class _GuideHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: LinearProgressIndicator(
-              minHeight: 6,
+              minHeight: 8,
               value: progress,
               backgroundColor: colors.surfaceTint,
               valueColor: const AlwaysStoppedAnimation<Color>(
@@ -526,7 +538,7 @@ class _ScheduleStepCard extends StatelessWidget {
                     title: 'Name and time your goal',
                     text: '',
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: nameController,
                     maxLength: nameLimit,
@@ -537,14 +549,14 @@ class _ScheduleStepCard extends StatelessWidget {
                       counterText: '',
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   _TimePickRow(
                     icon: Icons.wb_sunny_rounded,
                     label: 'Wake up',
                     value: timeOfDayLabel(wake),
                     onTap: onWake,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   _TimePickRow(
                     icon: Icons.nightlight_round,
                     label: 'Sleep',
@@ -691,11 +703,18 @@ class _WizardCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outline.withOpacity(0.18)),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: colors.outline.withOpacity(0.72)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: child,
     );
@@ -722,16 +741,16 @@ class _FriendlyPrompt extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Container(
-          width: 38,
-          height: 38,
+          width: 44,
+          height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppColors.primary.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(icon, color: AppColors.primary, size: 20),
+          child: Icon(icon, color: AppColors.primary, size: 22),
         ),
-        const SizedBox(width: 11),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,8 +762,9 @@ class _FriendlyPrompt extends StatelessWidget {
                       title,
                       style: TextStyle(
                         color: colors.onSurface,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
@@ -754,8 +774,8 @@ class _FriendlyPrompt extends StatelessWidget {
                       trailing!,
                       style: TextStyle(
                         color: colors.primary,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
@@ -767,9 +787,9 @@ class _FriendlyPrompt extends StatelessWidget {
                   text,
                   style: TextStyle(
                     color: colors.onSurface.withOpacity(0.58),
-                    fontSize: 12,
+                    fontSize: 12.5,
                     height: 1.22,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -799,12 +819,12 @@ class _TimePickRow extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Material(
       color: colors.surfaceTint.withOpacity(0.55),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Row(
             children: <Widget>[
               Icon(icon, size: 19, color: AppColors.primary),

@@ -43,7 +43,7 @@ class EnergyHealthApp extends StatelessWidget {
 class _SystemNavigationShield extends StatelessWidget {
   const _SystemNavigationShield({required this.child});
 
-  static const Color _barColor = Color(0xFF07090D);
+  static const Color _barColor = Color(0xFFF7F9FC);
 
   final Widget child;
 

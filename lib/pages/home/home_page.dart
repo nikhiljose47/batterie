@@ -46,7 +46,7 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _controller = HomeController();
     _weatherController = WeatherController()..load();
-    final initialIndex = _controller.state.selectedIndex.clamp(0, 2) as int;
+    final initialIndex = _controller.state.selectedIndex.clamp(0, 2);
     _tabController = TabController(
       length: 3,
       vsync: this,
@@ -104,12 +104,12 @@ class _HomePageState extends State<HomePage>
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 40,
+        toolbarHeight: 58,
         scrolledUnderElevation: 0,
         titleSpacing: AppSpacing.large,
         title: const Text(
           AppStrings.appName,
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
         ),
         actions: <Widget>[
           // Test-tube: pick a data store, land on the inspector page.
@@ -175,32 +175,47 @@ class _HomePageState extends State<HomePage>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surface,
-              border: Border(
-                bottom: BorderSide(color: colors.outline.withOpacity(0.6)),
+          preferredSize: const Size.fromHeight(58),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: colors.outline.withOpacity(0.68)),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.035),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: colors.primary,
-              indicatorWeight: 2,
-              labelColor: colors.primary,
-              unselectedLabelColor: colors.onSurface.withOpacity(0.58),
-              labelPadding: EdgeInsets.zero,
-              tabs: const <Widget>[
-                _ThinTab(icon: Icons.home_outlined, label: AppStrings.homeTab),
-                _ThinTab(
-                  icon: Icons.stacked_line_chart_rounded,
-                  label: AppStrings.statusTab,
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: colors.primary,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                _ThinTab(
-                  icon: Icons.article_outlined,
-                  label: AppStrings.articlesTab,
-                ),
-              ],
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: colors.onPrimary,
+                unselectedLabelColor: colors.onSurface.withOpacity(0.58),
+                labelPadding: EdgeInsets.zero,
+                padding: const EdgeInsets.all(4),
+                tabs: const <Widget>[
+                  _ThinTab(
+                      icon: Icons.home_outlined, label: AppStrings.homeTab),
+                  _ThinTab(
+                    icon: Icons.stacked_line_chart_rounded,
+                    label: AppStrings.statusTab,
+                  ),
+                  _ThinTab(
+                    icon: Icons.article_outlined,
+                    label: AppStrings.articlesTab,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -316,95 +331,6 @@ class _ProfileMenuItem extends StatelessWidget {
   }
 }
 
-/// Top-bar chip reflecting location state: red-tinted "Location off" when
-/// we can't get a fix, green chip with the lat,lon short code when we can.
-/// Tapping always retries/refreshes.
-class _LocationChip extends StatelessWidget {
-  const _LocationChip({required this.controller});
-
-  final WeatherController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final state = controller.state;
-        final location = state.snapshot?.location;
-
-        final bool isOff = location == null &&
-            (state.status == WeatherStatus.permissionDenied ||
-                state.status == WeatherStatus.permissionDeniedForever ||
-                state.status == WeatherStatus.serviceDisabled ||
-                state.status == WeatherStatus.error);
-
-        final String label;
-        final Color fg;
-        final Color bg;
-        if (location != null) {
-          label = location.placeLabel ??
-              '${location.latitude.toStringAsFixed(1)}°,'
-                  '${location.longitude.toStringAsFixed(1)}°';
-          fg = colors.primary;
-          bg = colors.primary.withOpacity(0.12);
-        } else if (isOff) {
-          label = 'Location off';
-          fg = colors.error;
-          bg = colors.error.withOpacity(0.12);
-        } else {
-          label = 'Locating…';
-          fg = colors.onSurface.withOpacity(0.62);
-          bg = colors.surfaceTint;
-        }
-
-        final needsPermission =
-            state.status == WeatherStatus.permissionDenied ||
-                state.status == WeatherStatus.permissionDeniedForever;
-        return InkWell(
-          onTap: needsPermission
-              ? controller.requestPermissionAndLoad
-              : controller.refresh,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: fg.withOpacity(0.35),
-                width: 0.8,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(
-                  location != null
-                      ? Icons.location_on_rounded
-                      : Icons.location_off_rounded,
-                  size: 12,
-                  color: fg,
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _ThinTab extends StatelessWidget {
   const _ThinTab({required this.icon, required this.label});
 
@@ -414,7 +340,7 @@ class _ThinTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tab(
-      height: 40,
+      height: 42,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
@@ -423,7 +349,7 @@ class _ThinTab extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900),
           ),
         ],
       ),
